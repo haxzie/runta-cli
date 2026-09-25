@@ -13,9 +13,7 @@
 ## Observations
 
 ### 1. Content jumps around while the page settles
-The Keys page visibly reflows during load rather than arriving in its final shape. Elements move under the
-cursor, which at best feels unstable and at worst causes mis-clicks — on a page whose controls include a
-row-level **delete** action, a shift at the wrong moment is more than cosmetic.
+The Keys page visibly reflows during load rather than arriving in its final shape.
 
 ### 2. The page has two independently-resolving async sections stacked vertically
 SSH keys sits above Runta API Keys, and each depends on its own data. Anything the upper section does after
@@ -33,8 +31,6 @@ transition between these states is a visible jump.
 - Sections rendering `null` (or a short spinner) while loading, then expanding to full height.
 - No min-height or skeleton reserving the final footprint of each panel.
 - The table rendering its rows only once data arrives, with no placeholder rows.
-- Web fonts swapping after first paint — the page is monospace throughout, and a fallback-to-webfont swap
-  reflows text-heavy blocks like these descriptions and table cells.
 
 ## Suggested fixes
 
@@ -47,10 +43,6 @@ transition between these states is a visible jump.
   states doesn't change the page's vertical layout.
 - **Fetch both sections' data in parallel** and ideally paint once, rather than letting each section pop in
   independently and shove the other one around.
-- **Stabilise fonts:** preload the monospace webfont and use `font-display: optional` (or a metric-matched
-  fallback) so a late font swap doesn't reflow the page.
-- **Guard the destructive control:** given the delete icon in each table row, make sure rows are not
-  interactive until the table has settled.
 - **Add CLS to the perf budget** alongside the dashboard load work in [audit 02](./02-dashboard-load-performance.md)
   — both are the same underlying story of the authenticated app feeling unsteady on arrival.
 

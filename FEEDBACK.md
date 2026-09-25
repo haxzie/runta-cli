@@ -117,18 +117,7 @@ Source: [`content/05-keys-page-layout-shift.md`](./content/05-keys-page-layout-s
 
 - **[F-16] Page visibly reflows during initial load.** _Severity: medium._
   Two independently-resolving sections (SSH keys above Runta API Keys) each expand from nothing into very
-  differently-sized states, so the upper one displaces everything below it as it settles. Elements move under
-  the cursor — and each API key row carries a delete action, so a shift at the wrong moment is more than
-  cosmetic.
+  differently-sized states, so the upper one displaces everything below it as it settles.
   → Measure CLS on the route first; reserve space with skeletons sized to the final panels (skeleton empty
   state for SSH, skeleton rows for the table), set min-heights on both containers, and fetch both sections in
   parallel rather than letting them pop in independently.
-
-- **[F-17] Late webfont swap likely adds to the reflow.** _Severity: low._
-  The page is monospace throughout; a fallback-to-webfont swap after first paint reflows text-heavy
-  descriptions and table cells.
-  → Preload the monospace face and use `font-display: optional` or a metric-matched fallback.
-
-- **[F-18] Destructive row action is live before the table settles.** _Severity: medium._
-  Delete icons sit in rows that are still moving during load.
-  → Keep rows non-interactive until the table has stabilised.
