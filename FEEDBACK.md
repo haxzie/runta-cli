@@ -14,6 +14,7 @@ Each audit's raw notes live in [`content/`](./content); this file is the running
 | 05 | [Settings → Keys: layout shift on load](./content/05-keys-page-layout-shift.md) | Settings → Keys | 2026-09-25 |
 | 06 | [Create runtime: Model should be a picker](./content/06-create-runtime-model-picker.md) | Create runtime flow | 2026-09-26 |
 | 07 | [Create runtime: Advanced options need icons](./content/07-create-runtime-advanced-options-icons.md) | Create runtime → Advanced options | 2026-09-26 |
+| 08 | [Create runtime: padding in expanded options](./content/08-published-ports-padding.md) | Create runtime → Published ports | 2026-09-26 |
 
 ## Feedback Points
 
@@ -120,3 +121,21 @@ Source: [`content/07-create-runtime-advanced-options-icons.md`](./content/07-cre
   all eight to find it.
   → Give each option a distinct, concept-mapped leading icon, consistent with the icon+label pattern already
   used elsewhere in the product, so rows can be recognised at a glance instead of read.
+
+### Create runtime — padding in expanded Advanced options
+Source: [`content/08-published-ports-padding.md`](./content/08-published-ports-padding.md)
+
+- **[F-22] Section header and its body sit on different left edges.** _Severity: low._
+  In expanded "Published ports", the header is inset behind its chevron while the description and dashed panel
+  start further left, near the container edge — the section reads as two unrelated blocks.
+  → Align body content to the header label (or inset both equally), consistently across the Advanced options.
+
+- **[F-23] Vertical padding jumps from loose to tight across the header divider.** _Severity: low._
+  The header row is generously padded, then the description starts immediately under the rule with no breathing
+  room, so the body text crowds the divider above it.
+  → Even out the step between header and body, and keep it consistent across sections.
+
+- **[F-24] The dashed empty-state panel is disproportionately tall.** _Severity: low._
+  It reserves far more height than its single line of content needs, opening a void in the middle of the form
+  directly below the cramped text above it.
+  → Size the panel to its content with a smaller minimum height and optically centred message.
