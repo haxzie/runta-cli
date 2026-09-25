@@ -8,6 +8,7 @@ Each audit's raw notes live in [`content/`](./content); this file is the running
 | # | Audit | Surface | Date |
 |---|-------|---------|------|
 | 01 | [Marketing site: homepage / first fold](./content/01-marketing-homepage-hero.md) | runta.dev homepage (logged-out, desktop) | 2026-09-25 |
+| 02 | [Dashboard: load performance](./content/02-dashboard-load-performance.md) | Runta dashboard (authenticated) | 2026-09-25 |
 
 ## Feedback Points
 
@@ -39,3 +40,13 @@ Source: [`content/01-marketing-homepage-hero.md`](./content/01-marketing-homepag
   The hero is entirely typography and empty boxes; the lower half of the fold is blank.
   → Replace the empty feature boxes / dead space with a terminal recording, product screenshot, or a
   before/after token-cost visual.
+
+### Dashboard — load performance
+Source: [`content/02-dashboard-load-performance.md`](./content/02-dashboard-load-performance.md)
+
+- **[F-06] Dashboard load is slow enough to drive drop-offs.** _Severity: high._
+  The authenticated dashboard takes long enough to become usable that it reads as sluggish. It sits at the
+  worst point in the funnel — the first screen after signup — so the cost shows up as lost activations.
+  → Measure the route (TTFB / LCP / TTI, cold vs. warm, first-load-after-signup vs. return) to find the real
+  bottleneck; render a shell with skeletons on first paint so the page is never blank; stream or defer heavy
+  panels so cheap content paints first; set a perf budget with monitoring to catch regressions.
