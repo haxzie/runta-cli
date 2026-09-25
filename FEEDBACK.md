@@ -10,6 +10,7 @@ Each audit's raw notes live in [`content/`](./content); this file is the running
 | 01 | [Marketing site: homepage / first fold](./content/01-marketing-homepage-hero.md) | runta.dev homepage (logged-out, desktop) | 2026-09-25 |
 | 02 | [Dashboard: load performance](./content/02-dashboard-load-performance.md) | Runta dashboard (authenticated) | 2026-09-25 |
 | 03 | [Login: GitHub OAuth does nothing](./content/03-github-login-broken.md) 🔴 | Runta login screen | 2026-09-25 |
+| 04 | [Modals: layout and spacing](./content/04-modal-design-api-key.md) | "New API key" modal (dashboard) | 2026-09-25 |
 
 ## Feedback Points
 
@@ -77,3 +78,35 @@ Source: [`content/03-github-login-broken.md`](./content/03-github-login-broken.m
   audit did.
   → Add an email magic link or a second OAuth provider as a fallback, plus an end-to-end sign-in smoke test
   running against production with alerting.
+
+### Modals — layout and spacing
+Source: [`content/04-modal-design-api-key.md`](./content/04-modal-design-api-key.md)
+
+- **[F-10] Warning box and action buttons share a row at mismatched heights.** _Severity: medium._
+  In the "New API key" modal the amber warning is roughly half again as tall as the Copy/Close buttons beside
+  it, and neither tops nor bottoms align — it reads as three unrelated elements rather than one action row.
+  → Move the warning to full width under the key field and give the buttons their own right-aligned row; define
+  a shared height scale so controls sharing a row line up by default.
+
+- **[F-11] Warning text is cramped and wraps badly.** _Severity: medium._
+  The message orphans "closing." on a second line, hanging-indented rather than aligned to the text block, with
+  tight padding pressing the copy against its own border.
+  → Full-width warning (fits on one line), more internal padding, set line-height, align wrapped lines.
+
+- **[F-12] Inconsistent vertical rhythm through the modal.** _Severity: low._
+  Title/subtitle nearly touch while other gaps are much wider — no consistent spacing scale holds the modal
+  together.
+  → Apply one spacing scale across title → subtitle → field → warning → actions.
+
+- **[F-13] Key field is unlabelled with no inline copy affordance.** _Severity: low._
+  The only way to copy sits on the far side of the modal from the value being read.
+  → Label the field and add an inline copy icon inside it.
+
+- **[F-14] "Close" rivals "Copy" in a one-time-reveal flow.** _Severity: medium._
+  The key is shown exactly once, yet the dismiss action sits beside the primary action at near-equal weight with
+  an ✕ icon — a misclick loses the key permanently.
+  → Demote Close to ghost/tertiary; consider a confirm or a "Close without copying" label while uncopied.
+
+- **[F-15] Fix these in the shared modal component, not per screen.** _Severity: medium._
+  The note flags modal design generally, so these patterns likely repeat product-wide.
+  → Audit other modals against the same rules and correct once in the shared component.
