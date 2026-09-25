@@ -17,8 +17,8 @@
     "dist"
   ],
   "scripts": {
-    "sync": "bun run scripts/sync-spec.ts --force && openapi-ts",
-    "generate": "bun run scripts/sync-spec.ts && openapi-ts",
+    "sync": "bun --env-file=../../.env run scripts/sync-spec.ts --force && openapi-ts",
+    "generate": "bun --env-file=../../.env run scripts/sync-spec.ts && openapi-ts",
     "prebuild": "pnpm run generate",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

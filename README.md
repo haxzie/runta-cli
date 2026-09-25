@@ -25,9 +25,15 @@ Requires [Bun](https://bun.sh) 1.3+, Node 22 (see `.nvmrc`) and pnpm 10.
 
 ```sh
 pnpm install
+cp .env.example .env      # optional; every value has a working default
 pnpm dev hello world      # run the CLI from source, with watch — no build step
 pnpm dev:once whoami      # same, single run
 ```
+
+Configuration for local development goes in a single **`.env` at the repo root**
+(gitignored — see `.env.example` for the full list). Bun loads it automatically for
+`pnpm dev`, and the codegen scripts pass `--env-file=../../.env` explicitly, since pnpm
+runs them with their own package as the working directory.
 
 `pnpm dev` runs `apps/cli/src/index.ts` through Bun directly. Workspace packages expose
 their TypeScript source under the `bun` export condition, so an edit anywhere in
@@ -77,6 +83,8 @@ snapshot from `RUNTA_OPENAPI_URL` first:
 Nothing outside `@runta/api` should import from `./generated` directly. The hand-written
 shell (`client.ts`, `errors.ts`) owns auth headers, the user agent, and turning every
 failure — including network failures — into a single `RuntaApiError`.
+
+Set these in the root `.env`:
 
 | Variable | Purpose |
 | --- | --- |
