@@ -13,6 +13,7 @@ Each audit's raw notes live in [`content/`](./content); this file is the running
 | 04 | [Modals: layout and spacing](./content/04-modal-design-api-key.md) | "New API key" modal (dashboard) | 2026-09-25 |
 | 05 | [Settings → Keys: layout shift on load](./content/05-keys-page-layout-shift.md) | Settings → Keys | 2026-09-25 |
 | 06 | [Create runtime: Model should be a picker](./content/06-create-runtime-model-picker.md) | Create runtime flow | 2026-09-26 |
+| 07 | [Create runtime: Advanced options need icons](./content/07-create-runtime-advanced-options-icons.md) | Create runtime → Advanced options | 2026-09-26 |
 
 ## Feedback Points
 
@@ -108,3 +109,14 @@ Source: [`content/06-create-runtime-model-picker.md`](./content/06-create-runtim
   models is maintained by hand, so stale identifiers linger whenever a provider ships or retires one.
   → Replace it with a searchable model picker sourced from a single list, matching the dropdown pattern already
   used on this form.
+
+### Create runtime — Advanced options
+Source: [`content/07-create-runtime-advanced-options-icons.md`](./content/07-create-runtime-advanced-options-icons.md)
+
+- **[F-21] Advanced options have no icons, so the eight rows are indistinguishable.** _Severity: low._
+  Storage, Custom images, Environment variables, SSH access, Published ports, Remote desktop, Spend and Egress
+  rules share the same chevron, type and spacing — only the label text separates them, so every visit means
+  reading down the list. The cost falls on repeat users, who know which section they want but must still scan
+  all eight to find it.
+  → Give each option a distinct, concept-mapped leading icon, consistent with the icon+label pattern already
+  used elsewhere in the product, so rows can be recognised at a glance instead of read.
