@@ -1,0 +1,4 @@
+{
+  "extends": "@runta/tsconfig/cli.json",
+  "include": ["src/**/*.ts"]
+}

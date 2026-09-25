@@ -1,0 +1,16 @@
+{
+  "name": "@runta/tsconfig",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "files": [
+    "base.json",
+    "library.json",
+    "cli.json"
+  ],
+  "exports": {
+    "./base.json": "./base.json",
+    "./library.json": "./library.json",
+    "./cli.json": "./cli.json"
+  }
+}

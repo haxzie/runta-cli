@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Build against the committed OpenAPI snapshot. A live spec change must never flip a
+  # build red or green on its own — spec drift is surfaced by api-drift.yml instead.
+  RUNTA_SKIP_API_SYNC: '1'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify generated SDK is up to date with the committed spec
+        run: |
+          pnpm api:generate
+          git diff --exit-code -- packages/api/src/generated \
+            || { echo '::error::packages/api/src/generated is stale. Run `pnpm api:generate` and commit the result.'; exit 1; }
+
+      - run: pnpm lint
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
+
+      - run: pnpm build
+
+  binaries:
+    # Smoke-test cross-compilation on PRs so a broken build is caught before tagging.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:binaries
+      - name: Smoke-test the linux-x64 binary
+        run: |
+          tar -xzf dist/runta-linux-x64.tar.gz -C dist
+          ./dist/runta --version
+          ./dist/runta hello ci

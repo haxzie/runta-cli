@@ -1,0 +1,29 @@
+{
+  "name": "@runta/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "runta": "./dist/index.js"
+  },
+  "scripts": {
+    "predev": "pnpm --filter @runta/api run generate",
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/index.ts --target=bun --outdir dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@runta/api": "workspace:*",
+    "@runta/core": "workspace:*",
+    "@runta/utils": "workspace:*",
+    "commander": "catalog:"
+  },
+  "devDependencies": {
+    "@runta/tsconfig": "workspace:*",
+    "@types/bun": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

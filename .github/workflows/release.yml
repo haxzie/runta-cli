@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  RUNTA_SKIP_API_SYNC: '1'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: pnpm install --frozen-lockfile
+
+      # With pending changesets this opens/updates the "Version Packages" PR and stops.
+      # Nothing is published to npm — every package is private.
+      - name: Open or update the version PR
+        uses: changesets/action@v1
+        with:
+          version: pnpm run version
+          commit: 'chore: version packages'
+          title: 'chore: version packages'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Once that PR merges, main carries a bumped version with no matching tag. That
+      # gap — not the action's output — is the signal to cut a release, which keeps this
+      # correct even if the version bump lands by some other route.
+      - name: Is there a version to release?
+        id: check
+        run: |
+          version=$(node -p "require('./apps/cli/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git rev-parse "v$version" >/dev/null 2>&1; then
+            echo "Tag v$version already exists, nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build binaries
+        if: steps.check.outputs.release == 'true'
+        run: pnpm build:binaries
+
+      - name: Publish GitHub Release
+        if: steps.check.outputs.release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          # Only this version's changelog section, not the whole file.
+          awk -v ver="## $VERSION" '
+            $0 == ver { inside = 1; next }
+            inside && /^## / { exit }
+            inside { print }
+          ' apps/cli/CHANGELOG.md > release-notes.md
+
+          {
+            echo
+            echo '## Install'
+            echo
+            echo '```sh'
+            echo "curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | sh"
+            echo '```'
+          } >> release-notes.md
+
+          # `gh release create` creates the v<version> tag, which install.sh resolves
+          # through the /releases/latest redirect.
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --notes-file release-notes.md \
+            dist/*.tar.gz dist/checksums.txt

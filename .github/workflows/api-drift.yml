@@ -1,0 +1,47 @@
+name: API spec drift
+
+on:
+  schedule:
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: pnpm install --frozen-lockfile
+
+      # The only job that talks to the live spec. Everything else uses the snapshot.
+      - name: Regenerate from the live spec
+        env:
+          RUNTA_OPENAPI_URL: ${{ vars.RUNTA_OPENAPI_URL }}
+        run: pnpm api:sync
+
+      - run: pnpm typecheck
+
+      - name: Open a PR if the spec moved
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/api-spec-sync
+          title: 'chore(api): sync OpenAPI spec'
+          commit-message: 'chore(api): sync OpenAPI spec'
+          body: |
+            Automated refresh of `packages/api/openapi.json` and the generated SDK.
+            Review the diff for breaking API changes before merging.
+          add-paths: |
+            packages/api/openapi.json
+            packages/api/src/generated

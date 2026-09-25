@@ -1,0 +1,7 @@
+{
+  "extends": "@runta/tsconfig/library.json",
+  "compilerOptions": {
+    "types": ["node", "bun"]
+  },
+  "include": ["src/**/*.ts"]
+}

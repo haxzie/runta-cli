@@ -1,0 +1,9 @@
+{
+  "$comment": "Editor-facing root config. Each workspace has its own tsconfig; `turbo run typecheck` is the source of truth.",
+  "extends": "./packages/tsconfig/base.json",
+  "include": ["scripts/**/*.ts"],
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "bun"]
+  }
+}

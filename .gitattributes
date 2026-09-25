@@ -1,0 +1,2 @@
+packages/api/src/generated/** linguist-generated=true
+pnpm-lock.yaml -diff linguist-generated=true
