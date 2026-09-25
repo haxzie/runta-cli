@@ -52,6 +52,12 @@ Source: [`content/02-dashboard-load-performance.md`](./content/02-dashboard-load
   bottleneck; render a shell with skeletons on first paint so the page is never blank; stream or defer heavy
   panels so cheap content paints first; set a perf budget with monitoring to catch regressions.
 
+- **[F-19] Navigating to an uncached dashboard page takes 2-3 seconds.** _Severity: high._
+  Moving between dashboard pages stalls for 2-3 seconds whenever the destination isn't cached, so the penalty
+  repeats on every first visit to a section rather than being paid once at signup.
+  → Prefetch the top-level pages: warm each primary destination's route bundle and data ahead of the click —
+  on app load for the main sections, and on hover/focus of a nav link for the rest.
+
 ### Login — GitHub OAuth 🔴 BLOCKER
 Source: [`content/03-github-login-broken.md`](./content/03-github-login-broken.md)
 
