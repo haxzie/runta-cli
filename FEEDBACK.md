@@ -9,8 +9,13 @@ Each audit's raw notes live in [`content/`](./content); this file is the running
 |---|-------|---------|------|
 | 01 | [Marketing site: homepage / first fold](./content/01-marketing-homepage-hero.md) | runta.dev homepage (logged-out, desktop) | 2026-09-25 |
 | 02 | [Dashboard: load performance](./content/02-dashboard-load-performance.md) | Runta dashboard (authenticated) | 2026-09-25 |
+| 03 | [Login: GitHub OAuth does nothing](./content/03-github-login-broken.md) 🔴 | Runta login screen | 2026-09-25 |
 
 ## Feedback Points
+
+> 🔴 **Blocker outstanding:** [F-07](#login--github-oauth-blocker) — GitHub login is dead, which blocks
+> sign-up, sign-in, and every authenticated surface behind it. Fix this before anything else on this list.
+
 
 ### Marketing site — homepage / first fold
 Source: [`content/01-marketing-homepage-hero.md`](./content/01-marketing-homepage-hero.md)
@@ -50,3 +55,25 @@ Source: [`content/02-dashboard-load-performance.md`](./content/02-dashboard-load
   → Measure the route (TTFB / LCP / TTI, cold vs. warm, first-load-after-signup vs. return) to find the real
   bottleneck; render a shell with skeletons on first paint so the page is never blank; stream or defer heavy
   panels so cheap content paints first; set a perf budget with monitoring to catch regressions.
+
+### Login — GitHub OAuth 🔴 BLOCKER
+Source: [`content/03-github-login-broken.md`](./content/03-github-login-broken.md)
+
+- **[F-07] "Continue with GitHub" does nothing when clicked.** _Severity: **blocker**._
+  No redirect, no popup, no spinner, no error — the button is indistinguishable from a static image, and the
+  failure is entirely silent. Since GitHub OAuth appears to be the only way in, this blocks sign-up, sign-in,
+  and every downstream surface (dashboard, CLI auth, billing). The audit could not proceed past this screen.
+  → Diagnose via console/network on click (JS error, 4xx on the OAuth request, blocked popup, or an unwired
+  handler); verify OAuth client ID and that the callback URI matches the deployed origin exactly.
+
+- **[F-08] Login failures are silent — no loading state, no error.** _Severity: high._
+  Independent of the root cause of F-07: a user gets zero signal about whether the click registered, whether
+  it's their network, or whether Runta is down.
+  → Show a loading state on click, surface a real error with a retry and support path on failure, and detect
+  blocked popups explicitly with a same-tab redirect fallback.
+
+- **[F-09] No alternative sign-in method, and no smoke test on the auth flow.** _Severity: high._
+  One broken OAuth provider locks every user out of the entire product, and nothing caught it before a manual
+  audit did.
+  → Add an email magic link or a second OAuth provider as a fallback, plus an end-to-end sign-in smoke test
+  running against production with alerting.
