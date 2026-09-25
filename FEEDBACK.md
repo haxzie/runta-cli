@@ -12,6 +12,7 @@ Each audit's raw notes live in [`content/`](./content); this file is the running
 | 03 | [Login: GitHub OAuth does nothing](./content/03-github-login-broken.md) 🔴 | Runta login screen | 2026-09-25 |
 | 04 | [Modals: layout and spacing](./content/04-modal-design-api-key.md) | "New API key" modal (dashboard) | 2026-09-25 |
 | 05 | [Settings → Keys: layout shift on load](./content/05-keys-page-layout-shift.md) | Settings → Keys | 2026-09-25 |
+| 06 | [Create runtime: Model should be a picker](./content/06-create-runtime-model-picker.md) | Create runtime flow | 2026-09-26 |
 
 ## Feedback Points
 
@@ -97,3 +98,13 @@ Source: [`content/05-keys-page-layout-shift.md`](./content/05-keys-page-layout-s
   → Measure CLS on the route first; reserve space with skeletons sized to the final panels (skeleton empty
   state for SSH, skeleton rows for the table), set min-heights on both containers, and fetch both sections in
   parallel rather than letting them pop in independently.
+
+### Create runtime — Model field
+Source: [`content/06-create-runtime-model-picker.md`](./content/06-create-runtime-model-picker.md)
+
+- **[F-20] Model is a free-text input instead of a picker.** _Severity: medium._
+  Choosing a model means typing the exact identifier by hand — no list, no validation, no indication of what's
+  available — while every other constrained choice on the form is a dropdown. It also means the set of valid
+  models is maintained by hand, so stale identifiers linger whenever a provider ships or retires one.
+  → Replace it with a searchable model picker sourced from a single list, matching the dropdown pattern already
+  used on this form.
