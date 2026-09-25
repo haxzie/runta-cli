@@ -18,7 +18,6 @@ Each audit's raw notes live in [`content/`](./content); this file is the running
 > 🔴 **Blocker outstanding:** [F-07](#login--github-oauth-blocker) — GitHub login is dead, which blocks
 > sign-up, sign-in, and every authenticated surface behind it. Fix this before anything else on this list.
 
-
 ### Marketing site — homepage / first fold
 Source: [`content/01-marketing-homepage-hero.md`](./content/01-marketing-homepage-hero.md)
 
@@ -42,11 +41,6 @@ Source: [`content/01-marketing-homepage-hero.md`](./content/01-marketing-homepag
   Dark background + orange accent, pill news badge, three evenly-sized empty feature boxes, bordered offer
   card — every default of a generated dark SaaS landing page, with nothing specific to Runta.
   → Give the fold a brand point of view: custom type treatment, real product surface, or illustration.
-
-- **[F-05] Fold has no product imagery and dead space below it.** _Severity: medium._
-  The hero is entirely typography and empty boxes; the lower half of the fold is blank.
-  → Replace the empty feature boxes / dead space with a terminal recording, product screenshot, or a
-  before/after token-cost visual.
 
 ### Dashboard — load performance
 Source: [`content/02-dashboard-load-performance.md`](./content/02-dashboard-load-performance.md)
@@ -74,12 +68,6 @@ Source: [`content/03-github-login-broken.md`](./content/03-github-login-broken.m
   → Show a loading state on click, surface a real error with a retry and support path on failure, and detect
   blocked popups explicitly with a same-tab redirect fallback.
 
-- **[F-09] No alternative sign-in method, and no smoke test on the auth flow.** _Severity: high._
-  One broken OAuth provider locks every user out of the entire product, and nothing caught it before a manual
-  audit did.
-  → Add an email magic link or a second OAuth provider as a fallback, plus an end-to-end sign-in smoke test
-  running against production with alerting.
-
 ### Modals — layout and spacing
 Source: [`content/04-modal-design-api-key.md`](./content/04-modal-design-api-key.md)
 
@@ -93,24 +81,6 @@ Source: [`content/04-modal-design-api-key.md`](./content/04-modal-design-api-key
   The message orphans "closing." on a second line, hanging-indented rather than aligned to the text block, with
   tight padding pressing the copy against its own border.
   → Full-width warning (fits on one line), more internal padding, set line-height, align wrapped lines.
-
-- **[F-12] Inconsistent vertical rhythm through the modal.** _Severity: low._
-  Title/subtitle nearly touch while other gaps are much wider — no consistent spacing scale holds the modal
-  together.
-  → Apply one spacing scale across title → subtitle → field → warning → actions.
-
-- **[F-13] Key field is unlabelled with no inline copy affordance.** _Severity: low._
-  The only way to copy sits on the far side of the modal from the value being read.
-  → Label the field and add an inline copy icon inside it.
-
-- **[F-14] "Close" rivals "Copy" in a one-time-reveal flow.** _Severity: medium._
-  The key is shown exactly once, yet the dismiss action sits beside the primary action at near-equal weight with
-  an ✕ icon — a misclick loses the key permanently.
-  → Demote Close to ghost/tertiary; consider a confirm or a "Close without copying" label while uncopied.
-
-- **[F-15] Fix these in the shared modal component, not per screen.** _Severity: medium._
-  The note flags modal design generally, so these patterns likely repeat product-wide.
-  → Audit other modals against the same rules and correct once in the shared component.
 
 ### Settings → Keys — layout shift on initial load
 Source: [`content/05-keys-page-layout-shift.md`](./content/05-keys-page-layout-shift.md)

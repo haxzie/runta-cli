@@ -46,14 +46,8 @@ so far; the rest of the audit is blocked behind it.
 - Handle **blocked popups** explicitly — detect the block and fall back to a same-tab redirect, or tell the
   user to allow popups.
 
-**Prevent recurrence:**
-- Add an end-to-end smoke test covering the full GitHub sign-in flow against production, alerting on failure.
-- Offer at least one **alternative sign-in method** (email magic link, or another OAuth provider) so a single
-  broken provider can't lock every user out of the product.
-
 ## Open questions
 
 - Does it fail on a specific browser/OS, or everywhere?
 - Any console errors or failed network requests visible at click time?
 - Does this reproduce on production, or was the audit run against staging/local?
-- Is GitHub OAuth currently the only available sign-in method?

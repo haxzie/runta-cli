@@ -22,8 +22,7 @@ Returning users have to guess a URL or dig through the docs.
 ### 2. Overall visual design reads as generic / "vibecoded"
 The page hits every default of a generated dark SaaS landing page — dark background with an orange accent,
 pill-shaped news badge, three evenly-sized feature boxes, a bordered offer card on the right. Nothing on the
-fold is specific to Runta as a product or brand. There is no product imagery, no terminal, no screenshot,
-no diagram — the hero is entirely typography and empty boxes, and the lower half of the fold is dead space.
+fold is specific to Runta as a product or brand.
 
 ### 3. Hero doesn't show the fastest path to value — the CLI command
 Runta is a CLI-first product, but the first fold never shows a command. The only route to "doing something"
@@ -43,7 +42,5 @@ them a paste-ready block is the most natural possible onboarding.
   ideally as the primary action, with the credit CTA sitting next to it as the secondary path.
 - Add a **"Copy prompt" button** that copies a ready-made prompt for setting Runta up via a coding agent
   (Claude Code, Cursor, etc.), so agent users can paste and go.
-- Replace the three empty feature boxes / dead lower fold with something concrete — a terminal recording,
-  product screenshot, or before/after token-cost visual — to break the generated-template look.
 - Give the fold a brand point of view: custom type treatment, real product surface, or an illustration,
   rather than the default dark + orange accent template.
