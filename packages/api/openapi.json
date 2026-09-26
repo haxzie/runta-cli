@@ -2026,8 +2026,56 @@
           },
           "model_provider": {
             "type": "object",
+            "description": "Present only on images that front a model provider. A runtime built from such an image needs a credential before its agent can authenticate \u2014 either an organization-managed provider, an injected secret, or an interactive sign-in.",
             "additionalProperties": true,
-            "description": "Present only on images that front a model provider. Shape not yet described."
+            "properties": {
+              "allow_custom_base_url": {
+                "type": "boolean"
+              },
+              "allow_runtime_sign_in": {
+                "type": "boolean",
+                "description": "Whether the agent can be signed in interactively inside the runtime."
+              },
+              "protocol_bindings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "protocol": {
+                      "type": "string"
+                    },
+                    "environment_variable": {
+                      "type": "string"
+                    },
+                    "base_url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "subscription_options": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "protocols": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "secret_preset_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },

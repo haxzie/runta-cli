@@ -1,5 +1,5 @@
 import type { Runtime } from '@runta/api';
-import { isCliError } from '@runta/utils';
+import { isCliError, setLogLevel } from '@runta/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { captureStdout, isolateEnv, type Route, stubFetch } from '../test/harness.js';
 import { type CommandDeps, create, inspect, list, remove } from './runtime.js';
@@ -197,6 +197,66 @@ describe('create', () => {
     await create({ image: 'Clean runtime', detach: true }, deps);
 
     expect(await bodyOf(stub.calls[1] as Request)).toEqual({ image: { id: 'clean' } });
+  });
+
+  it('infers the model-provider protocol for an image that binds exactly one', async () => {
+    // 12 of 13 images are refused without a protocol, and four bind only one — so demanding it
+    // would be demanding the user repeat what the API already knows.
+    const { stub, deps } = harness([
+      IMAGES([
+        {
+          id: 'claude',
+          name: 'Claude Code',
+          model_provider: { protocol_bindings: [{ protocol: 'anthropic_messages' }] },
+        } as never,
+      ]),
+      POST({ data: runtime() }),
+    ]);
+
+    await create({ image: 'claude', detach: true }, deps);
+
+    expect(await bodyOf(stub.calls[1] as Request)).toEqual({
+      image: { id: 'claude', model_provider_protocol: 'anthropic_messages' },
+    });
+  });
+
+  it('asks which protocol when the image binds several', async () => {
+    const { stub, deps } = harness([
+      IMAGES([
+        {
+          id: 'kimi',
+          name: 'Kimi',
+          model_provider: {
+            protocol_bindings: [{ protocol: 'anthropic_messages' }, { protocol: 'openai_chat' }],
+          },
+        } as never,
+      ]),
+    ]);
+
+    const error = await create({ image: 'kimi', detach: true }, deps).catch((e: unknown) => e);
+
+    expect((error as { hint?: string }).hint).toContain('anthropic_messages, openai_chat');
+    expect(stub.calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+
+  it("turns the API's missing-secret refusal into something actionable", async () => {
+    const { deps } = harness([
+      IMAGES(),
+      POST(
+        {
+          error: {
+            code: 'invalid_argument',
+            message:
+              'invalid argument: the selected runtime image reads its model-provider credential from ANTHROPIC_API_KEY, which no secret in this request populates',
+          },
+        },
+        422,
+      ),
+    ]);
+
+    const error = await create({ image: 'clean', detach: true }, deps).catch((e: unknown) => e);
+
+    expect((error as { hint?: string }).hint).toContain('dashboard.runta.com');
   });
 
   it('adds a 5xx hint, because those bodies are often not JSON', async () => {
@@ -432,11 +492,36 @@ describe('delete', () => {
       GET({ data: runtime() }),
       DEL(202, { data: runtime() }),
       GET({ error: { code: 'not_found', message: 'gone' } }, 404),
+      LIST(page([runtime({ id: 'other', display_name: 'other' })])),
     ]);
 
     await remove([ID], { yes: true }, deps);
 
     expect(out.text).toBe('');
+  });
+
+  it('points at create only when nothing is left', async () => {
+    // `runta list` after a delete would be noise — you know what you deleted. Reaching zero is the
+    // one state worth naming.
+    // isolateEnv silences the logger so test output stays readable; this test is about what the
+    // logger says, so turn it back up for the duration.
+    setLogLevel('info');
+    const stderr: string[] = [];
+    vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      stderr.push(args.join(' '));
+    });
+    const { deps } = harness([
+      GET({ data: runtime() }),
+      GET({ data: runtime() }),
+      DEL(202, { data: runtime() }),
+      GET({ error: { code: 'not_found', message: 'gone' } }, 404),
+      LIST(page([])),
+    ]);
+
+    await remove([ID], { yes: true }, deps);
+
+    expect(stderr.join('\n')).toContain('no runtimes left');
+    setLogLevel('silent');
   });
 
   it('skips waiting with --detach', async () => {
@@ -457,6 +542,7 @@ describe('delete', () => {
       GET({ data: runtime() }),
       DEL(202, { data: runtime() }),
       GET({ error: { code: 'not_found', message: 'gone' } }, 404),
+      LIST(page([])),
     ]);
     deps.isInteractive = () => true;
 
@@ -482,6 +568,7 @@ describe('delete', () => {
       GET({ data: runtime() }),
       DEL(202, { data: runtime() }),
       GET({ error: { code: 'not_found', message: 'gone' } }, 404),
+      LIST(page([])),
     ]);
     deps.isInteractive = () => true;
 
@@ -496,6 +583,7 @@ describe('delete', () => {
       GET({ data: runtime() }),
       DEL(202, { data: runtime() }),
       GET({ error: { code: 'not_found', message: 'gone' } }, 404),
+      LIST(page([])),
     ]);
 
     await remove([ID], { yes: true, json: true }, deps);

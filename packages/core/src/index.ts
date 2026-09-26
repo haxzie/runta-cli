@@ -11,9 +11,10 @@ export {
 export {
   type DeleteResult,
   deleteAtCurrentRevision,
+  modelProviderProtocol,
   RuntimeWaitError,
   resolveCheckpointId,
-  resolveImageId,
+  resolveImage,
   resolveRuntimeId,
   type WaitDeps,
   type WaitOptions,

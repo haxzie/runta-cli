@@ -435,9 +435,25 @@ export type RuntimeImage = {
     is_custom: boolean;
     exposed_ports: Array<number>;
     /**
-     * Present only on images that front a model provider. Shape not yet described.
+     * Present only on images that front a model provider. A runtime built from such an image needs a credential before its agent can authenticate — either an organization-managed provider, an injected secret, or an interactive sign-in.
      */
     model_provider?: {
+        allow_custom_base_url?: boolean;
+        /**
+         * Whether the agent can be signed in interactively inside the runtime.
+         */
+        allow_runtime_sign_in?: boolean;
+        protocol_bindings?: Array<{
+            protocol?: string;
+            environment_variable?: string;
+            base_url?: string;
+            [key: string]: unknown;
+        }>;
+        subscription_options?: Array<{
+            protocols?: Array<string>;
+            secret_preset_ids?: Array<string>;
+            [key: string]: unknown;
+        }>;
         [key: string]: unknown;
     };
 };

@@ -3,9 +3,10 @@ import { isCliError } from '@runta/utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   deleteAtCurrentRevision,
+  modelProviderProtocol,
   RuntimeWaitError,
   resolveCheckpointId,
-  resolveImageId,
+  resolveImage,
   resolveRuntimeId,
   waitUntilDeleted,
   waitUntilRunning,
@@ -348,7 +349,7 @@ describe('deleteAtCurrentRevision', () => {
   });
 });
 
-describe('resolveImageId', () => {
+describe('resolveImage', () => {
   const images = [
     { id: 'clean', name: 'Clean runtime' },
     { id: 'claude', name: 'Claude Code' },
@@ -357,14 +358,14 @@ describe('resolveImageId', () => {
   it('accepts the slug id unchanged', async () => {
     const { client: c } = await makeClient([imagesRoute(images)]);
 
-    await expect(resolveImageId(c, 'clean')).resolves.toBe('clean');
+    await expect(resolveImage(c, 'clean')).resolves.toMatchObject({ id: 'clean' });
   });
 
   it('resolves the display name to the slug', async () => {
     // The dashboard shows "Clean runtime"; the API wants "clean".
     const { client: c } = await makeClient([imagesRoute(images)]);
 
-    await expect(resolveImageId(c, 'Clean runtime')).resolves.toBe('clean');
+    await expect(resolveImage(c, 'Clean runtime')).resolves.toMatchObject({ id: 'clean' });
   });
 
   it('prefers an exact id match over a name match', async () => {
@@ -376,14 +377,14 @@ describe('resolveImageId', () => {
       ]),
     ]);
 
-    await expect(resolveImageId(c, 'clean')).resolves.toBe('clean');
+    await expect(resolveImage(c, 'clean')).resolves.toMatchObject({ id: 'clean' });
   });
 
   it('lists the available ids when the name is unknown', async () => {
     // There is no `runta image list` yet, and we are already holding the answer.
     const { client: c } = await makeClient([imagesRoute(images)]);
 
-    const error = await resolveImageId(c, 'Nope').catch((e: unknown) => e);
+    const error = await resolveImage(c, 'Nope').catch((e: unknown) => e);
 
     expect((error as Error).message).toContain("Image 'Nope' was not found");
     expect((error as { hint?: string }).hint).toContain('clean, claude');
@@ -397,7 +398,7 @@ describe('resolveImageId', () => {
       ]),
     ]);
 
-    const error = await resolveImageId(c, 'Same').catch((e: unknown) => e);
+    const error = await resolveImage(c, 'Same').catch((e: unknown) => e);
 
     expect((error as Error).message).toContain('ambiguous');
   });
@@ -447,5 +448,59 @@ describe('resolveCheckpointId', () => {
     const error = await resolveCheckpointId(c, 'ghost').catch((e: unknown) => e);
 
     expect((error as { hint?: string }).hint).toContain('does not exist yet');
+  });
+});
+
+describe('modelProviderProtocol', () => {
+  const image = (protocols: string[], id = 'claude') =>
+    ({
+      id,
+      name: id,
+      model_provider: { protocol_bindings: protocols.map((protocol) => ({ protocol })) },
+    }) as never;
+
+  it('returns nothing for an image with no model provider', () => {
+    expect(modelProviderProtocol({ id: 'clean', name: 'Clean' } as never)).toBeUndefined();
+  });
+
+  it('infers the only protocol an image binds', () => {
+    // `claude` binds anthropic_messages alone, so asking the user to name it would be asking them
+    // to repeat what the API already knows.
+    expect(modelProviderProtocol(image(['anthropic_messages']))).toBe('anthropic_messages');
+  });
+
+  it('accepts an explicit protocol the image supports', () => {
+    expect(modelProviderProtocol(image(['openai_chat', 'anthropic_messages']), 'openai_chat')).toBe(
+      'openai_chat',
+    );
+  });
+
+  it('lists the options when the image binds several and none was chosen', () => {
+    const error = (() => {
+      try {
+        modelProviderProtocol(image(['openai_chat', 'anthropic_messages']));
+      } catch (e) {
+        return e;
+      }
+    })();
+
+    expect(isCliError(error)).toBe(true);
+    expect((error as { hint?: string }).hint).toContain('openai_chat, anthropic_messages');
+    expect((error as { exitCode: number }).exitCode).toBe(2);
+  });
+
+  it('rejects a protocol the image does not support, and says what it does', () => {
+    const error = (() => {
+      try {
+        modelProviderProtocol(image(['anthropic_messages']), 'openai_chat');
+      } catch (e) {
+        return e;
+      }
+    })();
+
+    expect((error as Error).message).toContain(
+      "does not support model-provider protocol 'openai_chat'",
+    );
+    expect((error as { hint?: string }).hint).toContain('anthropic_messages');
   });
 });

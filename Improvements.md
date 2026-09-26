@@ -165,6 +165,100 @@ Two things fell out of implementing this that were not obvious beforehand:
 
 ---
 
+## I-6 — Suggest the next step, but only when there is one
+
+**Status:** decided, 2026-09-26, and implemented.
+
+Commands that leave you mid-task print a short block on stderr:
+
+```console
+$ runta create --name demo --detach
+Creating runtime 'demo'.
+
+Next steps:
+  runta inspect demo         check whether it is running yet
+  runta delete demo          remove it when you are done
+```
+
+Where they appear: after `login`, after `create` (both waited and detached), on an empty `list`, on
+`inspect` when the runtime is in `error`/`crashed`, degraded, or has a fully-blocked egress
+allowlist, on `logout` when `RUNTA_TOKEN` is still set, and after `delete` **only when no runtimes
+remain**.
+
+Where they deliberately do not: after a successful `delete` that left other runtimes, after
+`whoami`, and after `inspect` on a healthy runtime. Advice printed after every command is advice
+nobody reads — which is exactly why the production CLI's `required_action` field is ignorable.
+
+Three constraints make this a feature rather than noise:
+
+**stderr, always.** Suggestions are commentary, so they survive `--json` without touching the
+payload — `runta inspect demo --json 2>/dev/null` is still exactly the runtime object.
+
+**Never the command that just ran.** Upstream's `resume` returns
+`required_action: runta resume <name>`; an agent following the field as designed loops
+(`CLI_ISSUES.md` C-11).
+
+**Only commands that exist — enforced, not remembered.** Our first version of this suggested
+`runta exec`, which we have not built. That is the same defect as Runta's agent skill documenting a
+`runta agents ls` that does not exist (C-30), and the fix is not care. `suggest.test.ts` scrapes
+every `runta …` out of the source and resolves it against the real command tree, so a suggestion
+cannot outlive the command it names. It also guards itself: one assertion fails if the scraper stops
+finding suggestions, another proves the resolver actually rejects.
+
+---
+
+## I-7 — Infer what the API could have inferred, and translate its refusals
+
+**Status:** decided, 2026-09-26, and implemented.
+
+`create` could not build 12 of Runta's 13 runtime images at all. Those images front a model
+provider, and the API refuses them without `image.model_provider_protocol` — for which there was no
+flag.
+
+Two changes. **The protocol is inferred when the image binds exactly one** (`claude`, `codex`,
+`cursor` and `flue` each bind one), because demanding it would be demanding that the user repeat
+information the API already holds. When an image binds several, the error lists them:
+
+```console
+$ runta create --image kimi
+error Image 'kimi' supports several model-provider protocols.
+Pick one with --model-provider-protocol: anthropic_messages, openai_chat, openai_responses.
+
+$ runta create --image claude --model-provider-protocol openai_chat
+error Image 'claude' does not support model-provider protocol 'openai_chat'.
+It supports: anthropic_messages.
+```
+
+Both are checked before any request, from the image list we already fetched to resolve the name.
+
+**The API's two refusals are translated into next actions.** Its wording is accurate but terminal —
+it names the environment variable and stops:
+
+```console
+$ runta create --image claude --cpus 2 --memory 2048
+error invalid argument: the selected runtime image reads its model-provider credential from ANTHROPIC_API_KEY, which no secret in this request populates
+This image needs a model provider. Connect one at https://dashboard.runta.com, then create the runtime again.
+```
+
+The hint names the dashboard rather than a command because no command configures a provider yet, and
+`suggest.test.ts` would reject inventing one.
+
+### What I got wrong here, and why it is worth recording
+
+I first built a post-create readiness check — list the image, list the organization's providers, and
+warn that a `running` runtime's agent could not authenticate. That was written from
+`CLI_ISSUES.md` C-33, which records the production CLI reporting a ready runtime whose agent cannot
+run.
+
+The live API disproved the premise: it **refuses** such a create outright rather than producing an
+unusable runtime, so the check had no case to catch and I deleted it. Two lessons worth keeping.
+Where the API already does the right thing, the CLI should not carry code to compensate. And a
+finding recorded against the production CLI is not automatically a requirement for ours — C-33
+concerns the `--runtime-sign-in` path specifically, which we have not built and have not tested, so
+it stays open rather than being assumed fixed.
+
+---
+
 ## I-5 — Runtime configuration is not a resource
 
 **Status:** proposed.

@@ -9,9 +9,10 @@ import {
 import {
   createContext,
   deleteAtCurrentRevision,
+  modelProviderProtocol,
   RuntimeWaitError,
   resolveCheckpointId,
-  resolveImageId,
+  resolveImage,
   resolveRuntimeId,
   waitUntilDeleted,
   waitUntilRunning,
@@ -69,6 +70,7 @@ export interface CreateOptions {
   idleMode?: 'disabled' | 'suspend_only' | 'suspend_and_wakeup';
   idleTimeout?: string;
   fromCheckpoint?: string;
+  modelProviderProtocol?: string;
   detach?: boolean;
   timeout?: string;
   json?: boolean;
@@ -129,6 +131,7 @@ async function createBody(
       ['--cpus', options.cpus],
       ['--memory', options.memory],
       ['--image', options.image],
+      ['--model-provider-protocol', options.modelProviderProtocol],
     ] as const) {
       // The checkpoint fixes hardware and image identity, so accepting these silently would
       // mean ignoring them.
@@ -153,7 +156,7 @@ async function createBody(
 
   return {
     ...common,
-    ...(options.image ? { image: { id: await resolveImageId(client, options.image) } } : {}),
+    ...(options.image ? { image: await imageSpec(client, options) } : {}),
     ...(Object.keys(requests).length || limits
       ? {
           resources: {
@@ -163,6 +166,21 @@ async function createBody(
         }
       : {}),
   };
+}
+
+/**
+ * Builds the `image` block, filling in the model-provider protocol.
+ *
+ * An image that fronts a model provider is refused without one — 12 of the 13 images do — and four
+ * bind exactly one protocol, so it is inferred when unambiguous rather than demanded.
+ */
+async function imageSpec(
+  client: RuntaClient,
+  options: CreateOptions,
+): Promise<{ id: string; model_provider_protocol?: string }> {
+  const image = await resolveImage(client, options.image as string);
+  const protocol = modelProviderProtocol(image, options.modelProviderProtocol);
+  return { id: image.id, ...(protocol ? { model_provider_protocol: protocol } : {}) };
 }
 
 const ingress = (spec: string): { protocol: 'http' | 'https'; runtime_port: number } => {
@@ -498,6 +516,17 @@ export async function remove(
   for (const r of results) {
     logger.info(r.deleted ? `Deleted '${r.name}'.` : `Deletion of '${r.name}' requested.`);
   }
+
+  // Suggesting `runta list` here would be noise — you know what you just deleted. Reaching zero is
+  // different: that is a state worth naming, and the only case where there is a next step.
+  if (!options.detach) {
+    const remaining = await run(() => collect(client, { status: ACTIVE.join(',') }, 1));
+    if (remaining.length === 0) {
+      printNextSteps([
+        { command: 'runta create --name demo', why: 'no runtimes left — create another' },
+      ]);
+    }
+  }
 }
 
 // ---------------------------------------------------------------- shared
@@ -549,6 +578,12 @@ function hintFor(error: RuntaApiError): string | undefined {
   // `520 <none>`, which tells the user nothing. Name the cause instead.
   if (error.status >= 500)
     return 'The Runta API is having trouble — this is usually transient. Try again.';
+  // The API's own wording names the environment variable but not how to populate it, and nothing
+  // in this CLI configures a provider yet.
+  if (/which no secret in this request populates/.test(error.message))
+    return 'This image needs a model provider. Connect one at https://dashboard.runta.com, then create the runtime again.';
+  if (/model-provider protocol is required/.test(error.message))
+    return 'Pass --model-provider-protocol, or use an image that binds only one protocol.';
   return undefined;
 }
 
@@ -632,6 +667,10 @@ function addRuntimeVerbs(parent: Command): void {
     .option('--idle-mode <mode>', 'disabled | suspend_only | suspend_and_wakeup')
     .option('--idle-timeout <secs>', 'idle seconds before suspending')
     .option('--from-checkpoint <id>', 'restore from a checkpoint instead of creating fresh')
+    .option(
+      '--model-provider-protocol <protocol>',
+      'required by images that front a model provider; inferred when the image binds only one',
+    )
     .option('-d, --detach', 'return as soon as creation is accepted, without waiting')
     .option('--timeout <secs>', 'how long to wait before giving up (default 180)')
     .option('--json', 'print the runtime as JSON')

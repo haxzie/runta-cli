@@ -27,6 +27,7 @@ Both forms are the same command. See [Commands](./index.md#two-forms-for-runtime
 | `--idle-mode <mode>` | `disabled`, `suspend_only` or `suspend_and_wakeup` |
 | `--idle-timeout <secs>` | Idle seconds before suspending. Required with a suspending mode |
 | `--from-checkpoint <id>` | Restore from a checkpoint instead of creating fresh |
+| `--model-provider-protocol <p>` | Required by images that front a model provider; inferred when the image binds only one |
 | `-d, --detach` | Return as soon as creation is accepted, without waiting |
 | `--timeout <secs>` | How long to wait before giving up. Default 180 |
 | `--json` | Print the runtime as JSON |
@@ -81,6 +82,38 @@ becomes
 ```
 
 Omit a flag and the runtime image's recommendation applies.
+
+## Images that front a model provider
+
+12 of the 13 images run an agent against a model provider, and the API refuses to create one
+without a protocol. The CLI infers it when the image binds exactly one — so `--image claude` needs
+no extra flag:
+
+```sh
+runta create --image claude     # anthropic_messages inferred
+```
+
+When an image binds several, it asks, before making any request:
+
+```console
+$ runta create --image kimi
+error Image 'kimi' supports several model-provider protocols.
+Pick one with --model-provider-protocol: anthropic_messages, openai_chat, openai_responses.
+```
+
+A protocol the image does not support is rejected the same way, naming what it does support.
+
+Separately, such an image also needs a **credential**. With no organization model provider
+configured and no secret in the request, the API refuses the create — it does not hand you a running
+runtime whose agent cannot authenticate:
+
+```console
+$ runta create --image claude --cpus 2 --memory 2048
+error invalid argument: the selected runtime image reads its model-provider credential from ANTHROPIC_API_KEY, which no secret in this request populates
+This image needs a model provider. Connect one at https://dashboard.runta.com, then create the runtime again.
+```
+
+Configuring a provider is not yet possible from the CLI, hence the dashboard.
 
 ## `--image` takes a slug or a display name
 

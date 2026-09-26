@@ -7,6 +7,7 @@ import {
   listRuntimes,
   type RuntaClient,
   type Runtime,
+  type RuntimeImage,
 } from '@runta/api';
 import { fail } from '@runta/utils';
 
@@ -61,11 +62,12 @@ export async function resolveRuntimeId(client: RuntaClient, reference: string): 
  * accepts. Resolving means `--image "Clean runtime"` works too, which matters because the display
  * name is what the dashboard shows.
  */
-export async function resolveImageId(client: RuntaClient, reference: string): Promise<string> {
+export async function resolveImage(client: RuntaClient, reference: string): Promise<RuntimeImage> {
   const { data } = await listRuntimeImages({ client, throwOnError: true });
 
   // An exact id match wins outright: ids are the canonical form and cannot be ambiguous.
-  if (data.data.some((image) => image.id === reference)) return reference;
+  const byId = data.data.find((image) => image.id === reference);
+  if (byId) return byId;
 
   const matches = data.data
     .filter((image) => image.name === reference)
@@ -73,12 +75,45 @@ export async function resolveImageId(client: RuntaClient, reference: string): Pr
 
   // Naming the valid ids beats naming a command: there is no `runta image list` yet, and we are
   // already holding the full list that would answer the question.
-  return pick(
+  const id = pick(
     'Image',
     reference,
     matches,
     `Available images: ${data.data.map((image) => image.id).join(', ')}.`,
   );
+  return data.data.find((image) => image.id === id) as RuntimeImage;
+}
+
+/**
+ * The protocol to send for an image that fronts a model provider.
+ *
+ * `create` against such an image is refused without one, and 12 of the 13 images need it — but
+ * four of them bind exactly one protocol, so asking the user to name it would be asking them to
+ * repeat information the API already has. Inferred when unambiguous, and an explicit error listing
+ * the options when not.
+ */
+export function modelProviderProtocol(image: RuntimeImage, requested?: string): string | undefined {
+  const bindings = image.model_provider?.protocol_bindings ?? [];
+  const available = bindings.map((binding) => binding.protocol).filter((p): p is string => !!p);
+
+  if (available.length === 0) return undefined;
+
+  if (requested) {
+    if (!available.includes(requested)) {
+      return fail(`Image '${image.id}' does not support model-provider protocol '${requested}'.`, {
+        exitCode: 2,
+        hint: `It supports: ${available.join(', ')}.`,
+      });
+    }
+    return requested;
+  }
+
+  if (available.length === 1) return available[0];
+
+  return fail(`Image '${image.id}' supports several model-provider protocols.`, {
+    exitCode: 2,
+    hint: `Pick one with --model-provider-protocol: ${available.join(', ')}.`,
+  });
 }
 
 /**
