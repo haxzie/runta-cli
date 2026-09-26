@@ -650,7 +650,8 @@ _Severity: medium._
   "which account, which org, which token, does it still work, when does it expire". The only way to
   test a credential is to run a real API call like `runta ps` and read the error. It's also a
   debugging blind spot: with `RUNTA_TOKEN` set, nothing tells you the env var is shadowing your
-  `runta login` credential.
+  `runta login` credential. Independently raised in a separate manual session (2026-09-26): no way to
+  check whether you are logged in.
 - **No `runta version` subcommand** — only `-V/--version`. `runta version` → `UNKNOWN_COMMAND` with
   no did-you-mean.
 - **No shell completions.** `runta completions bash` / `completion bash` → `UNKNOWN_COMMAND`. For 65
@@ -680,6 +681,9 @@ Open on the machine that owns the browser:
 ```
 
 `gh auth login`, `wrangler login`, `vercel login` and `stripe login` all just open the browser.
+
+Independently reproduced in a separate manual session (2026-09-26, code `ME6E-PTQY`) — same output,
+same three-platform block, no browser opened.
 
 → When stdin/stdout is a TTY, open `verification_uri_complete` directly; print the URL as a fallback
 and gate the three-platform block behind `--no-browser`, non-TTY, or `$SSH_CONNECTION`. Keep the code
