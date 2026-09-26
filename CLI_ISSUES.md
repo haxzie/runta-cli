@@ -50,6 +50,7 @@ npm packages, the Homebrew tap, and the shipped binary (the source repo is priva
 | [C-32](#c-32-runta-sub---help-returns-the-entire-root-tree-in-json-mode) | `runta <sub> --help` returns the whole 78 KB root tree off-TTY | high |
 | [C-33](#c-33---runtime-sign-in-reports-a-ready-runtime-whose-agent-cant-run) | `--runtime-sign-in` reports a ready runtime whose agent isn't logged in | high |
 | [C-34](#c-34-the-runtime-argument-is-a-flag-on-two-commands-and-positional-on-34) | Runtime arg is a flag on 2 commands, positional on 34 | medium |
+| [C-35](#c-35-no-published-openapi-document-so-every-client-is-hand-written) | No published OpenAPI document; API docs disagree with the live API in six places | high |
 
 ---
 
@@ -1095,6 +1096,70 @@ recommends — does exist, as a documented alias of `create`.
 → Give `tokens analyze|savings` an optional positional alongside `--runtime`. Add
 `checkpoint restore --name` as C-26's `--into`. Rename the two `display_name` flags to
 `--display-name`, keeping `--name` as an alias.
+
+### C-35 — No published OpenAPI document, so every client is hand-written
+_Severity: high._
+
+The API reference states the underlying spec is **OpenAPI 3.0.3**, so a machine-readable
+description exists internally. It is not served anywhere. Every plausible URL 404s:
+
+```console
+https://api.runta.dev/openapi.json                 404
+https://api.runta.com/openapi.json                 404
+https://api.runta.com/v2/openapi.json              404
+https://api.runta.com/docs/openapi.json            404
+https://runta.com/openapi.json                     404
+https://runta.com/docs/reference/api/openapi.json  404
+```
+
+For anyone integrating, that means the 85 documented operations have to be transcribed by hand from
+HTML pages into a spec before a typed client can be generated — and then maintained by hand forever,
+with no way to diff against the source of truth when the API moves. Publishing the file Runta already
+has is close to zero work and removes that entire class of effort for every consumer.
+
+It also makes the C-05 drift invisible. Transcribing the docs rather than probing the live API
+produces a **wrong** client — six divergences found while describing just the four auth/identity
+operations:
+
+| # | Docs say | Live API does |
+|---|---|---|
+| 1 | `request_id` is a field inside `error` | `request_id` is a **sibling** of `error`; `error` holds only `code` and `message`. Confirmed on `/v2/runtimes/{id}`, `/v2/secrets/{id}`, `/v2/checkpoints/{id}`, `/v2/me` |
+| 2 | 401 covers "missing, malformed, or rejected" token | Missing credential → **403**; rejected token → 401 |
+| 3 | `POST /v2/auth/device/authorization` has no 400 | Returns **400** for every body validation failure |
+| 4 | (nothing about pagination) | List responses include `pagination: {next_cursor, has_more}` beside `data` |
+| 5 | Errors are JSON | The no-credential 403 is the bare **text** `Unauthenticated`, no JSON, no `content-type: application/json` — and the body says "Unauthenticated" while the status says 403 |
+| 6 | `--template` placeholder is `${credential}` | Requires `${secret}` (also C-05) |
+
+Two further inconsistencies that are real behaviour rather than doc bugs, but which a generated spec
+would at least make visible:
+
+- **The success envelope is not uniform.** `POST /v2/auth/device/authorization` and `GET /v2/me` wrap
+  their payload in `data`; `POST /v2/auth/device/token` does not.
+- **`POST /v2/auth/device/token` returns a different error shape at 400** — `error` is a bare RFC 8628
+  string (`authorization_pending`, `slow_down`, `access_denied`, `expired_token`) rather than the
+  object used everywhere else, so a client must branch on the status code before parsing `error`.
+
+Validation errors also leak Rust serde internals to the caller:
+
+```console
+$ curl -X POST -H 'content-type: application/json' -d '{"client_id":"nope"}' \
+    https://api.runta.com/v2/auth/device/authorization
+{"error":{"code":"invalid_argument","message":"Couldn't parse body parameter BeginDeviceAuthorizationRequest - doesn't match schema: unknown variant `nope`, expected one of `runta_cli`, `runta_agent`, `runta_crew` at line 1 column 19"},"request_id":"…"}
+```
+
+Useful content, wrong packaging — the caller gets an internal type name and a byte offset instead of a
+field path and an allowed-values list.
+
+→ Serve the existing spec at a stable URL (`https://api.runta.com/openapi.json`) and generate both the
+reference pages and the agent skill from it (C-05, C-30). Fix the six divergences above — #1 and #2 are
+the ones that silently corrupt hand-written clients, because the error code, message and request id all
+end up empty. Give validation errors a structured `error.details` with the field path and permitted
+values instead of serde's rendering.
+
+One more gap worth noting while the API surface is in view: the reference documents **22 Cloud Agents
+operations** under `/v2/agents` that the CLI exposes no commands for at all — while the official agent
+skill documents a `runta agents ls` that doesn't exist (C-30). The API is ahead of the CLI here, and a
+published spec would make that gap obvious rather than something you find by reading both by hand.
 
 ---
 
