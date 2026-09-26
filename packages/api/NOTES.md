@@ -122,7 +122,28 @@ So accepting names is a client responsibility — `resolveRuntimeId` in `@runta/
 matches. This is consistent with the exec WebSocket spec, which says the CLI resolves names to ids
 first, and inconsistent with these two REST pages.
 
-### 7. `resources.disk_gib` is actually `resources.requests.disk_gib`
+### 7. `checkpoint_id` is UUID-only too, and images have two identifiers
+
+Same pattern as `{runtime_id}`: a checkpoint name is rejected —
+
+```console
+$ curl -X POST -H "Authorization: Bearer $RUNTA_TOKEN" -H 'content-type: application/json' \
+    -d '{"checkpoint_id":"some-name"}' https://api.runta.com/v2/runtimes
+{"error":{"code":"invalid_argument","message":"checkpoint_id must be a UUID"},"request_id":"…"}
+```
+
+Images are the opposite shape: `GET /v2/images` returns both a slug `id` (`clean`) and a display
+`name` (`Clean runtime`), and `create` takes the slug. That list is **not paginated** — it is the one
+list endpoint with no `pagination` object, 13 images at the time of writing.
+
+`resolveRuntimeId`, `resolveCheckpointId` and `resolveImageId` in `@runta/core` exist because of
+this: the CLI accepts either form for all three and resolves before the request.
+
+The `CheckpointSummary` schema here is **partial** — only `id`, `display_name` and `state` are
+described, because the account used to verify this spec had no checkpoints to sample. Fill it in
+before building checkpoint commands.
+
+### 8. `resources.disk_gib` is actually `resources.requests.disk_gib`
 
 The reference flattens the `resources` nesting, leaving it ambiguous whether `disk_gib` sits under
 `resources` or `resources.requests`. Live, it is under `requests`, and `observed_disk_gib` is under
@@ -134,13 +155,13 @@ The reference flattens the `resources` nesting, leaving it ambiguous whether `di
                  "requests": { "memory_mib": 1024, "vcpus": 1, "disk_gib": 16 } } }
 ```
 
-### 8. `listruntimes` documents no allowed values for `status`
+### 9. `listruntimes` documents no allowed values for `status`
 
 The parameter is a bare string with no enum. Verified live: it accepts the values from the response
 `status` enum and answers 422 for anything else. `limit` is 1–100 — both 0 and 101 are 422 — and the
 cursor parameter is named `after`, not `cursor`.
 
-### 9. Envelope is inconsistent across auth endpoints
+### 10. Envelope is inconsistent across auth endpoints
 
 - `POST /v2/auth/device/authorization` → `{ "data": { … } }`
 - `POST /v2/auth/device/token` → **not** enveloped, fields at the top level
@@ -149,7 +170,7 @@ cursor parameter is named `after`, not `cursor`.
 Confirmed live. The spec models each one as it actually is, which is why `DeviceToken` has no wrapper
 type while `DeviceAuthorization` and `User` do.
 
-### 10. `POST /v2/auth/device/token` 400 has a different body shape from every other error
+### 11. `POST /v2/auth/device/token` 400 has a different body shape from every other error
 
 ```console
 $ curl -X POST -H 'content-type: application/json' -d '{"device_code":"deadbeef"}' \
@@ -202,7 +223,8 @@ accept either. One shared resolver, used by every command.
 
 ## Coverage
 
-Done: **auth** (3) + **identity** (1) + **runtimes** (4 of 21) + **model providers** (1 of 2).
+Done: **auth** (3) + **identity** (1) + **runtimes** (4 of 21) + **images** (1 of 5) +
+**checkpoints** (1 of 4) + **model providers** (1 of 2).
 
 | Group | Operations | Status |
 |---|---|---|
@@ -212,14 +234,15 @@ Done: **auth** (3) + **identity** (1) + **runtimes** (4 of 21) + **model provide
 | Events / token analysis | 5 | todo |
 | GitHub | 9 | todo |
 | Runtimes | 21 | 4 of 21 (create, list, get, delete) |
+| Images | 5 | 1 of 5 (`listRuntimeImages`, for name resolution) |
 | Files | 2 | todo |
 | SSH keys | 7 | todo |
 | Secrets | 5 | todo |
-| Checkpoints | 4 | todo |
+| Checkpoints | 4 | 1 of 4 (`listCheckpoints`, for name resolution) |
 | Cloud Agents | 22 | todo |
 | Managed model providers | 2 | 1 of 2 (`listManagedModelProviders`, for its `organization_id`) |
 
-85 documented operations total; 9 described here. Operation detail pages follow
+85 documented operations total; 11 described here. Operation detail pages follow
 `https://runta.com/docs/reference/api/operations/<slug>/`.
 
 Note for later: the docs list a **Cloud Agents** group (22 operations under `/v2/agents`) that the

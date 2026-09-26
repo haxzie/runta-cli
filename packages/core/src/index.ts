@@ -12,6 +12,8 @@ export {
   type DeleteResult,
   deleteAtCurrentRevision,
   RuntimeWaitError,
+  resolveCheckpointId,
+  resolveImageId,
   resolveRuntimeId,
   type WaitDeps,
   type WaitOptions,

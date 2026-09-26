@@ -3,7 +3,7 @@
   "info": {
     "title": "Runta API",
     "version": "0.1.0",
-    "description": "Hand-written from https://runta.com/docs/reference/api/ and verified against live https://api.runta.com. Runta does not publish an openapi.json (all candidate URLs 404), so this file is source rather than a generated snapshot \u2014 it is maintained by hand, operation group by operation group, and codegen reads it directly with no network access. Where the published docs and the live API disagree, this spec follows the live API; see NOTES.md for the list of divergences.\n\nCoverage: auth, identity, runtime CRUD, and the model-providers list (for its organization_id). 76 of the 85 documented operations are not yet described."
+    "description": "Hand-written from https://runta.com/docs/reference/api/ and verified against live https://api.runta.com. Runta does not publish an openapi.json (all candidate URLs 404), so this file is source rather than a generated snapshot \u2014 it is maintained by hand, operation group by operation group, and codegen reads it directly with no network access. Where the published docs and the live API disagree, this spec follows the live API; see NOTES.md for the list of divergences.\n\nCoverage: auth, identity, runtime CRUD, the image and checkpoint lists (for name resolution), and the model-providers list (for its organization_id). 74 of the 85 documented operations are not yet described."
   },
   "servers": [
     {
@@ -32,6 +32,14 @@
     {
       "name": "runtimes",
       "description": "Create, list, inspect and delete runtimes."
+    },
+    {
+      "name": "images",
+      "description": "Runtime images."
+    },
+    {
+      "name": "checkpoints",
+      "description": "Runtime checkpoints."
     }
   ],
   "paths": {
@@ -674,6 +682,143 @@
           },
           "204": {
             "description": "Deletion was already complete. No content."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          }
+        }
+      }
+    },
+    "/v2/images": {
+      "get": {
+        "operationId": "listRuntimeImages",
+        "summary": "List runtime images",
+        "tags": [
+          "images"
+        ],
+        "description": "Images carry both a slug `id` (what create takes) and a display `name`, so the CLI lists them to accept either.",
+        "responses": {
+          "200": {
+            "description": "Available runtime images.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeImageListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          }
+        }
+      }
+    },
+    "/v2/checkpoints": {
+      "get": {
+        "operationId": "listCheckpoints",
+        "summary": "List checkpoints",
+        "tags": [
+          "checkpoints"
+        ],
+        "description": "Cursor-paginated like the runtime list. Described here so `create --from-checkpoint` can accept a checkpoint name \u2014 `checkpoint_id` itself must be a UUID.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of checkpoints.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckpointListResponse"
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/Error400"
@@ -1795,6 +1940,150 @@
             }
           }
         ]
+      },
+      "RuntimeImage": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "architectures",
+          "disk",
+          "recommended_resources",
+          "is_default",
+          "is_custom",
+          "exposed_ports"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable slug, e.g. `clean` or `claude`. What create takes."
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name, e.g. \"Clean runtime\"."
+          },
+          "description": {
+            "type": "string"
+          },
+          "icon_key": {
+            "type": "string"
+          },
+          "architectures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "disk": {
+            "type": "object",
+            "required": [
+              "minimum_gib",
+              "maximum_gib",
+              "default_gib",
+              "step_gib"
+            ],
+            "properties": {
+              "minimum_gib": {
+                "type": "integer"
+              },
+              "maximum_gib": {
+                "type": "integer"
+              },
+              "default_gib": {
+                "type": "integer"
+              },
+              "step_gib": {
+                "type": "integer"
+              }
+            }
+          },
+          "recommended_resources": {
+            "type": "object",
+            "required": [
+              "vcpus",
+              "memory_mib"
+            ],
+            "properties": {
+              "vcpus": {
+                "type": "integer"
+              },
+              "memory_mib": {
+                "type": "integer"
+              }
+            }
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "is_custom": {
+            "type": "boolean"
+          },
+          "exposed_ports": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "model_provider": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Present only on images that front a model provider. Shape not yet described."
+          }
+        }
+      },
+      "RuntimeImageListResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "description": "Not paginated \u2014 unlike the runtime and checkpoint lists, there is no `pagination`.",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuntimeImage"
+            }
+          }
+        }
+      },
+      "CheckpointSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "display_name"
+        ],
+        "additionalProperties": true,
+        "description": "Partial. Only the fields needed to resolve a name are described, because the account used to verify this spec had no checkpoints. See NOTES.md.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "description": "Observed values include `creating` and `ready`."
+          }
+        }
+      },
+      "CheckpointListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckpointSummary"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
       }
     },
     "responses": {

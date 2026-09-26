@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   deleteAtCurrentRevision,
   RuntimeWaitError,
+  resolveCheckpointId,
+  resolveImageId,
   resolveRuntimeId,
   waitUntilDeleted,
   waitUntilRunning,
@@ -99,6 +101,18 @@ const page = (runtimes: Runtime[], cursor: string | null = null) => ({
 });
 
 const listRoute = (body: unknown) => ({ method: 'GET', path: '/v2/runtimes', status: 200, body });
+const imagesRoute = (images: { id: string; name: string }[]) => ({
+  method: 'GET',
+  path: '/v2/images',
+  status: 200,
+  body: { data: images },
+});
+const checkpointsRoute = (body: unknown) => ({
+  method: 'GET',
+  path: '/v2/checkpoints',
+  status: 200,
+  body,
+});
 const getRoute = (body: unknown, status = 200) => ({
   method: 'GET',
   path: `/v2/runtimes/${ID}`,
@@ -331,5 +345,107 @@ describe('deleteAtCurrentRevision', () => {
     const error = await deleteAtCurrentRevision(c, ID).catch((e: unknown) => e);
 
     expect((error as RuntaApiError).status).toBe(403);
+  });
+});
+
+describe('resolveImageId', () => {
+  const images = [
+    { id: 'clean', name: 'Clean runtime' },
+    { id: 'claude', name: 'Claude Code' },
+  ];
+
+  it('accepts the slug id unchanged', async () => {
+    const { client: c } = await makeClient([imagesRoute(images)]);
+
+    await expect(resolveImageId(c, 'clean')).resolves.toBe('clean');
+  });
+
+  it('resolves the display name to the slug', async () => {
+    // The dashboard shows "Clean runtime"; the API wants "clean".
+    const { client: c } = await makeClient([imagesRoute(images)]);
+
+    await expect(resolveImageId(c, 'Clean runtime')).resolves.toBe('clean');
+  });
+
+  it('prefers an exact id match over a name match', async () => {
+    // A hypothetical image named the same as another's id must not shadow the canonical form.
+    const { client: c } = await makeClient([
+      imagesRoute([
+        { id: 'clean', name: 'Clean runtime' },
+        { id: 'other', name: 'clean' },
+      ]),
+    ]);
+
+    await expect(resolveImageId(c, 'clean')).resolves.toBe('clean');
+  });
+
+  it('lists the available ids when the name is unknown', async () => {
+    // There is no `runta image list` yet, and we are already holding the answer.
+    const { client: c } = await makeClient([imagesRoute(images)]);
+
+    const error = await resolveImageId(c, 'Nope').catch((e: unknown) => e);
+
+    expect((error as Error).message).toContain("Image 'Nope' was not found");
+    expect((error as { hint?: string }).hint).toContain('clean, claude');
+  });
+
+  it('refuses to guess between two images sharing a display name', async () => {
+    const { client: c } = await makeClient([
+      imagesRoute([
+        { id: 'a', name: 'Same' },
+        { id: 'b', name: 'Same' },
+      ]),
+    ]);
+
+    const error = await resolveImageId(c, 'Same').catch((e: unknown) => e);
+
+    expect((error as Error).message).toContain('ambiguous');
+  });
+});
+
+describe('resolveCheckpointId', () => {
+  it('passes a UUID straight through', async () => {
+    const { client: c, calls } = await makeClient([]);
+
+    await expect(resolveCheckpointId(c, ID)).resolves.toBe(ID);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('resolves a checkpoint name', async () => {
+    // checkpoint_id must be a UUID — the API answers `checkpoint_id must be a UUID` for a name.
+    const { client: c } = await makeClient([
+      checkpointsRoute({
+        data: [{ id: ID, display_name: 'nightly' }],
+        pagination: { next_cursor: null, has_more: false },
+      }),
+    ]);
+
+    await expect(resolveCheckpointId(c, 'nightly')).resolves.toBe(ID);
+  });
+
+  it('walks pages', async () => {
+    const { client: c, calls } = await makeClient([
+      checkpointsRoute({
+        data: [{ id: 'x', display_name: 'other' }],
+        pagination: { next_cursor: 'c1', has_more: true },
+      }),
+      checkpointsRoute({
+        data: [{ id: ID, display_name: 'nightly' }],
+        pagination: { next_cursor: null, has_more: false },
+      }),
+    ]);
+
+    await expect(resolveCheckpointId(c, 'nightly')).resolves.toBe(ID);
+    expect(calls[1]?.url).toContain('after=c1');
+  });
+
+  it('says the list command does not exist rather than naming the wrong one', async () => {
+    const { client: c } = await makeClient([
+      checkpointsRoute({ data: [], pagination: { next_cursor: null, has_more: false } }),
+    ]);
+
+    const error = await resolveCheckpointId(c, 'ghost').catch((e: unknown) => e);
+
+    expect((error as { hint?: string }).hint).toContain('does not exist yet');
   });
 });

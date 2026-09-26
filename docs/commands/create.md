@@ -82,11 +82,34 @@ becomes
 
 Omit a flag and the runtime image's recommendation applies.
 
+## `--image` takes a slug or a display name
+
+Images carry both — `clean` and `Clean runtime` — and the API accepts only the slug, so the CLI
+resolves the name:
+
+```sh
+runta create --image clean            # slug
+runta create --image 'Clean runtime'  # display name, resolved to `clean`
+```
+
+An unknown name lists what exists, because there is no `runta image list` yet:
+
+```console
+$ runta create --image 'Nope'
+error Image 'Nope' was not found.
+Available images: claude, clean, cloud_agent, codex, cursor, deepseek_harness, exo, flue, hermes, kimi, openclaw, opencode, pi.
+```
+
 ## Restoring from a checkpoint
 
 ```sh
-runta create --from-checkpoint ck_abc --name restored
+runta create --from-checkpoint 01a0dcc4-… --name restored
+runta create --from-checkpoint nightly --name restored   # by name
 ```
+
+`checkpoint_id` must be a UUID, so a name is resolved the same way a runtime name is. There is no
+`runta checkpoint list` yet, so an unknown name says so rather than naming a command that would
+not help.
 
 A checkpoint fixes the runtime's size and image identity, so `--cpus`, `--memory` and `--image`
 are **rejected** rather than silently ignored:

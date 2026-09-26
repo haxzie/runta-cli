@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BeginDeviceAuthorizationData, BeginDeviceAuthorizationErrors, BeginDeviceAuthorizationResponses, CreateRuntimeData, CreateRuntimeErrors, CreateRuntimeResponses, DeleteRuntimeData, DeleteRuntimeErrors, DeleteRuntimeResponses, ExchangeDeviceTokenData, ExchangeDeviceTokenErrors, ExchangeDeviceTokenResponses, GetMeData, GetMeErrors, GetMeResponses, GetRuntimeData, GetRuntimeErrors, GetRuntimeResponses, ListManagedModelProvidersData, ListManagedModelProvidersErrors, ListManagedModelProvidersResponses, ListRuntimesData, ListRuntimesErrors, ListRuntimesResponses, RevokeCurrentTokenData, RevokeCurrentTokenErrors, RevokeCurrentTokenResponses } from './types.gen';
+import type { BeginDeviceAuthorizationData, BeginDeviceAuthorizationErrors, BeginDeviceAuthorizationResponses, CreateRuntimeData, CreateRuntimeErrors, CreateRuntimeResponses, DeleteRuntimeData, DeleteRuntimeErrors, DeleteRuntimeResponses, ExchangeDeviceTokenData, ExchangeDeviceTokenErrors, ExchangeDeviceTokenResponses, GetMeData, GetMeErrors, GetMeResponses, GetRuntimeData, GetRuntimeErrors, GetRuntimeResponses, ListCheckpointsData, ListCheckpointsErrors, ListCheckpointsResponses, ListManagedModelProvidersData, ListManagedModelProvidersErrors, ListManagedModelProvidersResponses, ListRuntimeImagesData, ListRuntimeImagesErrors, ListRuntimeImagesResponses, ListRuntimesData, ListRuntimesErrors, ListRuntimesResponses, RevokeCurrentTokenData, RevokeCurrentTokenErrors, RevokeCurrentTokenResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -126,5 +126,27 @@ export const deleteRuntime = <ThrowOnError extends boolean = false>(options: Opt
 export const getRuntime = <ThrowOnError extends boolean = false>(options: Options<GetRuntimeData, ThrowOnError>): RequestResult<GetRuntimeResponses, GetRuntimeErrors, ThrowOnError> => (options.client ?? client).get<GetRuntimeResponses, GetRuntimeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v2/runtimes/{runtime_id}',
+    ...options
+});
+
+/**
+ * List runtime images
+ *
+ * Images carry both a slug `id` (what create takes) and a display `name`, so the CLI lists them to accept either.
+ */
+export const listRuntimeImages = <ThrowOnError extends boolean = false>(options?: Options<ListRuntimeImagesData, ThrowOnError>): RequestResult<ListRuntimeImagesResponses, ListRuntimeImagesErrors, ThrowOnError> => (options?.client ?? client).get<ListRuntimeImagesResponses, ListRuntimeImagesErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/images',
+    ...options
+});
+
+/**
+ * List checkpoints
+ *
+ * Cursor-paginated like the runtime list. Described here so `create --from-checkpoint` can accept a checkpoint name — `checkpoint_id` itself must be a UUID.
+ */
+export const listCheckpoints = <ThrowOnError extends boolean = false>(options?: Options<ListCheckpointsData, ThrowOnError>): RequestResult<ListCheckpointsResponses, ListCheckpointsErrors, ThrowOnError> => (options?.client ?? client).get<ListCheckpointsResponses, ListCheckpointsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/checkpoints',
     ...options
 });

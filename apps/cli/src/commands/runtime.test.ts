@@ -66,6 +66,14 @@ const POST = (body: unknown, status = 201): Route => ({
   status,
   body,
 });
+const IMAGES = (
+  images: { id: string; name: string }[] = [{ id: 'clean', name: 'Clean runtime' }],
+): Route => ({
+  method: 'GET',
+  path: '/v2/images',
+  status: 200,
+  body: { data: images },
+});
 const DEL = (status = 202, body?: unknown): Route => ({
   method: 'DELETE',
   path: `/v2/runtimes/${ID}`,
@@ -183,14 +191,45 @@ describe('create', () => {
     expect((error as Error).message).toContain('--cpus cannot be combined with --from-checkpoint');
   });
 
+  it('resolves an image display name to its slug before creating', async () => {
+    const { stub, deps } = harness([IMAGES(), POST({ data: runtime() })]);
+
+    await create({ image: 'Clean runtime', detach: true }, deps);
+
+    expect(await bodyOf(stub.calls[1] as Request)).toEqual({ image: { id: 'clean' } });
+  });
+
+  it('adds a 5xx hint, because those bodies are often not JSON', async () => {
+    // Runta's API 520s intermittently, and the bare message degrades to `520 <none>`.
+    const { deps } = harness([
+      { method: 'POST', path: '/v2/runtimes', status: 503, body: undefined },
+    ]);
+
+    const error = await create({ detach: true }, deps).catch((e: unknown) => e);
+
+    expect((error as { hint?: string }).hint).toContain('transient');
+  });
+
   it('sends checkpoint_id when restoring', async () => {
-    const { stub, deps } = harness([POST({ data: runtime() })]);
+    // `checkpoint_id` must be a UUID, so a name is resolved first — same as runtimes.
+    const { stub, deps } = harness([
+      {
+        method: 'GET',
+        path: '/v2/checkpoints',
+        status: 200,
+        body: {
+          data: [{ id: ID, display_name: 'nightly' }],
+          pagination: { next_cursor: null, has_more: false },
+        },
+      },
+      POST({ data: runtime() }),
+    ]);
 
-    await create({ fromCheckpoint: 'ck_1', name: 'restored', detach: true }, deps);
+    await create({ fromCheckpoint: 'nightly', name: 'restored', detach: true }, deps);
 
-    expect(await bodyOf(stub.calls[0] as Request)).toEqual({
+    expect(await bodyOf(stub.calls[1] as Request)).toEqual({
       name: 'restored',
-      checkpoint_id: 'ck_1',
+      checkpoint_id: ID,
     });
   });
 

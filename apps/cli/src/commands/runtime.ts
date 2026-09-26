@@ -10,6 +10,8 @@ import {
   createContext,
   deleteAtCurrentRevision,
   RuntimeWaitError,
+  resolveCheckpointId,
+  resolveImageId,
   resolveRuntimeId,
   waitUntilDeleted,
   waitUntilRunning,
@@ -76,7 +78,7 @@ export async function create(
   deps: CommandDeps = defaultDeps,
 ): Promise<void> {
   const { client } = await createContext();
-  const body = createBody(options);
+  const body = await run(() => createBody(client, options));
 
   let runtime = await run(async () => {
     const { data } = await createRuntime({ client, body, throwOnError: true });
@@ -109,7 +111,10 @@ export async function create(
  * Builds the request body. Note the API has no top-level `cpus`/`memory`/`disk` — they live
  * under `resources.requests`, and the auto-scaling ceiling is `resources.limits.memory_mib`.
  */
-function createBody(options: CreateOptions): Parameters<typeof createRuntime>[0]['body'] {
+async function createBody(
+  client: RuntaClient,
+  options: CreateOptions,
+): Promise<Parameters<typeof createRuntime>[0]['body']> {
   const common = {
     ...(options.name ? { name: options.name } : {}),
     ...(options.publish?.length ? { ingress_specs: options.publish.map(ingress) } : {}),
@@ -131,7 +136,7 @@ function createBody(options: CreateOptions): Parameters<typeof createRuntime>[0]
         });
       }
     }
-    return { ...common, checkpoint_id: options.fromCheckpoint };
+    return { ...common, checkpoint_id: await resolveCheckpointId(client, options.fromCheckpoint) };
   }
 
   const requests = {
@@ -145,7 +150,7 @@ function createBody(options: CreateOptions): Parameters<typeof createRuntime>[0]
 
   return {
     ...common,
-    ...(options.image ? { image: { id: options.image } } : {}),
+    ...(options.image ? { image: { id: await resolveImageId(client, options.image) } } : {}),
     ...(Object.keys(requests).length || limits
       ? {
           resources: {
@@ -492,6 +497,10 @@ function hintFor(error: RuntaApiError): string | undefined {
   if (error.status === 404) return 'Check the name or id with `runta list --all`.';
   if (error.status === 409)
     return 'Something else changed the runtime at the same time. Try again.';
+  // 5xx bodies are often not JSON, so the message degrades to bare status text like
+  // `520 <none>`, which tells the user nothing. Name the cause instead.
+  if (error.status >= 500)
+    return 'The Runta API is having trouble — this is usually transient. Try again.';
   return undefined;
 }
 

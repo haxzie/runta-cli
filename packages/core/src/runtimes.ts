@@ -2,6 +2,8 @@ import {
   deleteRuntime,
   getRuntime,
   isRuntaApiError,
+  listCheckpoints,
+  listRuntimeImages,
   listRuntimes,
   type RuntaClient,
   type Runtime,
@@ -49,16 +51,86 @@ export async function resolveRuntimeId(client: RuntaClient, reference: string): 
     after = data.pagination.next_cursor;
   }
 
-  if (matches.length === 0) {
-    return fail(`Runtime '${reference}' was not found.`, {
-      exitCode: 1,
-      hint: 'List what exists with `runta list --all`.',
+  return pick('Runtime', reference, matches, 'List what exists with `runta list --all`.');
+}
+
+/**
+ * Turns an image name or slug into the slug `create` needs.
+ *
+ * Images carry both — `id: "clean"` and `name: "Clean runtime"` — and the id is what the API
+ * accepts. Resolving means `--image "Clean runtime"` works too, which matters because the display
+ * name is what the dashboard shows.
+ */
+export async function resolveImageId(client: RuntaClient, reference: string): Promise<string> {
+  const { data } = await listRuntimeImages({ client, throwOnError: true });
+
+  // An exact id match wins outright: ids are the canonical form and cannot be ambiguous.
+  if (data.data.some((image) => image.id === reference)) return reference;
+
+  const matches = data.data
+    .filter((image) => image.name === reference)
+    .map((image) => ({ id: image.id, display_name: image.name }));
+
+  // Naming the valid ids beats naming a command: there is no `runta image list` yet, and we are
+  // already holding the full list that would answer the question.
+  return pick(
+    'Image',
+    reference,
+    matches,
+    `Available images: ${data.data.map((image) => image.id).join(', ')}.`,
+  );
+}
+
+/**
+ * Turns a checkpoint name into its UUID.
+ *
+ * `checkpoint_id` must be a UUID — verified live, it answers `checkpoint_id must be a UUID` for a
+ * name — so this is the same client-side resolution runtimes need.
+ */
+export async function resolveCheckpointId(client: RuntaClient, reference: string): Promise<string> {
+  if (UUID.test(reference)) return reference;
+
+  const matches: { id: string; display_name: string }[] = [];
+  let after: string | undefined;
+
+  for (;;) {
+    const { data } = await listCheckpoints({
+      client,
+      query: { limit: 100, ...(after ? { after } : {}) },
+      throwOnError: true,
     });
+    matches.push(...data.data.filter((checkpoint) => checkpoint.display_name === reference));
+    if (!data.pagination.has_more || !data.pagination.next_cursor) break;
+    after = data.pagination.next_cursor;
+  }
+
+  return pick(
+    'Checkpoint',
+    reference,
+    matches,
+    'Pass the checkpoint UUID instead — `runta checkpoint list` does not exist yet.',
+  );
+}
+
+/**
+ * Shared outcome for every name lookup, so all three read the same way.
+ *
+ * An ambiguous name is an error rather than a guess. Names are not unique, and silently picking
+ * the first match means deleting or restoring the wrong thing some fraction of the time.
+ */
+function pick(
+  noun: string,
+  reference: string,
+  matches: readonly { id: string; display_name: string }[],
+  hint: string,
+): string {
+  if (matches.length === 0) {
+    return fail(`${noun} '${reference}' was not found.`, { exitCode: 1, hint });
   }
   if (matches.length > 1) {
-    return fail(`Runtime name '${reference}' is ambiguous — ${matches.length} runtimes share it.`, {
+    return fail(`${noun} name '${reference}' is ambiguous — ${matches.length} of them share it.`, {
       exitCode: 1,
-      hint: `Use an id instead: ${matches.map((runtime) => runtime.id).join(', ')}`,
+      hint: `Use an id instead: ${matches.map((match) => match.id).join(', ')}`,
     });
   }
   return matches[0]?.id as string;
@@ -99,7 +171,7 @@ const DEFAULTS = { timeoutMs: 180_000, intervalMs: 2_000 };
  */
 export async function waitUntilRunning(
   client: RuntaClient,
-  reference: string,
+  runtimeId: string,
   deps: WaitDeps,
   options: WaitOptions = {},
 ): Promise<Runtime> {
@@ -109,7 +181,7 @@ export async function waitUntilRunning(
   for (;;) {
     const { data } = await getRuntime({
       client,
-      path: { runtime_id: reference },
+      path: { runtime_id: runtimeId },
       throwOnError: true,
     });
     const runtime = data.data;
@@ -143,7 +215,7 @@ export async function waitUntilRunning(
 /** Polls until the runtime is gone — a 404, or a terminal absence. */
 export async function waitUntilDeleted(
   client: RuntaClient,
-  reference: string,
+  runtimeId: string,
   deps: WaitDeps,
   options: WaitOptions = {},
 ): Promise<void> {
@@ -155,7 +227,7 @@ export async function waitUntilDeleted(
     try {
       const { data } = await getRuntime({
         client,
-        path: { runtime_id: reference },
+        path: { runtime_id: runtimeId },
         throwOnError: true,
       });
       runtime = data.data;
@@ -195,7 +267,7 @@ export interface DeleteResult {
  */
 export async function deleteAtCurrentRevision(
   client: RuntaClient,
-  reference: string,
+  runtimeId: string,
   attempts = 2,
 ): Promise<DeleteResult> {
   let last: unknown;
@@ -203,7 +275,7 @@ export async function deleteAtCurrentRevision(
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const { data } = await getRuntime({
       client,
-      path: { runtime_id: reference },
+      path: { runtime_id: runtimeId },
       throwOnError: true,
     });
     const runtime = data.data;
@@ -211,7 +283,7 @@ export async function deleteAtCurrentRevision(
     try {
       const response = await deleteRuntime({
         client,
-        path: { runtime_id: reference },
+        path: { runtime_id: runtimeId },
         query: { expected_revision: runtime.revision },
         throwOnError: true,
       });

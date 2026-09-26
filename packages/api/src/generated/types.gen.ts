@@ -409,6 +409,64 @@ export type CreateRuntimeRequest = {
     checkpoint_id: string;
 };
 
+export type RuntimeImage = {
+    /**
+     * Stable slug, e.g. `clean` or `claude`. What create takes.
+     */
+    id: string;
+    /**
+     * Display name, e.g. "Clean runtime".
+     */
+    name: string;
+    description?: string;
+    icon_key?: string;
+    architectures: Array<string>;
+    disk: {
+        minimum_gib: number;
+        maximum_gib: number;
+        default_gib: number;
+        step_gib: number;
+    };
+    recommended_resources: {
+        vcpus: number;
+        memory_mib: number;
+    };
+    is_default: boolean;
+    is_custom: boolean;
+    exposed_ports: Array<number>;
+    /**
+     * Present only on images that front a model provider. Shape not yet described.
+     */
+    model_provider?: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * Not paginated — unlike the runtime and checkpoint lists, there is no `pagination`.
+ */
+export type RuntimeImageListResponse = {
+    data: Array<RuntimeImage>;
+};
+
+/**
+ * Partial. Only the fields needed to resolve a name are described, because the account used to verify this spec had no checkpoints. See NOTES.md.
+ */
+export type CheckpointSummary = {
+    id: string;
+    display_name: string;
+    /**
+     * Observed values include `creating` and `ready`.
+     */
+    state?: string;
+    [key: string]: unknown;
+};
+
+export type CheckpointListResponse = {
+    data: Array<CheckpointSummary>;
+    pagination: Pagination;
+};
+
 export type BeginDeviceAuthorizationData = {
     body: BeginDeviceAuthorizationRequest;
     path?: never;
@@ -1063,3 +1121,144 @@ export type GetRuntimeResponses = {
 };
 
 export type GetRuntimeResponse = GetRuntimeResponses[keyof GetRuntimeResponses];
+
+export type ListRuntimeImagesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v2/images';
+};
+
+export type ListRuntimeImagesErrors = {
+    /**
+     * Malformed or invalid request body.
+     */
+    400: ErrorResponse;
+    /**
+     * The bearer token was present but rejected.
+     */
+    401: ErrorResponse;
+    /**
+     * No bearer token was supplied, or the token's role does not allow this action.
+     */
+    403: ErrorResponse;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * The request conflicts with current resource state.
+     */
+    409: ErrorResponse;
+    /**
+     * Validation or application error.
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded.
+     */
+    429: ErrorResponse;
+    /**
+     * Internal error.
+     */
+    500: ErrorResponse;
+    /**
+     * Operation is not implemented.
+     */
+    501: ErrorResponse;
+    /**
+     * Upstream service is unavailable.
+     */
+    503: ErrorResponse;
+    /**
+     * Upstream request timed out.
+     */
+    504: ErrorResponse;
+    /**
+     * Error response.
+     */
+    default: ErrorResponse;
+};
+
+export type ListRuntimeImagesError = ListRuntimeImagesErrors[keyof ListRuntimeImagesErrors];
+
+export type ListRuntimeImagesResponses = {
+    /**
+     * Available runtime images.
+     */
+    200: RuntimeImageListResponse;
+};
+
+export type ListRuntimeImagesResponse = ListRuntimeImagesResponses[keyof ListRuntimeImagesResponses];
+
+export type ListCheckpointsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        limit?: number;
+        after?: string;
+    };
+    url: '/v2/checkpoints';
+};
+
+export type ListCheckpointsErrors = {
+    /**
+     * Malformed or invalid request body.
+     */
+    400: ErrorResponse;
+    /**
+     * The bearer token was present but rejected.
+     */
+    401: ErrorResponse;
+    /**
+     * No bearer token was supplied, or the token's role does not allow this action.
+     */
+    403: ErrorResponse;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * The request conflicts with current resource state.
+     */
+    409: ErrorResponse;
+    /**
+     * Validation or application error.
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded.
+     */
+    429: ErrorResponse;
+    /**
+     * Internal error.
+     */
+    500: ErrorResponse;
+    /**
+     * Operation is not implemented.
+     */
+    501: ErrorResponse;
+    /**
+     * Upstream service is unavailable.
+     */
+    503: ErrorResponse;
+    /**
+     * Upstream request timed out.
+     */
+    504: ErrorResponse;
+    /**
+     * Error response.
+     */
+    default: ErrorResponse;
+};
+
+export type ListCheckpointsError = ListCheckpointsErrors[keyof ListCheckpointsErrors];
+
+export type ListCheckpointsResponses = {
+    /**
+     * A page of checkpoints.
+     */
+    200: CheckpointListResponse;
+};
+
+export type ListCheckpointsResponse = ListCheckpointsResponses[keyof ListCheckpointsResponses];

@@ -58,9 +58,21 @@ unique, an ambiguous name is an error rather than a guess —
 
 ```console
 $ runta inspect demo
-error Runtime name 'demo' is ambiguous — 2 runtimes share it.
+error Runtime name 'demo' is ambiguous — 2 of them share it.
 Use an id instead: 01a0dcc4-…, 01a0dd12-…
 ```
+
+The same holds for every other identifier the CLI accepts, so there is nothing to remember about
+which flag wants which form:
+
+| Identifier | Accepts | Canonical form |
+| --- | --- | --- |
+| `<runtime>` on `inspect`, `delete` | name or UUID | UUID |
+| `--image` on `create` | slug or display name | slug, e.g. `clean` |
+| `--from-checkpoint` on `create` | name or UUID | UUID |
+
+Each resolves to the canonical form before any request that needs it, and each refuses an
+ambiguous name rather than picking one.
 
 ## Global options
 
