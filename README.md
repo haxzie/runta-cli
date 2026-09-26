@@ -150,6 +150,15 @@ docs web app:
 
 Keep them in step with the code: a flag added without a docs change is a bug.
 
+### Design rules
+
+[`.claude/skills/cli-design/`](./.claude/skills/cli-design) holds the rules we design this CLI
+by — naming, flags, output and JSON contracts, errors, exit codes, credential handling,
+destructive-action safety, agent-friendliness. Every rule traces to a specific defect recorded in
+[`CLI_ISSUES.md`](./CLI_ISSUES.md), so `references/findings-map.md` is the evidence behind each
+one and `references/checklist.md` is the pre-PR pass. Claude Code loads it automatically when you
+touch a command; read it yourself before designing one.
+
 ## Development
 
 Requires [Bun](https://bun.sh) 1.3+, Node 22 (see `.nvmrc`) and pnpm 10.
