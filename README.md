@@ -152,8 +152,10 @@ Keep them in step with the code: a flag added without a docs change is a bug.
 
 ### Design rules
 
-[`RESEARCH.md`](./RESEARCH.md) records how E2B, Daytona, Modal and Docker name the equivalent
-commands, and which of their conventions we adopt — read it before naming anything new.
+[`Improvements.md`](./Improvements.md) is the decision log: where we deliberately depart from the
+production Runta CLI and why. [`RESEARCH.md`](./RESEARCH.md) is the evidence behind those calls —
+how E2B, Daytona, Modal and Docker name the equivalent commands. Read both before naming anything
+new.
 
 [`.claude/skills/cli-design/`](./.claude/skills/cli-design) holds the rules we design this CLI
 by — naming, flags, output and JSON contracts, errors, exit codes, credential handling,

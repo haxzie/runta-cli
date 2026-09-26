@@ -179,6 +179,13 @@ And, following the universal conventions above:
 - `rm` takes **variadic** positionals, as E2B's `kill [sandboxIDs...]` does and the production Runta
   `rm` already does.
 
+> **Superseded in part.** The recommendation below assumed we would keep the production names and
+> add the field's as aliases. That is no longer the plan: we are starting from zero, so there is no
+> installed base to stay compatible with and no aliases. The decisions actually taken — `create` /
+> `list` / `inspect` / `delete`, flat runtime verbs, no aliases — are in
+> [`Improvements.md`](./Improvements.md). The evidence above stands unchanged; only the conclusion
+> drawn from it moved.
+
 ### Open decision: wait by default, or `--wait`?
 
 The field says **wait by default, `-d`/`--detach` to opt out**. The production Runta CLI says
