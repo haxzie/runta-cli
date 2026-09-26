@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses } from './types.gen';
+import type { BeginDeviceAuthorizationData, BeginDeviceAuthorizationErrors, BeginDeviceAuthorizationResponses, ExchangeDeviceTokenData, ExchangeDeviceTokenErrors, ExchangeDeviceTokenResponses, GetMeData, GetMeErrors, GetMeResponses, RevokeCurrentTokenData, RevokeCurrentTokenErrors, RevokeCurrentTokenResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -19,10 +19,55 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 /**
- * Return the authenticated user
+ * Start a device authorization
+ *
+ * Begins the RFC 8628 device authorization flow. Unauthenticated: this is how a client obtains a credential in the first place. Returns a `user_code` to show the user, a `verification_uri_complete` to open, and a `device_code` to poll `POST /v2/auth/device/token` with, no more often than every `interval` seconds and no later than `expires_at`.
  */
-export const getCurrentUser = <ThrowOnError extends boolean = false>(options?: Options<GetCurrentUserData, ThrowOnError>): RequestResult<GetCurrentUserResponses, GetCurrentUserErrors, ThrowOnError> => (options?.client ?? client).get<GetCurrentUserResponses, GetCurrentUserErrors, ThrowOnError>({
+export const beginDeviceAuthorization = <ThrowOnError extends boolean = false>(options: Options<BeginDeviceAuthorizationData, ThrowOnError>): RequestResult<BeginDeviceAuthorizationResponses, BeginDeviceAuthorizationErrors, ThrowOnError> => (options.client ?? client).post<BeginDeviceAuthorizationResponses, BeginDeviceAuthorizationErrors, ThrowOnError>({
+    url: '/v2/auth/device/authorization',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Exchange a device code for an access token
+ *
+ * Polls for completion of a device authorization. Unauthenticated. While the user has not yet approved, this returns **400 with a different body shape** from every other endpoint — a flat OAuth error string (`authorization_pending`, `slow_down`, `access_denied`, `expired_token`) plus the polling `interval`. Callers must branch on the status code before parsing `error`, because at 400 `error` is a string and everywhere else it is an object.
+ */
+export const exchangeDeviceToken = <ThrowOnError extends boolean = false>(options: Options<ExchangeDeviceTokenData, ThrowOnError>): RequestResult<ExchangeDeviceTokenResponses, ExchangeDeviceTokenErrors, ThrowOnError> => (options.client ?? client).post<ExchangeDeviceTokenResponses, ExchangeDeviceTokenErrors, ThrowOnError>({
+    url: '/v2/auth/device/token',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Revoke the current bearer credential
+ *
+ * Revokes the credential used to make this request. Takes no body — the token in the `Authorization` header is the subject. This is what `runta logout` calls.
+ */
+export const revokeCurrentToken = <ThrowOnError extends boolean = false>(options?: Options<RevokeCurrentTokenData, ThrowOnError>): RequestResult<RevokeCurrentTokenResponses, RevokeCurrentTokenErrors, ThrowOnError> => (options?.client ?? client).delete<RevokeCurrentTokenResponses, RevokeCurrentTokenErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v1/me',
+    url: '/v2/auth/token',
+    ...options
+});
+
+/**
+ * Get the current user profile
+ *
+ * The minimal current-user identity exposed to user-authorized device clients.
+ *
+ * Two caveats confirmed live:
+ * 1. An organization-scoped API key (`rt_…`) gets **403 `permission_denied`** here — "principal's role does not allow this organization action". This endpoint only works with a credential minted by the device flow for a user.
+ * 2. It returns no organization, scope, or expiry information, so it cannot answer "which org am I in" or "is my token still valid". There is no token-introspection operation in the API.
+ */
+export const getMe = <ThrowOnError extends boolean = false>(options?: Options<GetMeData, ThrowOnError>): RequestResult<GetMeResponses, GetMeErrors, ThrowOnError> => (options?.client ?? client).get<GetMeResponses, GetMeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/me',
     ...options
 });

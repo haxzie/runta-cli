@@ -21,7 +21,7 @@ import { stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DEFAULT_SPEC_URL = 'https://api.runta.dev/openapi.json';
+const DEFAULT_SPEC_URL = 'https://api.runta.com/openapi.json';
 const DEFAULT_TTL_MS = 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;
 

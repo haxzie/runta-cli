@@ -3,31 +3,313 @@
   "info": {
     "title": "Runta API",
     "version": "0.1.0",
-    "description": "Placeholder spec. Replace by pointing RUNTA_OPENAPI_URL at the live schema and running `pnpm api:sync`."
+    "description": "Hand-written from https://runta.com/docs/reference/api/ and verified against live https://api.runta.com. Runta does not publish an openapi.json (all candidate URLs 404), so `pnpm api:sync` cannot refresh this file \u2014 it is maintained by hand, operation group by operation group. Where the published docs and the live API disagree, this spec follows the live API; see api/NOTES.md for the list of divergences.\n\nCoverage: auth + identity. 81 of the 85 documented operations are not yet described."
   },
-  "servers": [{ "url": "https://api.runta.dev" }],
+  "servers": [
+    {
+      "url": "https://api.runta.com",
+      "description": "Hosted public API"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Device authorization and credential lifecycle."
+    },
+    {
+      "name": "identity",
+      "description": "Who the current credential belongs to."
+    }
+  ],
   "paths": {
-    "/v1/me": {
-      "get": {
-        "operationId": "getCurrentUser",
-        "summary": "Return the authenticated user",
-        "tags": ["users"],
+    "/v2/auth/device/authorization": {
+      "post": {
+        "operationId": "beginDeviceAuthorization",
+        "summary": "Start a device authorization",
+        "description": "Begins the RFC 8628 device authorization flow. Unauthenticated: this is how a client obtains a credential in the first place. Returns a `user_code` to show the user, a `verification_uri_complete` to open, and a `device_code` to poll `POST /v2/auth/device/token` with, no more often than every `interval` seconds and no later than `expires_at`.",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BeginDeviceAuthorizationRequest"
+              },
+              "example": {
+                "client_id": "runta_cli",
+                "device_name": "my-laptop"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "The authenticated user",
+            "description": "Device authorization started.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/User" }
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceAuthorizationResponse"
+                },
+                "example": {
+                  "data": {
+                    "device_code": "0f3c\u2026",
+                    "user_code": "G3UE-K5BZ",
+                    "verification_uri": "https://dashboard.runta.com/device",
+                    "verification_uri_complete": "https://dashboard.runta.com/device?code=G3UE-K5BZ",
+                    "expires_at": "2026-09-26T08:11:38Z",
+                    "interval": 5
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          }
+        }
+      }
+    },
+    "/v2/auth/device/token": {
+      "post": {
+        "operationId": "exchangeDeviceToken",
+        "summary": "Exchange a device code for an access token",
+        "description": "Polls for completion of a device authorization. Unauthenticated. While the user has not yet approved, this returns **400 with a different body shape** from every other endpoint \u2014 a flat OAuth error string (`authorization_pending`, `slow_down`, `access_denied`, `expired_token`) plus the polling `interval`. Callers must branch on the status code before parsing `error`, because at 400 `error` is a string and everywhere else it is an object.",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExchangeDeviceTokenRequest"
+              },
+              "example": {
+                "device_code": "0f3c\u2026"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device access token issued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceToken"
+                },
+                "example": {
+                  "access_token": "rt_\u2026",
+                  "token_type": "Bearer",
+                  "expires_in": 2592000
+                }
               }
             }
           },
           "401": {
-            "description": "Missing or invalid credentials",
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          },
+          "400": {
+            "description": "Authorization is still pending, or the device code was denied or expired. Note the non-standard body shape.",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/Error" }
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTokenPendingError"
+                },
+                "example": {
+                  "error": "authorization_pending",
+                  "interval": 5
+                }
               }
             }
+          }
+        }
+      }
+    },
+    "/v2/auth/token": {
+      "delete": {
+        "operationId": "revokeCurrentToken",
+        "summary": "Revoke the current bearer credential",
+        "description": "Revokes the credential used to make this request. Takes no body \u2014 the token in the `Authorization` header is the subject. This is what `runta logout` calls.",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "204": {
+            "description": "Token revoked. No content."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          }
+        }
+      }
+    },
+    "/v2/me": {
+      "get": {
+        "operationId": "getMe",
+        "summary": "Get the current user profile",
+        "description": "The minimal current-user identity exposed to user-authorized device clients.\n\nTwo caveats confirmed live:\n1. An organization-scoped API key (`rt_\u2026`) gets **403 `permission_denied`** here \u2014 \"principal's role does not allow this organization action\". This endpoint only works with a credential minted by the device flow for a user.\n2. It returns no organization, scope, or expiry information, so it cannot answer \"which org am I in\" or \"is my token still valid\". There is no token-introspection operation in the API.",
+        "tags": [
+          "identity"
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                },
+                "example": {
+                  "data": {
+                    "user_id": "800d9aa5-479a-4773-9a15-53d5a4193701",
+                    "email": "user@example.com",
+                    "display_name": "Example User"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
           }
         }
       }
@@ -35,28 +317,390 @@
   },
   "components": {
     "securitySchemes": {
-      "bearerAuth": { "type": "http", "scheme": "bearer" }
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Runta API Key",
+        "description": "A Runta API key (`rt_\u2026`), bound to exactly one organization, or a user access token from the device flow. Sent as `Authorization: Bearer <token>`. Omitting the header yields 403, not 401."
+      }
     },
     "schemas": {
-      "User": {
-        "type": "object",
-        "required": ["id", "email"],
-        "properties": {
-          "id": { "type": "string" },
-          "email": { "type": "string", "format": "email" },
-          "name": { "type": "string" }
-        }
+      "ErrorCode": {
+        "type": "string",
+        "description": "Stable machine-readable error code.",
+        "enum": [
+          "already_exists",
+          "command_failed",
+          "deadline_exceeded",
+          "failed_precondition",
+          "internal",
+          "invalid_argument",
+          "not_found",
+          "permission_denied",
+          "rate_limited",
+          "unauthenticated",
+          "unavailable",
+          "unimplemented"
+        ]
       },
       "Error": {
         "type": "object",
-        "required": ["code", "message"],
+        "required": [
+          "code",
+          "message"
+        ],
+        "additionalProperties": false,
         "properties": {
-          "code": { "type": "string" },
-          "message": { "type": "string" },
-          "requestId": { "type": "string" }
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable detail. Not stable; branch on `code`."
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "Standard error envelope. `request_id` is a **sibling of `error`**, not a field inside it \u2014 the published docs place it inside `error`, but the live API does not. It matches the `X-Request-Id` response header and is a UUID v7.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/Error"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Correlation id, also returned as the `X-Request-Id` header."
+          }
+        },
+        "examples": [
+          {
+            "error": {
+              "code": "not_found",
+              "message": "runtime 'demo' was not found"
+            },
+            "request_id": "01a0dcb6-d3c3-7c10-acf9-961792e6c237"
+          }
+        ]
+      },
+      "Pagination": {
+        "type": "object",
+        "description": "Cursor pagination, returned as a sibling of `data` on list endpoints. Undocumented in the published reference; included here because list operations will need it.",
+        "required": [
+          "has_more"
+        ],
+        "properties": {
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass as `cursor` to fetch the next page."
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DeviceClientId": {
+        "type": "string",
+        "description": "Which first-party client is authorizing.",
+        "enum": [
+          "runta_cli",
+          "runta_agent",
+          "runta_crew"
+        ]
+      },
+      "BeginDeviceAuthorizationRequest": {
+        "type": "object",
+        "required": [
+          "client_id"
+        ],
+        "properties": {
+          "client_id": {
+            "$ref": "#/components/schemas/DeviceClientId"
+          },
+          "device_name": {
+            "type": "string",
+            "description": "Label shown to the user on the approval screen."
+          },
+          "app_url": {
+            "type": "string",
+            "description": "Override the portal origin used to build `verification_uri`."
+          }
+        }
+      },
+      "DeviceAuthorization": {
+        "type": "object",
+        "required": [
+          "device_code",
+          "user_code",
+          "verification_uri",
+          "verification_uri_complete",
+          "expires_at",
+          "interval"
+        ],
+        "properties": {
+          "device_code": {
+            "type": "string",
+            "description": "Secret. Poll with this; never show it to the user."
+          },
+          "user_code": {
+            "type": "string",
+            "description": "Short code to display, e.g. `G3UE-K5BZ`."
+          },
+          "verification_uri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "verification_uri_complete": {
+            "type": "string",
+            "format": "uri",
+            "description": "Open this \u2014 it pre-fills `user_code`."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Stop polling after this instant."
+          },
+          "interval": {
+            "type": "integer",
+            "description": "Minimum seconds between polls.",
+            "examples": [
+              5
+            ]
+          }
+        }
+      },
+      "DeviceAuthorizationResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DeviceAuthorization"
+          }
+        }
+      },
+      "ExchangeDeviceTokenRequest": {
+        "type": "object",
+        "required": [
+          "device_code"
+        ],
+        "properties": {
+          "device_code": {
+            "type": "string"
+          }
+        }
+      },
+      "DeviceToken": {
+        "type": "object",
+        "description": "Not enveloped in `data`, unlike most 2xx bodies.",
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string",
+            "examples": [
+              "Bearer"
+            ]
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Seconds until expiry."
+          }
+        }
+      },
+      "DeviceTokenPendingError": {
+        "type": "object",
+        "description": "The 400 body for `POST /v2/auth/device/token` only. `error` is a **string** here, unlike the object in `ErrorResponse`.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "RFC 8628 error. `authorization_pending` and `slow_down` are retryable; the rest are terminal.",
+            "enum": [
+              "authorization_pending",
+              "slow_down",
+              "access_denied",
+              "expired_token"
+            ]
+          },
+          "interval": {
+            "type": "integer",
+            "description": "Updated minimum seconds between polls."
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "email",
+          "display_name"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UserResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "Malformed or invalid request body.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "The bearer token was present but rejected.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "No bearer token was supplied, or the token's role does not allow this action.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "The requested resource was not found.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error409": {
+        "description": "The request conflicts with current resource state.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error422": {
+        "description": "Validation or application error.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error429": {
+        "description": "Rate limit exceeded.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error500": {
+        "description": "Internal error.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error501": {
+        "description": "Operation is not implemented.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error503": {
+        "description": "Upstream service is unavailable.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error504": {
+        "description": "Upstream request timed out.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "ErrorDefault": {
+        "description": "Error response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
         }
       }
     }
-  },
-  "security": [{ "bearerAuth": [] }]
+  }
 }

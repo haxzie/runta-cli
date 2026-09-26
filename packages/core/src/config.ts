@@ -11,7 +11,7 @@ export interface RuntaConfig {
 }
 
 export const defaultConfig: RuntaConfig = {
-  apiUrl: 'https://api.runta.dev',
+  apiUrl: 'https://api.runta.com',
   token: undefined,
 };
 

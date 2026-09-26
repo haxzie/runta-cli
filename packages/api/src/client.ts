@@ -5,7 +5,7 @@ import type { ClientOptions } from './generated/types.gen';
 export type RuntaClient = Client;
 
 export interface RuntaClientOptions {
-  /** API base URL, e.g. `https://api.runta.dev`. */
+  /** API base URL, e.g. `https://api.runta.com`. */
   baseUrl: string;
   /** Bearer token. Requests are sent unauthenticated when omitted. */
   token?: string | undefined;
