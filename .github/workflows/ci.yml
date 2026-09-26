@@ -9,10 +9,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Build against the committed OpenAPI snapshot. A live spec change must never flip a
-  # build red or green on its own — spec drift is surfaced by api-drift.yml instead.
-  RUNTA_SKIP_API_SYNC: '1'
 
 jobs:
   check:
@@ -33,7 +29,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Verify generated SDK is up to date with the committed spec
+      - name: Verify generated SDK is up to date with openapi.json
         run: |
           pnpm api:generate
           git diff --exit-code -- packages/api/src/generated \

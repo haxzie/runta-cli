@@ -12,9 +12,6 @@ permissions:
   contents: write
   pull-requests: write
 
-env:
-  RUNTA_SKIP_API_SYNC: '1'
-
 jobs:
   release:
     runs-on: ubuntu-latest

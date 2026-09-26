@@ -3,7 +3,7 @@
   "info": {
     "title": "Runta API",
     "version": "0.1.0",
-    "description": "Hand-written from https://runta.com/docs/reference/api/ and verified against live https://api.runta.com. Runta does not publish an openapi.json (all candidate URLs 404), so `pnpm api:sync` cannot refresh this file \u2014 it is maintained by hand, operation group by operation group. Where the published docs and the live API disagree, this spec follows the live API; see api/NOTES.md for the list of divergences.\n\nCoverage: auth + identity. 81 of the 85 documented operations are not yet described."
+    "description": "Hand-written from https://runta.com/docs/reference/api/ and verified against live https://api.runta.com. Runta does not publish an openapi.json (all candidate URLs 404), so this file is source rather than a generated snapshot \u2014 it is maintained by hand, operation group by operation group, and codegen reads it directly with no network access. Where the published docs and the live API disagree, this spec follows the live API; see NOTES.md for the list of divergences.\n\nCoverage: auth + identity. 81 of the 85 documented operations are not yet described."
   },
   "servers": [
     {

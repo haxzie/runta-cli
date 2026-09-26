@@ -16,7 +16,6 @@
     "lint:fix": "biome check --write .",
     "test": "turbo run test",
     "api:generate": "pnpm --filter @runta/api run generate",
-    "api:sync": "pnpm --filter @runta/api run sync",
     "build:binaries": "bun run scripts/build-binaries.ts",
     "clean": "turbo run clean && rm -rf node_modules dist .turbo",
     "changeset": "changeset",

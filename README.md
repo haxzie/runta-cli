@@ -46,8 +46,7 @@ their TypeScript source under the `bun` export condition, so an edit anywhere in
 | `pnpm typecheck` | `tsc --noEmit` everywhere |
 | `pnpm test` | Vitest across the workspace |
 | `pnpm lint` / `pnpm lint:fix` | Biome check / autofix |
-| `pnpm api:generate` | Regenerate the SDK (respects a 1h spec cache) |
-| `pnpm api:sync` | Force-refetch the OpenAPI spec, then regenerate |
+| `pnpm api:generate` | Regenerate the SDK from `packages/api/openapi.json` |
 | `pnpm build:binaries` | Cross-compile release binaries into `dist/` |
 | `pnpm changeset` | Record a change for the next release |
 
@@ -68,29 +67,28 @@ Every package is private. Changesets versions them as one fixed group, so
 
 `packages/api/src/generated/**` is produced by
 [`@hey-api/openapi-ts`](https://heyapi.dev) and must never be edited by hand. It is
-generated from `packages/api/openapi.json`, a **committed snapshot** of the live spec.
+generated from `packages/api/openapi.json`.
 
-Generation is wired into `predev` and `prebuild`, so the SDK is always current with the
-snapshot without anyone having to remember a step. `scripts/sync-spec.ts` refreshes the
-snapshot from `RUNTA_OPENAPI_URL` first:
+**`openapi.json` is hand-maintained.** Runta publishes no OpenAPI document — every
+plausible URL 404s — so there is nothing to sync from and codegen never touches the
+network. The spec is written from
+[the API reference](https://runta.com/docs/reference/api/) and verified against live
+`api.runta.com`, one operation group at a time. `packages/api/NOTES.md` records the
+coverage so far and the places where the live API disagrees with the published docs.
 
-- A fetch failure is a warning, not an error — it falls back to the snapshot, so
-  `pnpm dev` works offline and when the API is down.
-- The fetch is skipped if the snapshot is under an hour old (`pnpm api:sync` forces it).
-- CI never fetches, so a live spec change cannot flip a build red or green on its own.
-  A nightly `api-drift` workflow does the fetch and opens a PR when the spec moves.
+Consequences worth knowing:
+
+- Adding an endpoint is a two-step edit: describe it in `openapi.json`, then
+  `pnpm api:generate` and commit the regenerated `src/generated`.
+- Generation is wired into `predev` and `prebuild`, so the SDK is never stale locally,
+  and CI fails if committed `src/generated` doesn't match `openapi.json`.
+- Everything works offline. There is no spec cache, no TTL, and no env var to set.
+- If Runta ever publishes a spec, this becomes a generated artifact again and the
+  hand-written file can go away. Until then, treat `openapi.json` as source.
 
 Nothing outside `@runta/api` should import from `./generated` directly. The hand-written
 shell (`client.ts`, `errors.ts`) owns auth headers, the user agent, and turning every
 failure — including network failures — into a single `RuntaApiError`.
-
-Set these in the root `.env`:
-
-| Variable | Purpose |
-| --- | --- |
-| `RUNTA_OPENAPI_URL` | Spec URL to fetch |
-| `RUNTA_SKIP_API_SYNC=1` | Never fetch; use the committed snapshot |
-| `RUNTA_SPEC_TTL_MS` | Freshness window before refetching |
 
 ## Releasing
 

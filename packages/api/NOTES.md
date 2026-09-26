@@ -5,7 +5,7 @@
 Runta does **not** publish an OpenAPI document. Every plausible URL 404s:
 
 ```
-https://api.runta.dev/openapi.json                 404   <- what .env.example points at
+https://api.runta.dev/openapi.json                 404   <- what the scaffolding pointed at
 https://api.runta.com/openapi.json                 404
 https://api.runta.com/v2/openapi.json              404
 https://api.runta.com/docs/openapi.json            404
@@ -13,13 +13,16 @@ https://runta.com/openapi.json                     404
 https://runta.com/docs/reference/api/openapi.json  404
 ```
 
-So `scripts/sync-spec.ts` can never succeed as configured — it will always warn and fall back to the
-committed snapshot. The docs at `https://runta.com/docs/reference/api/` say the underlying spec is
-OpenAPI **3.0.3**, so one exists internally; it just isn't served. Worth asking Runta to expose it,
-because that turns this whole file into a generated artifact.
+The docs at `https://runta.com/docs/reference/api/` say the underlying spec is OpenAPI **3.0.3**, so
+one exists internally; it just isn't served. Worth asking Runta to expose it, because that turns this
+whole file back into a generated artifact.
 
-Until then: the spec is maintained by hand, one operation group at a time, and **verified against the
-live API** rather than transcribed from the docs.
+Until then this file is **source, not a snapshot**: maintained by hand, one operation group at a time,
+and **verified against the live API** rather than transcribed from the docs. There is no sync step —
+`pnpm api:generate` reads `openapi.json` directly and never touches the network. (The original
+scaffolding had a `scripts/sync-spec.ts` pointed at `api.runta.dev/openapi.json` and a nightly
+`api-drift` workflow to open PRs when the spec moved; both were removed, since neither can ever do
+anything.)
 
 ## Divergences: live API vs. published docs
 

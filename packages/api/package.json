@@ -17,8 +17,7 @@
     "dist"
   ],
   "scripts": {
-    "sync": "bun --env-file=../../.env run scripts/sync-spec.ts --force && openapi-ts",
-    "generate": "bun --env-file=../../.env run scripts/sync-spec.ts && openapi-ts",
+    "generate": "openapi-ts",
     "prebuild": "pnpm run generate",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -28,7 +27,6 @@
   "devDependencies": {
     "@hey-api/openapi-ts": "catalog:",
     "@runta/tsconfig": "workspace:*",
-    "@types/bun": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

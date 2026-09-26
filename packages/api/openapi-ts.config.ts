@@ -1,8 +1,9 @@
 import { defineConfig } from '@hey-api/openapi-ts';
 
 /**
- * Reads the committed snapshot, never the network — `scripts/sync-spec.ts` owns
- * refreshing that file and runs immediately before this (see the `generate` script).
+ * Reads `./openapi.json`, which is hand-maintained in the repo — Runta publishes no
+ * spec to fetch, so there is no sync step and codegen never touches the network.
+ * See NOTES.md.
  */
 export default defineConfig({
   input: './openapi.json',
