@@ -9,7 +9,7 @@
   "scripts": {
     "predev": "pnpm api:generate",
     "dev": "bun run --watch apps/cli/src/index.ts",
-    "dev:once": "bun run apps/cli/src/index.ts",
+    "cli": "bun run apps/cli/src/index.ts",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "biome check .",

@@ -167,7 +167,7 @@ Requires [Bun](https://bun.sh) 1.3+, Node 22 (see `.nvmrc`) and pnpm 10.
 pnpm install
 cp .env.example .env      # optional; every value has a working default
 pnpm dev hello world      # run the CLI from source, with watch — no build step
-pnpm dev:once whoami      # same, single run
+pnpm cli whoami           # same, single run, no watch
 ```
 
 Configuration for local development goes in a single **`.env` at the repo root**
@@ -181,6 +181,7 @@ their TypeScript source under the `bun` export condition, so an edit anywhere in
 | Command | Does |
 | --- | --- |
 | `pnpm dev [args]` | Run the CLI from source, watching for changes |
+| `pnpm cli [args]` | Run the CLI from source once, without watch |
 | `pnpm build` | Turbo build of every package |
 | `pnpm typecheck` | `tsc --noEmit` everywhere |
 | `pnpm test` | Vitest across the workspace |
