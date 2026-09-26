@@ -84,7 +84,7 @@ this audit's findings:
 | C-09 | No machine-readable `--dry-run` | Removes the "resolve → show the user → execute" pattern; the agent must describe intent in prose |
 | C-31 | Discovery costs ~19.6k tokens and can't be narrowed | A meaningful slice of the working context spent on formatting, before any work happens |
 | C-16 | `exec` buffers all output into a JSON string | No incremental progress on long commands, and stdout/stderr interleaving is lost |
-| C-11 | `required_action` points back at the command just run | An agent that follows the field as designed loops on `resume`, or undoes its own `pause` |
+| C-11 | `required_action` points back at the command just run — **on `accepted: true` responses** | An agent has no reason to distrust a success payload, so it undoes its own `pause` and reports success at both steps |
 | C-18 | Every list uses a different array key; no `request_id` | No generic accessor works across commands; failures aren't traceable to a support ticket |
 | C-22 | Lifecycle responses embed all 45 runtime fields | ~346 tokens to learn that one state changed |
 | C-04 | Raw `websocket error: HTTP error: 409 Conflict` | The agent can't explain the failure or recover from it; the cause ("runtime is shut down") is recoverable and knowable |
@@ -469,9 +469,24 @@ $ runta resume audit1
 what the field is for, and what the root help advertises) will loop on `resume`, or immediately undo
 its own `pause`.
 
+**Independently reproduced on a second pass** (2026-09-26, `prequel-dev`), which sharpens the point:
+the field arrives on a **successful** response, not an error one.
+
+```console
+$ runta pause prequel-dev
+{ "accepted": true, "action": "pause", "desired_status": "paused",
+  "required_action": { "command": "runta resume prequel-dev --json", "type": "run_command" }, … }
+```
+
+`accepted: true` and "you are required to resume it" in the same payload. This matters more than the
+error-path case: an agent has no reason to inspect `required_action` sceptically on a success, so the
+pause it was asked to perform is undone immediately, and both steps report success. Every lifecycle
+verb tested behaves this way.
+
 → Reserve `required_action` for genuine blockers (auth, wait, precondition). Put informational
 follow-ups in a separate `suggested_next` field. For async lifecycle actions, make the required
-action a *wait*, not a repeat.
+action a *wait*, not a repeat. At minimum, never emit `required_action` alongside
+`accepted: true`.
 
 ### C-12 — The table renderer collapses to one character per column
 _Severity: high._
@@ -542,8 +557,26 @@ $ runta checkpoint restore audit-ckpt audit-restored
 
 (Good message — but no `required_action`, and no `checkpoint create --wait` to have avoided it.)
 
+Re-confirmed on 2026-09-26: `pause`, `resume`, `shutdown` and `boot` still have **zero** occurrences
+of `--wait` in their help. The absence is hard to justify on duration — `runta pause prequel-dev`
+returned in 3.8 s and the runtime was already `paused` at the first poll 8 s later. A `--wait` here
+would cost a few seconds, not minutes.
+
+**A no-op is indistinguishable from a real transition.** Pausing an already-paused runtime returns the
+same success payload as pausing a running one:
+
+```console
+$ runta pause prequel-dev     # already paused
+{ "accepted": true, "action": "pause", "desired_status": "paused", … }
+```
+
+Idempotency is the right behaviour, but with `status` reporting the pre-transition value there is no
+field anywhere in the response that distinguishes "I paused it" from "it was already paused" — so a
+caller cannot tell whether it caused the state it observes.
+
 → Add `--wait`/`--timeout` uniformly to every async command. Either omit `status` from action
-responses or return the post-transition value.
+responses or return the post-transition value. Distinguish a no-op from a transition (a `changed:
+false`, or `202` vs `200` semantics).
 
 ### C-15 — List commands silently truncate at 100
 _Severity: high._
