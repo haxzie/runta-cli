@@ -110,6 +110,18 @@ over 43 rows — and ignores `COLUMNS` (C-12). Clamp to a sane minimum; honour `
 **Honour `NO_COLOR` completely.** Upstream drops the colour but keeps the bold (C-25). All-or-
 nothing, plus a `--color=auto|always|never` for the cases detection gets wrong.
 
+**Suggest the next step, but only when there is one.** A command that leaves the user mid-task
+should say what to do next — a freshly created runtime, an empty list, a runtime in `error`. A
+command that completed a task should say nothing, because advice printed every time is advice
+nobody reads. Put suggestions on stderr so they survive `--json` without touching the payload.
+
+Two rules make the difference between a suggestion and a bug. **Never suggest the command that
+just ran** — upstream's `resume` returns `required_action: runta resume <name>`, and an agent
+following the field as designed loops (C-11). And **only ever name a command that exists**: we
+shipped a `create` that suggested `runta exec` before `exec` was written, which is the same defect
+as upstream's agent skill documenting `runta agents ls` (C-30). The fix is not care, it is a test —
+scrape every `runta …` out of the source and resolve it against the real command tree.
+
 ## Errors
 
 **An error names what failed, why, and what to do next.** Upstream's most likely error —

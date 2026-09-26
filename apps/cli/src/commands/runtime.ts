@@ -18,6 +18,7 @@ import {
 } from '@runta/core';
 import { type Column, fail, logger, renderTable } from '@runta/utils';
 import type { Command } from 'commander';
+import { type NextStep, printNextSteps } from '../suggest.js';
 
 /**
  * Statuses `list` shows by default.
@@ -87,6 +88,7 @@ export async function create(
 
   if (options.detach) {
     emit(runtime, options.json, deps, `Creating runtime '${runtime.display_name}'.`);
+    printNextSteps(createNextSteps(runtime, false));
     return;
   }
 
@@ -105,6 +107,7 @@ export async function create(
   );
 
   emit(runtime, options.json, deps, describe(runtime));
+  printNextSteps(createNextSteps(runtime, true));
 }
 
 /**
@@ -228,6 +231,13 @@ export async function list(
     logger.info(
       options.all ? 'No runtimes.' : 'No active runtimes. Use --all to include stopped ones.',
     );
+    // An empty list is the one place a new user is definitely stuck, so it is worth a pointer.
+    printNextSteps([
+      { command: 'runta create --name demo', why: 'create your first runtime' },
+      ...(options.all
+        ? []
+        : [{ command: 'runta list --all', why: 'include stopped and failed runtimes' }]),
+    ]);
     return;
   }
   deps.write(`${renderTable(runtimes, LIST_COLUMNS)}\n`);
@@ -296,6 +306,44 @@ export async function inspect(
     return;
   }
   deps.write(`${detailView(runtime)}\n`);
+  printNextSteps(inspectNextSteps(runtime));
+}
+
+/**
+ * Only suggests something when the runtime is in a state you would want to act on. A healthy
+ * running runtime needs no advice, and printing some after every inspect trains people to stop
+ * reading it.
+ */
+function inspectNextSteps(runtime: Runtime): NextStep[] {
+  const name = runtime.display_name;
+
+  if (runtime.status === 'error' || runtime.status === 'crashed') {
+    return [
+      { command: `runta delete ${name}`, why: 'remove it — this runtime cannot be recovered' },
+      { command: 'runta create --name ' + name, why: 'create a replacement' },
+    ];
+  }
+  if (runtime.degraded) {
+    return [
+      {
+        command: `runta inspect ${name}`,
+        why: 'check again — degraded means no heartbeat for 60s+',
+      },
+    ];
+  }
+  if (
+    runtime.egress_policy.mode === 'allowlist' &&
+    runtime.egress_policy.allowed_hosts.length === 0
+  ) {
+    // Easy to do by accident and invisible from the runtime's status.
+    return [
+      {
+        command: `runta inspect ${name} --json`,
+        why: 'egress is fully blocked — nothing in this runtime can reach the network',
+      },
+    ];
+  }
+  return [];
 }
 
 /**
@@ -522,10 +570,38 @@ function describe(runtime: Runtime): string {
   return [
     `Runtime '${runtime.display_name}' is running.`,
     ingress ? `Published: ${ingress}` : undefined,
-    `Run a command:  runta exec ${runtime.display_name} -- <command>`,
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/**
+ * What to do with a runtime that was just created.
+ *
+ * Deliberately does not suggest `runta exec` — that command does not exist yet, and pointing at a
+ * command the binary lacks is the defect we recorded against Runta's own agent skill (C-30).
+ * Add it here when `exec` ships.
+ */
+function createNextSteps(runtime: Runtime, waited: boolean): NextStep[] {
+  const name = runtime.display_name;
+  const steps: NextStep[] = [];
+
+  if (!waited) {
+    // Without waiting the runtime is not usable yet, so watching it is the only sensible step.
+    steps.push({ command: `runta inspect ${name}`, why: 'check whether it is running yet' });
+  } else {
+    steps.push({ command: `runta inspect ${name}`, why: 'see its full state' });
+  }
+
+  if (runtime.ingress_specs.length > 0) {
+    steps.push({
+      command: `runta inspect ${name} --json`,
+      why: 'read ingress_specs — the public URL is not yet available from the CLI',
+    });
+  }
+
+  steps.push({ command: `runta delete ${name}`, why: 'remove it when you are done' });
+  return steps;
 }
 
 // ---------------------------------------------------------------- registration

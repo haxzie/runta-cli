@@ -16,6 +16,7 @@ import {
 import { fail, logger } from '@runta/utils';
 import type { Command } from 'commander';
 import { canOpenBrowser, openUrl } from '../browser.js';
+import { printNextSteps } from '../suggest.js';
 
 export interface LoginOptions {
   json?: boolean;
@@ -90,6 +91,10 @@ export async function login(
     return;
   }
   logger.info(`Authorized. Token saved to ${path}`);
+  printNextSteps([
+    { command: 'runta whoami', why: 'confirm which account and team you are on' },
+    { command: 'runta create --name demo', why: 'create your first runtime' },
+  ]);
 }
 
 async function prompt(
@@ -172,6 +177,17 @@ export async function logout(
     return;
   }
   logger.info(cleared || revoked ? 'Logged out.' : 'Not logged in — nothing to do.');
+
+  // The one thing logout cannot do is unset your shell. Revoking a token that came from the
+  // environment leaves every future command sending a credential the server has forgotten, and
+  // nothing else in the output would tell you.
+  if (process.env.RUNTA_TOKEN) {
+    logger.warn('RUNTA_TOKEN is still set in your environment and now refers to a revoked token.');
+    printNextSteps([
+      { command: 'unset RUNTA_TOKEN', why: 'stop sending the revoked credential' },
+      { command: 'runta login', why: 'sign in again' },
+    ]);
+  }
 }
 
 /**

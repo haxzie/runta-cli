@@ -58,6 +58,33 @@ done
 
 `jq` reads NDJSON without any flags.
 
+## Next steps
+
+Some commands print a short "next steps" block when they leave you mid-task:
+
+```console
+$ runta create --name demo --detach
+Creating runtime 'demo'.
+
+Next steps:
+  runta inspect demo         check whether it is running yet
+  runta delete demo          remove it when you are done
+```
+
+Three things are deliberate about it:
+
+- **It goes to stderr**, like all other commentary. So it survives `--json` without touching the
+  payload — `runta inspect demo --json 2>/dev/null` is still exactly the runtime object.
+- **It only appears when there is something to do.** `inspect` on a healthy runtime prints none;
+  `inspect` on a failed one suggests deleting and recreating. Advice after every command is advice
+  nobody reads.
+- **It never suggests the command you just ran.** That sounds obvious, but it is a real defect in
+  Runta's own CLI, whose `resume` returns `required_action: runta resume <name>` — follow that
+  field literally, as an agent would, and you loop.
+
+Every command named in a suggestion or a hint is checked against the real command tree by a test,
+so a suggestion cannot outlive the command it names.
+
 ## Colour
 
 Diagnostics are coloured only when stderr is a TTY. `NO_COLOR` (any value) or `TERM=dumb`

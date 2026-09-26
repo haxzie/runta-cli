@@ -37,6 +37,13 @@ in hindsight.
 - [ ] Table width clamped to a minimum and honours `COLUMNS`
 - [ ] `NO_COLOR` suppresses *all* escape sequences
 
+## Next steps
+
+- [ ] Printed only when the command leaves the user mid-task, not on every success
+- [ ] On stderr, so `--json` payloads stay clean
+- [ ] Does not name the command that just ran
+- [ ] Every command named actually exists (the scraper test covers this)
+
 ## Errors
 
 - [ ] Message names the subject, the cause, and the next step
