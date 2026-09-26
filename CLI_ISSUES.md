@@ -50,6 +50,44 @@ npm packages, the Homebrew tap, and the shipped binary (the source repo is priva
 
 ---
 
+## Agent readiness
+
+The CLI is explicitly pitched at AI coding agents — the root help links the agent skills page, and
+there is a published `SKILL.md` for Claude Code, Cursor and Codex. Assessed against that goal, using
+this audit's findings:
+
+**What's right, and is genuinely better than most CLIs:**
+
+- `--json` is **implied when stdout isn't a TTY**, so an agent gets machine-readable output without
+  knowing to ask for it.
+- Errors use a stable envelope — `{ error: { code, kind, message, required_action } }` — with `code`
+  as a real enum (`MISSING_TOKEN`, `NOT_FOUND`, `FAILED_PRECONDITION`, `ALREADY_EXISTS`,
+  `EXEC_INCOMPLETE`, `INVALID_ARGUMENT`, …), so an agent can branch on `code` instead of
+  pattern-matching prose.
+- Exit codes are disciplined: `2` usage, `1` API error, and `exec` passes the remote status through
+  verbatim (verified `0…255`).
+- `runta help --json` exposes the entire command tree — the right idea, rare in CLIs.
+
+**What blocks agent use today**, in order of how much damage it does:
+
+| # | Issue | Why it hurts an agent specifically |
+|---|---|---|
+| C-01 | `exec` fails spuriously ~10% of the time | The agent cannot distinguish "the user's build broke" from "the websocket hiccuped", so it either reports false failures or retries operations that may not be idempotent |
+| C-30 | The official `SKILL.md` documents commands and flags that don't exist | The agent has no reason to doubt its own skill file, so it confidently runs `runta agents ls` and `--no-shell` and fails in front of the user |
+| C-06 | `help --json` misreports every boolean flag's arity | Read literally — which is the whole point of a machine-readable contract — the agent writes `runta ps --all true` and errors |
+| C-09 | No machine-readable `--dry-run` | Removes the "resolve → show the user → execute" pattern; the agent must describe intent in prose |
+| C-31 | Discovery costs ~19.6k tokens and can't be narrowed | A meaningful slice of the working context spent on formatting, before any work happens |
+| C-16 | `exec` buffers all output into a JSON string | No incremental progress on long commands, and stdout/stderr interleaving is lost |
+| C-11 | `required_action` points back at the command just run | An agent that follows the field as designed loops on `resume`, or undoes its own `pause` |
+| C-18 | Every list uses a different array key; no `request_id` | No generic accessor works across commands; failures aren't traceable to a support ticket |
+| C-22 | Lifecycle responses embed all 45 runtime fields | ~346 tokens to learn that one state changed |
+| C-04 | Raw `websocket error: HTTP error: 409 Conflict` | The agent can't explain the failure or recover from it; the cause ("runtime is shut down") is recoverable and knowable |
+
+The through-line: the **shape** of the machine interface is good, but its **contract** (C-06, C-30),
+its **reliability** (C-01), and its **cost** (C-31, C-22) are not yet at the level the positioning
+implies. C-06 and C-30 are the cheapest to fix and would have the largest immediate effect, because
+both are generated-artifact problems rather than product design.
+
 ## Issues
 
 ### C-01 — `runta exec` fails spuriously about 10% of the time
@@ -360,6 +398,14 @@ you'd get without creating the runtime), and the resulting policy for `egress se
 set`. **(b)** Interactive confirmation on destructive commands when stdin is a TTY, with `--yes/-y`
 to skip and automatic skip under `--json`/non-TTY so scripts are unaffected — "this will delete 3
 runtimes: a, b, c".
+
+**For agents specifically, the JSON half of (a) is the important half.** An agent's safe pattern is
+"resolve the plan → show the user → execute", and without a machine-readable dry-run there is no
+plan to show — the agent has to describe its intent in prose and hope the CLI agrees. This is the gap
+the official agent skill (C-30) papers over by *instructing the agent* to ask for confirmation before
+`rm` / `checkpoint rm` / `secret delete`: a safety property asserted in prose because the tool has no
+primitive for it. `--dry-run --json` plus `--yes` would replace that instruction with something
+enforceable.
 
 ### C-10 — Egress is a silent replace-all on a security boundary
 _Severity: high._
