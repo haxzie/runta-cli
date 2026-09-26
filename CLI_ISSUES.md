@@ -45,6 +45,8 @@ npm packages, the Homebrew tap, and the shipped binary (the source repo is priva
 | [C-27](#c-27-human-output-polish) | Human-output polish (`is absent from the API`, silent waits, empty states) | low |
 | [C-28](#c-28-distribution-and-packaging-gaps) | Distribution gaps: no Windows/Intel, missing `os` field, stale `next` tag | medium |
 | [C-29](#c-29-the-npm-shim-flattens-signal-death-to-exit-1) | npm shim flattens signal death to exit 1 | low |
+| [C-30](#c-30-the-official-agent-skill-documents-commands-that-dont-exist) | The official agent skill documents commands and flags that don't exist | 🔴 blocker |
+| [C-31](#c-31-agent-discovery-costs-20k-tokens-and-cant-be-narrowed) | `runta help --json` costs ~20k tokens; no compact JSON, no narrowing | high |
 
 ---
 
@@ -836,6 +838,76 @@ invocation (~30–40 ms and a second PID) purely to `spawnSync` a native binary.
 
 → Exit `128 + signo` when `result.signal` is set. Consider pointing `bin` straight at the platform
 package's binary via a `postinstall` symlink, or use `execve` semantics, to drop the node hop.
+
+---
+
+### C-30 — The official agent skill documents commands that don't exist
+_Severity: **blocker**._
+
+`/docs/reference/agent-skills/runta-cli/` ships a `SKILL.md` that Claude Code, Cursor and Codex load
+as ground truth. It is substantially wrong — this is worse than C-05, because an agent reading it has
+no reason to doubt it and will confidently run commands that cannot work:
+
+| Skill says | Reality |
+|---|---|
+| `runta agents ls` | **No `agents` command exists.** `error: unrecognized subcommand 'agents'` (did-you-mean offers `image`) |
+| `runta run --name pi-agent --agent pi --no-shell` | **Neither `--agent` nor `--no-shell` exists** — 0 matches across all 84 commands |
+| `runta egress set -f policy.yaml` | **No `-f`.** `error: unexpected argument '-f' found` |
+| `runta secret rule list --runtime demo` | **No `--runtime` flag.** It's `runta secret rule ls <RUNTIME_NAME>` (positional) |
+| `runta secret rule delete <stub_id>` | **No `delete`, no stub ids.** It's `runta secret rule rm --host <HOST> --header <HEADER> <RUNTIME_NAME>` |
+| `--template 'Bearer ${credential}'` | CLI requires `${secret}` (see C-05) |
+| "`runta run` requires `--cpus` and `--memory`" | Both are optional |
+
+It also never mentions `runta login` (the skill tells agents to set `RUNTA_TOKEN`, so an agent will
+never suggest the interactive path a human needs) and never mentions `--json` — the single most
+important flag for an agent, and the one that makes every output machine-readable.
+
+What it gets right is worth keeping: "verify uncommon flags with `runta <command> --help`", "require
+explicit user confirmation before `runta rm` / `runta checkpoint rm` / `runta secret delete`", and
+"keep tokens out of logs and source control". The confirmation rule is the CLI compensating in prose
+for the missing `--yes`/confirmation primitives in C-09 — an agent is asked to enforce a safety
+property the tool doesn't support.
+
+→ Generate `SKILL.md` from `runta help --json` in CI, the same way the docs reference should be
+(C-05), so it cannot drift. Add a CI check that every command and flag quoted in the skill parses
+under `runta <cmd> --help`. Document `--json`, `runta login`, and the fact that `--json` is implied
+off-TTY. Replace the "ask for confirmation" rule with real `--dry-run`/`--yes` support and tell the
+agent to use it.
+
+### C-31 — Agent discovery costs ~20k tokens and can't be narrowed
+_Severity: high._
+
+The root help tells agents `runta help --json` is the way to discover commands. Measured payload
+sizes (tokens ≈ bytes/4):
+
+| Command | Bytes | ≈ Tokens |
+|---|---|---|
+| `runta help --json` | 78,370 | **~19,600** |
+| `runta help run` | 7,422 | ~1,855 |
+| `runta` (no args) | 3,409 | ~852 |
+| `runta inspect <rt>` | 1,337 | ~334 |
+| `runta pause <rt>` | 1,384 | ~346 |
+| `runta egress describe <rt>` | 1,344 | ~336 |
+| `runta ps` (1 runtime) | 257 | ~64 |
+| `runta exec <rt> -- true` | 430 | ~107 |
+
+So the advertised discovery step burns roughly 20k tokens — a meaningful slice of a working context —
+in a single call, and there is no way to ask for less. Three compounding causes:
+
+1. **No compact JSON.** Everything is pretty-printed with 2-space indent. Re-serialising the same
+   payloads compactly saves **54% on `help --json`** (78,370 → 36,777 bytes, ~19.6k → ~9.2k tokens)
+   and **23% on `inspect`**. There is no `--json-compact` / `--compact` flag.
+2. **No way to narrow `help --json`.** It's all-or-nothing — no `--depth 1` for just the top-level
+   command list, no filtering to one subtree beyond the already-large per-command form.
+3. **No field selection on data commands** (C-22). `runta inspect` returns 31 fields / ~334 tokens
+   when an agent almost always wants 5 (`id`, `name`, `status`, `vcpus`, `memory` = 126 bytes). Every
+   lifecycle call — `pause`, `resume`, `boot`, `shutdown` — pays the same ~346 tokens to convey one
+   state change.
+
+→ Add `--compact` (or make `--json` compact off-TTY and pretty on-TTY, matching the existing
+TTY-detection logic). Add `runta help --json --depth 1` for a cheap command index. Add
+`--fields id,status` or `-q` on data commands. Together these would cut typical agent context use by
+roughly half.
 
 ---
 
