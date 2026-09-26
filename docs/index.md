@@ -14,7 +14,7 @@ It is a single standalone binary with no runtime dependency.
 | Page | What it covers |
 | --- | --- |
 | [Installation](./installation.md) | Install, upgrade, uninstall, supported platforms |
-| [Authentication](./authentication.md) | `auth login`, API keys in CI, where credentials live |
+| [Authentication](./authentication.md) | `login`, API keys in CI, where credentials live |
 | [Configuration](./configuration.md) | Every environment variable and the config file, with precedence |
 | [Output and scripting](./output-and-scripting.md) | `--json`, stdout vs stderr, exit codes |
 | [Commands](./commands/index.md) | Reference for every command |
@@ -26,7 +26,7 @@ It is a single standalone binary with no runtime dependency.
 curl -fsSL https://raw.githubusercontent.com/haxzie/runta-cli/main/scripts/install.sh | sh
 
 # Sign in through the browser
-runta auth login
+runta login
 
 # Confirm who you are
 runta whoami
@@ -43,8 +43,8 @@ runta whoami
 
 The CLI is early. Today it covers authentication and identity:
 
-- [`runta auth login`](./commands/auth.md#runta-auth-login)
-- [`runta auth logout`](./commands/auth.md#runta-auth-logout)
+- [`runta login`](./commands/login.md)
+- [`runta logout`](./commands/logout.md)
 - [`runta whoami`](./commands/whoami.md)
 - [`runta hello`](./commands/hello.md) — a development smoke test
 

@@ -27,8 +27,8 @@ runta [global options] <command> [command options]
 
 | Command | Does |
 | --- | --- |
-| `runta auth login` | Sign in through a browser using a one-time device code |
-| `runta auth logout` | Revoke the stored credential and remove it locally |
+| `runta login` | Sign in through a browser using a one-time device code |
+| `runta logout` | Revoke the stored credential and remove it locally |
 | `runta whoami` | Show the currently authenticated user |
 | `runta hello [name]` | Print a greeting — smoke test, no network, no credential |
 
@@ -54,7 +54,7 @@ file transfer and agents are not implemented yet — see
 Interactively, via the device flow:
 
 ```console
-$ runta auth login
+$ runta login
 Your code is ABCD-1234
 Opened your browser to approve it.
 Waiting for authorization…
@@ -77,7 +77,7 @@ runta whoami
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `RUNTA_TOKEN` | — | Bearer credential; skips `auth login` |
+| `RUNTA_TOKEN` | — | Bearer credential; skips `login` |
 | `RUNTA_API_URL` | `https://api.runta.com` | API base URL |
 | `RUNTA_CONFIG_HOME` | `~/.runta` | Directory holding `config.json` |
 | `RUNTA_LOG_LEVEL` | `info` | `silent`, `error`, `warn`, `info`, `debug` |
@@ -99,11 +99,11 @@ created on demand. Other keys in the file are preserved when the token is writte
 stdout is data; progress, hints and errors go to stderr, so pipes stay clean. Output does
 **not** change shape based on whether stdout is a TTY — pass `--json` explicitly.
 
-`whoami --json` prints the API envelope verbatim. `auth login --json` is a progress stream, so
+`whoami --json` prints the API envelope verbatim. `login --json` is a progress stream, so
 it emits NDJSON — one compact object per line, the code arriving before polling starts:
 
 ```console
-$ runta auth login --json --no-browser
+$ runta login --json --no-browser
 {"status":"authorization_pending","user_code":"ABCD-1234","verification_uri_complete":"…?code=ABCD-1234","expires_at":"2026-09-26T09:50:41Z"}
 {"status":"authorized","config_path":"/Users/you/.runta/config.json"}
 ```
@@ -116,10 +116,10 @@ $ runta auth login --json --no-browser
 
 ### Nuances worth knowing
 
-- **`RUNTA_TOKEN` silently shadows a stored login.** You can `auth login` successfully and
+- **`RUNTA_TOKEN` silently shadows a stored login.** You can `login` successfully and
   still be acting as a different identity, with nothing in the output saying so. Check
   `env | grep RUNTA_TOKEN` when results look wrong.
-- **`auth logout` revokes env tokens too, permanently.** If `RUNTA_TOKEN` is set, that key is
+- **`logout` revokes env tokens too, permanently.** If `RUNTA_TOKEN` is set, that key is
   destroyed for everyone using it, and the CLI cannot unset your environment variable —
   `{"revoked":true,"cleared":false}` is the tell.
 - **`whoami` rejects organization API keys.** `GET /v2/me` accepts only a user credential from

@@ -48,12 +48,10 @@ const exitCodeFor = (error: RuntaApiError): number =>
  */
 export function hintFor(error: RuntaApiError): string | undefined {
   if (error.status === 403 && error.code === 'permission_denied') {
-    return 'This looks like an organization API key. `whoami` needs a user credential — run `runta auth login`.';
+    return 'This looks like an organization API key. `whoami` needs a user credential — run `runta login`.';
   }
-  if (error.status === 403)
-    return 'No credential was sent. Run `runta auth login` or set RUNTA_TOKEN.';
-  if (error.status === 401)
-    return 'The token was rejected. Run `runta auth login` to get a new one.';
+  if (error.status === 403) return 'No credential was sent. Run `runta login` or set RUNTA_TOKEN.';
+  if (error.status === 401) return 'The token was rejected. Run `runta login` to get a new one.';
   return undefined;
 }
 

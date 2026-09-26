@@ -74,4 +74,4 @@ rm -rf ~/.runta
 
 That removes the binary **and** your stored credential
 (see [Authentication → where credentials live](./authentication.md#where-credentials-live)).
-To remove only the credential, use `runta auth logout`.
+To remove only the credential, use `runta logout`.

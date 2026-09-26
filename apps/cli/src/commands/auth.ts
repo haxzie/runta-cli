@@ -128,7 +128,7 @@ async function prompt(
 }
 
 const hintForDeviceAuth = (error: DeviceAuthError): string | undefined => {
-  if (error.reason === 'expired') return 'Run `runta auth login` again to get a fresh code.';
+  if (error.reason === 'expired') return 'Run `runta login` again to get a fresh code.';
   if (error.reason === 'unreachable') return 'Check your connection, then try again.';
   return undefined;
 };
@@ -174,10 +174,13 @@ export async function logout(
   logger.info(cleared || revoked ? 'Logged out.' : 'Not logged in — nothing to do.');
 }
 
-export function registerAuth(program: Command): void {
-  const auth = program.command('auth').description('Sign in and out of Runta');
-
-  auth
+/**
+ * `login` and `logout` sit at the top level rather than under an `auth` group, matching
+ * Runta's own CLI — `runta login` is what muscle memory reaches for, and two commands do not
+ * earn a namespace.
+ */
+export function registerAuthCommands(program: Command): void {
+  program
     .command('login')
     .description('Sign in through a browser using a one-time device code')
     .option('--json', 'print machine-readable progress instead of prose')
@@ -186,7 +189,7 @@ export function registerAuth(program: Command): void {
       await login(opts);
     });
 
-  auth
+  program
     .command('logout')
     .description('Revoke the stored credential and remove it from the local config')
     .option('--json', 'print the result as JSON')

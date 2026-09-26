@@ -1,7 +1,7 @@
 ---
 title: runta whoami
 description: Show the authenticated user, and why an organization API key is rejected here.
-sidebar_position: 8
+sidebar_position: 9
 ---
 
 # `runta whoami`
@@ -58,7 +58,7 @@ An organization API key (`rt_…`) authenticates successfully but is rejected by
 ```console
 $ runta whoami
 error principal's role does not allow this organization action
-This looks like an organization API key. `whoami` needs a user credential — run `runta auth login`.
+This looks like an organization API key. `whoami` needs a user credential — run `runta login`.
 exit 2
 ```
 
@@ -74,7 +74,7 @@ so none of these are currently answerable:
 - which organization this credential belongs to
 - what the token is allowed to do
 - when it expires
-- whether the token came from `RUNTA_TOKEN` or from `auth login`
+- whether the token came from `RUNTA_TOKEN` or from `login`
 
 For the last one, see
 [Which credential am I actually using?](../authentication.md#which-credential-am-i-actually-using).
@@ -90,12 +90,12 @@ For the last one, see
 ```console
 $ runta whoami                                     # nothing set
 error 403 Forbidden
-No credential was sent. Run `runta auth login` or set RUNTA_TOKEN.
+No credential was sent. Run `runta login` or set RUNTA_TOKEN.
 exit 2
 
 $ RUNTA_TOKEN=rt_bogus runta whoami                # rejected
 error invalid bearer credential
-The token was rejected. Run `runta auth login` to get a new one.
+The token was rejected. Run `runta login` to get a new one.
 exit 2
 ```
 

@@ -8,10 +8,10 @@ sidebar_position: 3
 
 Every command except `hello` needs a credential. There are two ways to supply one.
 
-## Interactive: `runta auth login`
+## Interactive: `runta login`
 
 ```console
-$ runta auth login
+$ runta login
 Your code is ABCD-1234
 Opened your browser to approve it.
 Waiting for authorization…
@@ -25,7 +25,7 @@ polls until you approve. The resulting token is written to
 
 The browser is opened for you. If that is wrong for your situation — a remote shell, a
 container, no desktop — the CLI detects it and prints the URL instead, and you can force
-that with `--no-browser`. See [`runta auth login`](./commands/auth.md#runta-auth-login) for
+that with `--no-browser`. See [`runta login`](./commands/login.md) for
 all flags.
 
 ### It tolerates a flaky API
@@ -58,10 +58,10 @@ env:
 [precedence](./configuration.md#precedence) — and the warning below, because this is the one
 part of the system that will surprise you.
 
-## Signing out: `runta auth logout`
+## Signing out: `runta logout`
 
 ```console
-$ runta auth logout
+$ runta logout
 Logged out.
 ```
 
@@ -73,8 +73,8 @@ If the revoke call fails, the local token is still cleared. A credential the ser
 already forgotten is one worth forgetting locally too.
 
 :::warning
-`auth logout` revokes whichever credential is currently in effect — **including one that came
-from `RUNTA_TOKEN`**. If you have an API key exported in your shell and run `auth logout`, that
+`logout` revokes whichever credential is currently in effect — **including one that came
+from `RUNTA_TOKEN`**. If you have an API key exported in your shell and run `logout`, that
 key is destroyed for every consumer of it, and the CLI cannot remove it from your environment,
 so your shell keeps supplying a now-dead token. Check `env | grep RUNTA_TOKEN` before signing
 out.
@@ -97,14 +97,14 @@ out.
 | Directory mode | `0700` |
 | Override | `RUNTA_CONFIG_HOME` sets the directory |
 
-The directory is created on demand, so `auth login` works on a machine that has never run
+The directory is created on demand, so `login` works on a machine that has never run
 `runta`. Other keys in the file — `apiUrl`, for instance — are preserved when the token is
 written or cleared; the token is one field in a shared config file, not the whole document.
 
 The token is stored **in plaintext**. `0600` keeps it away from other users on the machine,
 but any process running as you can read it, and it will be included in home-directory backups.
 This matches how `gh`, `aws` and `kubectl` store credentials. If that is not acceptable for
-your threat model, use `RUNTA_TOKEN` from a secret manager instead and never run `auth login`.
+your threat model, use `RUNTA_TOKEN` from a secret manager instead and never run `login`.
 
 ## Which credential am I actually using?
 
@@ -113,7 +113,7 @@ resolved, not which source the token came from. Until that exists, the quickest 
 
 ```sh
 env | grep RUNTA_TOKEN                 # is an env var shadowing my login?
-cat ~/.runta/config.json               # what did auth login store?
+cat ~/.runta/config.json               # what did login store?
 runta --verbose whoami 2>&1 | head -1  # which endpoint is being called
 ```
 
@@ -125,7 +125,7 @@ flow. An organization API key authenticates fine but is rejected here:
 ```console
 $ runta whoami
 error principal's role does not allow this organization action
-This looks like an organization API key. `whoami` needs a user credential — run `runta auth login`.
+This looks like an organization API key. `whoami` needs a user credential — run `runta login`.
 ```
 
 That is expected, not a bug — see [`whoami`](./commands/whoami.md#organization-api-keys).

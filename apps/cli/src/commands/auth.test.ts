@@ -65,7 +65,7 @@ const readStoredToken = async (): Promise<unknown> => {
   return parsed.token;
 };
 
-describe('auth login', () => {
+describe('login', () => {
   it('runs the device flow against the configured API and stores the issued token', async () => {
     const stub = use([
       { method: 'POST', path: AUTHZ, status: 200, body: authorization },
@@ -249,7 +249,7 @@ describe('auth login', () => {
   });
 });
 
-describe('auth logout', () => {
+describe('logout', () => {
   it('revokes the credential and clears it locally', async () => {
     process.env.RUNTA_TOKEN = 'rt_user';
     const stub = use([{ method: 'DELETE', path: REVOKE, status: 204 }]);

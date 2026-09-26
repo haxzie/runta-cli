@@ -14,8 +14,8 @@ runta [global options] <command> [command options]
 
 | Command | Does |
 | --- | --- |
-| [`runta auth login`](./auth.md#runta-auth-login) | Sign in through a browser using a one-time device code |
-| [`runta auth logout`](./auth.md#runta-auth-logout) | Revoke the stored credential and remove it locally |
+| [`runta login`](./login.md) | Sign in through a browser using a one-time device code |
+| [`runta logout`](./logout.md) | Revoke the stored credential and remove it locally |
 | [`runta whoami`](./whoami.md) | Show the currently authenticated user |
 | [`runta hello`](./hello.md) | Print a greeting — a smoke test for the dev loop |
 
@@ -43,8 +43,8 @@ accepts:
 
 ```sh
 runta --help
-runta auth --help
-runta auth login --help
+runta login --help
+runta whoami --help
 ```
 
 If this documentation and `--help` disagree, `--help` is right.

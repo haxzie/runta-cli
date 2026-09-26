@@ -13,7 +13,7 @@ the environment or from a config file.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `RUNTA_TOKEN` | — | Bearer credential. Skips `auth login` entirely |
+| `RUNTA_TOKEN` | — | Bearer credential. Skips `login` entirely |
 | `RUNTA_API_URL` | `https://api.runta.com` | API base URL |
 | `RUNTA_CONFIG_HOME` | `~/.runta` | Directory holding `config.json` |
 | `RUNTA_LOG_LEVEL` | `info` | `silent`, `error`, `warn`, `info` or `debug` |
@@ -23,7 +23,7 @@ the environment or from a config file.
 
 ## Config file
 
-`~/.runta/config.json`, created by `runta auth login`. Both keys are optional:
+`~/.runta/config.json`, created by `runta login`. Both keys are optional:
 
 ```json
 {
@@ -35,7 +35,7 @@ the environment or from a config file.
 Set `RUNTA_CONFIG_HOME` to move the directory — useful for keeping profiles apart:
 
 ```sh
-RUNTA_CONFIG_HOME=~/.runta-staging runta auth login
+RUNTA_CONFIG_HOME=~/.runta-staging runta login
 RUNTA_CONFIG_HOME=~/.runta-staging runta whoami
 ```
 
@@ -63,7 +63,7 @@ debug calling https://api.runta.com/v2/me
 ```
 
 :::warning
-`RUNTA_TOKEN` silently shadows a stored login. You can run `auth login` successfully and still
+`RUNTA_TOKEN` silently shadows a stored login. You can run `login` successfully and still
 be making requests as a *different* identity, with nothing in the output to tell you. If
 results look wrong, check `env | grep RUNTA_TOKEN` first.
 :::
