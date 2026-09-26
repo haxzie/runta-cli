@@ -152,6 +152,9 @@ Keep them in step with the code: a flag added without a docs change is a bug.
 
 ### Design rules
 
+[`RESEARCH.md`](./RESEARCH.md) records how E2B, Daytona, Modal and Docker name the equivalent
+commands, and which of their conventions we adopt — read it before naming anything new.
+
 [`.claude/skills/cli-design/`](./.claude/skills/cli-design) holds the rules we design this CLI
 by — naming, flags, output and JSON contracts, errors, exit codes, credential handling,
 destructive-action safety, agent-friendliness. Every rule traces to a specific defect recorded in
