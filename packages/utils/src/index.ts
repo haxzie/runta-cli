@@ -7,3 +7,4 @@ export {
   logger,
   setLogLevel,
 } from './logger.js';
+export { type Column, renderTable, terminalWidth } from './table.js';

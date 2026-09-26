@@ -28,8 +28,11 @@ curl -fsSL https://raw.githubusercontent.com/haxzie/runta-cli/main/scripts/insta
 # Sign in through the browser
 runta login
 
-# Confirm who you are
-runta whoami
+# Create a runtime and use it
+runta create --name demo --cpus 1 --memory 512
+runta list
+runta inspect demo
+runta delete demo
 ```
 
 For CI or any non-interactive environment, skip the login entirely and set a token:
@@ -41,13 +44,14 @@ runta whoami
 
 ## Current scope
 
-The CLI is early. Today it covers authentication and identity:
+The CLI is early. Today it covers the runtime lifecycle, authentication and identity:
 
-- [`runta login`](./commands/login.md)
-- [`runta logout`](./commands/logout.md)
-- [`runta whoami`](./commands/whoami.md)
+- [`runta create`](./commands/create.md) · [`runta list`](./commands/list.md) ·
+  [`runta inspect`](./commands/inspect.md) · [`runta delete`](./commands/delete.md)
+- [`runta login`](./commands/login.md) · [`runta logout`](./commands/logout.md) ·
+  [`runta whoami`](./commands/whoami.md)
 - [`runta hello`](./commands/hello.md) — a development smoke test
 
-Runtime, checkpoint, secret, egress, file-transfer and agent commands are not implemented
-yet. See [Commands → not yet implemented](./commands/index.md#not-yet-implemented) for what
-the API exposes and the CLI does not.
+`exec`, checkpoints, secrets, file transfer, images and agents are not implemented yet. See
+[Commands → not yet implemented](./commands/index.md#not-yet-implemented) for what the API
+exposes and the CLI does not.

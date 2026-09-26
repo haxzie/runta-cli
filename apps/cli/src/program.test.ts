@@ -28,7 +28,48 @@ describe('command surface', () => {
 
   it('registers exactly the commands we document', () => {
     // `help` is synthesised by commander and is not in `program.commands`.
-    expect(names()).toEqual(['hello', 'login', 'logout', 'whoami']);
+    expect(names()).toEqual([
+      'create',
+      'delete',
+      'hello',
+      'inspect',
+      'list',
+      'login',
+      'logout',
+      'runtime',
+      'whoami',
+    ]);
+  });
+
+  it('exposes the runtime verbs both under the noun and at the top level', () => {
+    // Noun-first is canonical so every resource reads the same way and an agent can predict
+    // `runta checkpoint list` from one example; the top-level forms exist because runtimes are
+    // what you type all day. See Improvements.md I-2.
+    const group = program().commands.find((c) => c.name() === 'runtime');
+    const verbs = group?.commands.map((c) => c.name()).sort();
+
+    expect(verbs).toEqual(['create', 'delete', 'inspect', 'list']);
+    for (const verb of verbs ?? []) expect(names()).toContain(verb);
+  });
+
+  it('keeps the two forms of each verb in step', () => {
+    // Registered from one function, so a flag added to one form cannot go missing from the other.
+    const group = program().commands.find((c) => c.name() === 'runtime');
+    for (const verb of ['create', 'delete', 'inspect', 'list']) {
+      const flat = optionsOf(verb);
+      const nested = (group?.commands.find((c) => c.name() === verb)?.options ?? [])
+        .map((o) => o.long ?? o.short ?? '')
+        .sort();
+      expect(nested).toEqual(flat);
+    }
+  });
+
+  it('has no run or ps command', () => {
+    // Improvements.md I-1: `run` would name the command that runs nothing, and `ps` is ambiguous
+    // about whether it lists runtimes or processes inside one.
+    expect(names()).not.toContain('run');
+    expect(names()).not.toContain('ps');
+    expect(names()).not.toContain('rm');
   });
 
   it('keeps the login flags', () => {

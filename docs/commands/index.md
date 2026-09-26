@@ -14,10 +14,53 @@ runta [global options] <command> [command options]
 
 | Command | Does |
 | --- | --- |
+| [`runta create`](./create.md) | Create a runtime and wait until it can accept commands |
+| [`runta list`](./list.md) | List runtimes |
+| [`runta inspect`](./inspect.md) | Show everything about one runtime |
+| [`runta delete`](./delete.md) | Delete one or more runtimes |
 | [`runta login`](./login.md) | Sign in through a browser using a one-time device code |
 | [`runta logout`](./logout.md) | Revoke the stored credential and remove it locally |
 | [`runta whoami`](./whoami.md) | Show the authenticated user and active team |
 | [`runta hello`](./hello.md) | Print a greeting — a smoke test for the dev loop |
+
+## Two forms for runtime commands
+
+Every runtime verb is reachable two ways, and they are the same command:
+
+```sh
+runta runtime create      runta create
+runta runtime list        runta list
+runta runtime inspect     runta inspect
+runta runtime delete      runta delete
+```
+
+The noun-first form is canonical, so every resource reads the same way and you can predict
+`runta checkpoint list` from having seen `runta runtime list`. The top-level form exists because
+runtimes are the noun you work with all day and naming them twice gets old. Runtimes are the only
+resource with that shortcut.
+
+There are no other aliases. In particular there is no `run`, no `ps` and no `rm` — see
+[Improvements.md](https://github.com/haxzie/runta-cli/blob/main/Improvements.md) for why.
+
+## Runtimes are named or identified
+
+Every command that targets a runtime takes it as a **positional** argument and accepts either a
+name or a UUID:
+
+```sh
+runta inspect demo
+runta inspect 01a0dcc4-2ba7-7353-acb2-7fa79602b0a0
+```
+
+Names are resolved by the CLI, because the API's path parameter only accepts a UUID. Two
+consequences: resolving a name costs one extra request, and because names are not guaranteed
+unique, an ambiguous name is an error rather than a guess —
+
+```console
+$ runta inspect demo
+error Runtime name 'demo' is ambiguous — 2 runtimes share it.
+Use an id instead: 01a0dcc4-…, 01a0dd12-…
+```
 
 ## Global options
 
@@ -56,7 +99,9 @@ currently covers four. Nothing below exists yet as a command:
 
 | Area | API operations | Status |
 | --- | --- | --- |
-| Runtimes — create, list, inspect, resize, pause, resume, stop, delete | 21 | Not started |
+| Runtimes — create, list, inspect, delete | 4 | **Done** |
+| Runtimes — resize, pause, resume, start, stop, VNC | 17 | Not started |
+| `exec` — run a command in a runtime (WebSocket, not REST) | — | Not started |
 | Cloud agents — create, run, follow up, artifacts, workspace | 22 | Not started |
 | GitHub — connect, repositories, runtime bindings | 9 | Not started |
 | SSH keys — tenant keys and per-runtime attachment | 7 | Not started |

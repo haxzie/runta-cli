@@ -27,6 +27,10 @@ runta [global options] <command> [command options]
 
 | Command | Does |
 | --- | --- |
+| `runta create` | Create a runtime and wait until it can accept commands |
+| `runta list` | List runtimes |
+| `runta inspect <runtime>` | Show everything about one runtime |
+| `runta delete <runtime>...` | Delete runtimes, with `--dry-run` and confirmation |
 | `runta login` | Sign in through a browser using a one-time device code |
 | `runta logout` | Revoke the stored credential and remove it locally |
 | `runta whoami` | Show the authenticated user and active team |

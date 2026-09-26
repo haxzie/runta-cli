@@ -3,7 +3,7 @@
   "info": {
     "title": "Runta API",
     "version": "0.1.0",
-    "description": "Hand-written from https://runta.com/docs/reference/api/ and verified against live https://api.runta.com. Runta does not publish an openapi.json (all candidate URLs 404), so this file is source rather than a generated snapshot \u2014 it is maintained by hand, operation group by operation group, and codegen reads it directly with no network access. Where the published docs and the live API disagree, this spec follows the live API; see NOTES.md for the list of divergences.\n\nCoverage: auth, identity, and the model-providers list (for its organization_id). 80 of the 85 documented operations are not yet described."
+    "description": "Hand-written from https://runta.com/docs/reference/api/ and verified against live https://api.runta.com. Runta does not publish an openapi.json (all candidate URLs 404), so this file is source rather than a generated snapshot \u2014 it is maintained by hand, operation group by operation group, and codegen reads it directly with no network access. Where the published docs and the live API disagree, this spec follows the live API; see NOTES.md for the list of divergences.\n\nCoverage: auth, identity, runtime CRUD, and the model-providers list (for its organization_id). 76 of the 85 documented operations are not yet described."
   },
   "servers": [
     {
@@ -28,6 +28,10 @@
     {
       "name": "model-providers",
       "description": "Organization-managed model providers. Also the only endpoint that reveals the organization id."
+    },
+    {
+      "name": "runtimes",
+      "description": "Create, list, inspect and delete runtimes."
     }
   ],
   "paths": {
@@ -340,6 +344,339 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          }
+        }
+      }
+    },
+    "/v2/runtimes": {
+      "get": {
+        "operationId": "listRuntimes",
+        "summary": "List runtimes",
+        "tags": [
+          "runtimes"
+        ],
+        "description": "Cursor-paginated. The cursor parameter is named `after`, not `cursor`.",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated statuses. Upstream documents no enum; verified live to accept RuntimeStatus values, rejecting anything else with 422."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "description": "Page size. 0 and 101 both return 422."
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque cursor from pagination.next_cursor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of runtimes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createRuntime",
+        "summary": "Create a runtime",
+        "tags": [
+          "runtimes"
+        ],
+        "description": "Asynchronous: returns 201 with status `creating`. Poll until the runtime is usable.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "description": "Reuse across retries of one logical creation so a retry cannot double-create."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRuntimeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Runtime created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeResponse"
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Canonical runtime URI.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          }
+        }
+      }
+    },
+    "/v2/runtimes/{runtime_id}": {
+      "get": {
+        "operationId": "getRuntime",
+        "summary": "Get a runtime",
+        "tags": [
+          "runtimes"
+        ],
+        "parameters": [
+          {
+            "name": "runtime_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Runtime UUID or display name \u2014 despite the upstream title, a name is accepted."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The runtime.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteRuntime",
+        "summary": "Delete a runtime",
+        "tags": [
+          "runtimes"
+        ],
+        "description": "Optimistic concurrency: `expected_revision` is required and must match the runtime's current `revision`, so a caller has to read the runtime first. A stale revision is a 409.",
+        "parameters": [
+          {
+            "name": "runtime_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Runtime UUID or display name."
+          },
+          {
+            "name": "expected_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "The runtime's current `revision`."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Deletion accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeResponse"
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Canonical runtime URI.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Deletion was already complete. No content."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
           },
           "401": {
             "$ref": "#/components/responses/Error401"
@@ -703,6 +1040,761 @@
             }
           }
         }
+      },
+      "RuntimeStatus": {
+        "type": "string",
+        "description": "Observed runtime status.",
+        "enum": [
+          "running",
+          "paused",
+          "shutdown",
+          "creating",
+          "deleting",
+          "error",
+          "crashed",
+          "suspended",
+          "unavailable"
+        ]
+      },
+      "RuntimeDesiredStatus": {
+        "type": "string",
+        "description": "Control-plane target state. A strict subset of RuntimeStatus \u2014 no creating, error, crashed or unavailable.",
+        "enum": [
+          "running",
+          "paused",
+          "suspended",
+          "shutdown",
+          "deleting"
+        ]
+      },
+      "EgressPolicy": {
+        "description": "Egress policy. denylist denies the listed hosts and allows everything else; allowlist permits only the listed hosts.",
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "mode",
+              "denied_hosts"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "denylist"
+                ]
+              },
+              "denied_hosts": {
+                "type": "array",
+                "maxItems": 128,
+                "items": {
+                  "type": "string"
+                },
+                "description": "Hostnames, wildcard patterns, IPs or CIDRs. An empty list means unrestricted egress."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "mode",
+              "allowed_hosts"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "allowlist"
+                ]
+              },
+              "allowed_hosts": {
+                "type": "array",
+                "maxItems": 128,
+                "items": {
+                  "type": "string"
+                },
+                "description": "An empty list means no egress at all."
+              }
+            }
+          }
+        ]
+      },
+      "IdlePolicy": {
+        "description": "Idle suspension and auto-wakeup policy.",
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "mode"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "disabled"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "mode",
+              "suspend_after_secs"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "suspend_only"
+                ]
+              },
+              "suspend_after_secs": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "mode",
+              "suspend_after_secs"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "suspend_and_wakeup"
+                ]
+              },
+              "suspend_after_secs": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              }
+            }
+          }
+        ]
+      },
+      "IngressSpec": {
+        "type": "object",
+        "required": [
+          "protocol",
+          "runtime_port"
+        ],
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "http",
+              "https"
+            ]
+          },
+          "runtime_port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          }
+        }
+      },
+      "LlmTokenSavingPolicy": {
+        "type": "object",
+        "description": "Compression of large tool outputs. Omit on create to leave every method disabled.",
+        "properties": {
+          "json_array_enabled": {
+            "type": "boolean"
+          },
+          "log_enabled": {
+            "type": "boolean"
+          },
+          "search_results_enabled": {
+            "type": "boolean"
+          },
+          "git_diff_enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SecretEnvironmentBinding": {
+        "type": "object",
+        "required": [
+          "name",
+          "value_template"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "value_template": {
+            "type": "string"
+          }
+        }
+      },
+      "SecretEgressRule": {
+        "type": "object",
+        "required": [
+          "host_pattern",
+          "action",
+          "name",
+          "value_template"
+        ],
+        "properties": {
+          "host_pattern": {
+            "type": "string"
+          },
+          "path_pattern": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Defaults to every path."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "header",
+              "query"
+            ],
+            "description": "Where the secret is injected."
+          },
+          "name": {
+            "type": "string",
+            "description": "Header or query-parameter name."
+          },
+          "value_template": {
+            "type": "string"
+          }
+        }
+      },
+      "SecretFileBinding": {
+        "type": "object",
+        "required": [
+          "path",
+          "value_template"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative to the guest home directory."
+          },
+          "value_template": {
+            "type": "string"
+          }
+        }
+      },
+      "SecretConfiguration": {
+        "type": "object",
+        "required": [
+          "secret_id"
+        ],
+        "properties": {
+          "secret_id": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecretEnvironmentBinding"
+            }
+          },
+          "egress_rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecretEgressRule"
+            }
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecretFileBinding"
+            }
+          }
+        }
+      },
+      "RepositoryCheckout": {
+        "type": "object",
+        "required": [
+          "repository_id"
+        ],
+        "properties": {
+          "repository_id": {
+            "type": "integer",
+            "description": "GitHub repository id."
+          },
+          "branch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "VncConnection": {
+        "type": "object",
+        "required": [
+          "hostname",
+          "port",
+          "username",
+          "security_type"
+        ],
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "minLength": 1
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "username": {
+            "type": "string",
+            "enum": [
+              "runta"
+            ]
+          },
+          "security_type": {
+            "type": "string",
+            "enum": [
+              "X509Plain"
+            ]
+          }
+        }
+      },
+      "RuntimeResources": {
+        "type": "object",
+        "required": [
+          "current",
+          "limits",
+          "requests"
+        ],
+        "description": "Verified against the live API: disk_gib is under `requests`, not `resources`.",
+        "properties": {
+          "current": {
+            "type": "object",
+            "required": [
+              "memory_mib",
+              "observed_disk_gib"
+            ],
+            "properties": {
+              "memory_mib": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "observed_disk_gib": {
+                "type": "integer",
+                "description": "Worker-observed overlay capacity in GiB."
+              }
+            }
+          },
+          "limits": {
+            "type": "object",
+            "required": [
+              "memory_mib"
+            ],
+            "properties": {
+              "memory_mib": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum memory for auto-scaling."
+              }
+            }
+          },
+          "requests": {
+            "type": "object",
+            "required": [
+              "memory_mib",
+              "vcpus"
+            ],
+            "properties": {
+              "memory_mib": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "vcpus": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2147483647
+              },
+              "disk_gib": {
+                "type": "integer",
+                "minimum": 16,
+                "maximum": 256
+              }
+            }
+          }
+        }
+      },
+      "Runtime": {
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "status",
+          "desired_status",
+          "degraded",
+          "created_at",
+          "updated_at",
+          "egress_policy",
+          "idle_policy",
+          "ingress_specs",
+          "resources",
+          "image_id",
+          "revision",
+          "ssh_enabled",
+          "vnc_enabled",
+          "vnc_ready",
+          "vnc_connection",
+          "owner_user_id",
+          "can_manage",
+          "llm_tool_io_capture_enabled",
+          "llm_session_content_capture_enabled",
+          "llm_token_saving_policy",
+          "secret_configuration"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable runtime UUID."
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RuntimeStatus"
+          },
+          "desired_status": {
+            "$ref": "#/components/schemas/RuntimeDesiredStatus"
+          },
+          "degraded": {
+            "type": "boolean",
+            "description": "A running runtime with no successful heartbeat for 60s or more."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "RFC3339. No format declared upstream."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "RFC3339. No format declared upstream."
+          },
+          "image_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Monotonic aggregate revision. DELETE requires this as `expected_revision`."
+          },
+          "environment_variables": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 64
+          },
+          "egress_policy": {
+            "$ref": "#/components/schemas/EgressPolicy"
+          },
+          "idle_policy": {
+            "$ref": "#/components/schemas/IdlePolicy"
+          },
+          "ingress_specs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngressSpec"
+            }
+          },
+          "resources": {
+            "$ref": "#/components/schemas/RuntimeResources"
+          },
+          "ssh_enabled": {
+            "type": "boolean"
+          },
+          "vnc_enabled": {
+            "type": "boolean"
+          },
+          "vnc_ready": {
+            "type": "boolean"
+          },
+          "vnc_connection": {
+            "$ref": "#/components/schemas/VncConnection",
+            "description": "Gateway parameters for the zone. Populated even when vnc_enabled is false."
+          },
+          "vnc_error_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Omitted when null."
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Provisioning failure code. Omitted when null."
+          },
+          "owner_user_id": {
+            "type": "string"
+          },
+          "can_manage": {
+            "type": "boolean"
+          },
+          "llm_tool_io_capture_enabled": {
+            "type": "boolean"
+          },
+          "llm_session_content_capture_enabled": {
+            "type": "boolean"
+          },
+          "llm_token_saving_policy": {
+            "$ref": "#/components/schemas/LlmTokenSavingPolicy"
+          },
+          "secret_configuration": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecretConfiguration"
+            }
+          }
+        }
+      },
+      "RuntimeResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Runtime"
+          }
+        }
+      },
+      "RuntimeListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Runtime"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "CreateRuntimeRequest": {
+        "description": "Either a fresh runtime from a Runtime Image, or a restore from a checkpoint. Note there is no top-level cpus/memory/disk \u2014 those are resources.requests.*.",
+        "oneOf": [
+          {
+            "title": "Fresh",
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Human-readable name. A random one is assigned when omitted."
+              },
+              "egress_policy": {
+                "$ref": "#/components/schemas/EgressPolicy"
+              },
+              "idle_policy": {
+                "$ref": "#/components/schemas/IdlePolicy",
+                "description": "Defaults to disabled."
+              },
+              "ingress_specs": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "$ref": "#/components/schemas/IngressSpec"
+                }
+              },
+              "secret_configuration": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SecretConfiguration"
+                }
+              },
+              "ssh_key_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "vnc_enabled": {
+                "type": "boolean"
+              },
+              "repositories": {
+                "type": "array",
+                "maxItems": 20,
+                "items": {
+                  "$ref": "#/components/schemas/RepositoryCheckout"
+                }
+              },
+              "llm_tool_io_capture_enabled": {
+                "type": "boolean"
+              },
+              "llm_session_content_capture_enabled": {
+                "type": "boolean"
+              },
+              "llm_token_saving_policy": {
+                "$ref": "#/components/schemas/LlmTokenSavingPolicy"
+              },
+              "environment_variables": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "maxProperties": 64,
+                "description": "Names must match [A-Za-z_][A-Za-z0-9_]*. The RUNTA_ prefix is reserved."
+              },
+              "resources": {
+                "type": "object",
+                "properties": {
+                  "limits": {
+                    "type": "object",
+                    "required": [
+                      "memory_mib"
+                    ],
+                    "properties": {
+                      "memory_mib": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    }
+                  },
+                  "requests": {
+                    "type": "object",
+                    "properties": {
+                      "memory_mib": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 1024
+                      },
+                      "vcpus": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 2147483647,
+                        "default": 1
+                      },
+                      "disk_gib": {
+                        "type": "integer",
+                        "minimum": 16,
+                        "maximum": 256
+                      }
+                    }
+                  }
+                }
+              },
+              "image": {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "model_provider_protocol": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "model_provider_base_url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "model_provider_model": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "runtime_sign_in": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "title": "FromCheckpoint",
+            "type": "object",
+            "required": [
+              "checkpoint_id"
+            ],
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Human-readable name. A random one is assigned when omitted."
+              },
+              "egress_policy": {
+                "$ref": "#/components/schemas/EgressPolicy"
+              },
+              "idle_policy": {
+                "$ref": "#/components/schemas/IdlePolicy",
+                "description": "Defaults to disabled."
+              },
+              "ingress_specs": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "$ref": "#/components/schemas/IngressSpec"
+                }
+              },
+              "secret_configuration": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SecretConfiguration"
+                }
+              },
+              "ssh_key_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "vnc_enabled": {
+                "type": "boolean"
+              },
+              "repositories": {
+                "type": "array",
+                "maxItems": 20,
+                "items": {
+                  "$ref": "#/components/schemas/RepositoryCheckout"
+                }
+              },
+              "llm_tool_io_capture_enabled": {
+                "type": "boolean"
+              },
+              "llm_session_content_capture_enabled": {
+                "type": "boolean"
+              },
+              "llm_token_saving_policy": {
+                "$ref": "#/components/schemas/LlmTokenSavingPolicy"
+              },
+              "checkpoint_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Resources and image identity are fixed by the checkpoint."
+              }
+            }
+          }
+        ]
       }
     },
     "responses": {

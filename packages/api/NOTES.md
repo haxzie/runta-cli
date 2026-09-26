@@ -108,7 +108,39 @@ is an API key, not a user session" rather than as an error. Also note `/v2/me` r
 scopes and no expiry, and the API has **no** token-introspection operation, so "which org is this key
 for / is it still valid" is currently unanswerable.
 
-### 6. Envelope is inconsistent across auth endpoints
+### 6. `{runtime_id}` does not accept a display name
+
+`GET /v2/runtimes/{runtime_id}` and `DELETE` are documented as taking "Runtime UUID **or display
+name**". They take a UUID only:
+
+```console
+$ curl -H "Authorization: Bearer $RUNTA_TOKEN" https://api.runta.com/v2/runtimes/jesting_kalong
+{"error":{"code":"invalid_argument","message":"runtime_id must be a UUID"},"request_id":"…"}
+```
+
+So accepting names is a client responsibility — `resolveRuntimeId` in `@runta/core` lists and
+matches. This is consistent with the exec WebSocket spec, which says the CLI resolves names to ids
+first, and inconsistent with these two REST pages.
+
+### 7. `resources.disk_gib` is actually `resources.requests.disk_gib`
+
+The reference flattens the `resources` nesting, leaving it ambiguous whether `disk_gib` sits under
+`resources` or `resources.requests`. Live, it is under `requests`, and `observed_disk_gib` is under
+`current`:
+
+```json
+{ "resources": { "current":  { "memory_mib": 1024, "observed_disk_gib": 16 },
+                 "limits":   { "memory_mib": 1024 },
+                 "requests": { "memory_mib": 1024, "vcpus": 1, "disk_gib": 16 } } }
+```
+
+### 8. `listruntimes` documents no allowed values for `status`
+
+The parameter is a bare string with no enum. Verified live: it accepts the values from the response
+`status` enum and answers 422 for anything else. `limit` is 1–100 — both 0 and 101 are 422 — and the
+cursor parameter is named `after`, not `cursor`.
+
+### 9. Envelope is inconsistent across auth endpoints
 
 - `POST /v2/auth/device/authorization` → `{ "data": { … } }`
 - `POST /v2/auth/device/token` → **not** enveloped, fields at the top level
@@ -117,7 +149,7 @@ for / is it still valid" is currently unanswerable.
 Confirmed live. The spec models each one as it actually is, which is why `DeviceToken` has no wrapper
 type while `DeviceAuthorization` and `User` do.
 
-### 7. `POST /v2/auth/device/token` 400 has a different body shape from every other error
+### 10. `POST /v2/auth/device/token` 400 has a different body shape from every other error
 
 ```console
 $ curl -X POST -H 'content-type: application/json' -d '{"device_code":"deadbeef"}' \
@@ -170,7 +202,7 @@ accept either. One shared resolver, used by every command.
 
 ## Coverage
 
-Done: **auth** (3) + **identity** (1) + **model providers** (1 of 2).
+Done: **auth** (3) + **identity** (1) + **runtimes** (4 of 21) + **model providers** (1 of 2).
 
 | Group | Operations | Status |
 |---|---|---|
@@ -179,7 +211,7 @@ Done: **auth** (3) + **identity** (1) + **model providers** (1 of 2).
 | Health | 2 | todo |
 | Events / token analysis | 5 | todo |
 | GitHub | 9 | todo |
-| Runtimes | 21 | todo |
+| Runtimes | 21 | 4 of 21 (create, list, get, delete) |
 | Files | 2 | todo |
 | SSH keys | 7 | todo |
 | Secrets | 5 | todo |
@@ -187,7 +219,7 @@ Done: **auth** (3) + **identity** (1) + **model providers** (1 of 2).
 | Cloud Agents | 22 | todo |
 | Managed model providers | 2 | 1 of 2 (`listManagedModelProviders`, for its `organization_id`) |
 
-85 documented operations total; 5 described here. Operation detail pages follow
+85 documented operations total; 9 described here. Operation detail pages follow
 `https://runta.com/docs/reference/api/operations/<slug>/`.
 
 Note for later: the docs list a **Cloud Agents** group (22 operations under `/v2/agents`) that the

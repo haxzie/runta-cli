@@ -2,6 +2,7 @@ import { type LogLevel, setLogLevel } from '@runta/utils';
 import { Command } from 'commander';
 import { registerAuthCommands } from './commands/auth.js';
 import { registerHello } from './commands/hello.js';
+import { registerRuntime } from './commands/runtime.js';
 import { registerWhoami } from './commands/whoami.js';
 import { version } from './version.js';
 
@@ -22,6 +23,7 @@ export function buildProgram(): Command {
 
   registerAuthCommands(program);
   registerHello(program);
+  registerRuntime(program);
   registerWhoami(program);
 
   return program;

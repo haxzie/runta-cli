@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BeginDeviceAuthorizationData, BeginDeviceAuthorizationErrors, BeginDeviceAuthorizationResponses, ExchangeDeviceTokenData, ExchangeDeviceTokenErrors, ExchangeDeviceTokenResponses, GetMeData, GetMeErrors, GetMeResponses, ListManagedModelProvidersData, ListManagedModelProvidersErrors, ListManagedModelProvidersResponses, RevokeCurrentTokenData, RevokeCurrentTokenErrors, RevokeCurrentTokenResponses } from './types.gen';
+import type { BeginDeviceAuthorizationData, BeginDeviceAuthorizationErrors, BeginDeviceAuthorizationResponses, CreateRuntimeData, CreateRuntimeErrors, CreateRuntimeResponses, DeleteRuntimeData, DeleteRuntimeErrors, DeleteRuntimeResponses, ExchangeDeviceTokenData, ExchangeDeviceTokenErrors, ExchangeDeviceTokenResponses, GetMeData, GetMeErrors, GetMeResponses, GetRuntimeData, GetRuntimeErrors, GetRuntimeResponses, ListManagedModelProvidersData, ListManagedModelProvidersErrors, ListManagedModelProvidersResponses, ListRuntimesData, ListRuntimesErrors, ListRuntimesResponses, RevokeCurrentTokenData, RevokeCurrentTokenErrors, RevokeCurrentTokenResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -80,5 +80,51 @@ export const getMe = <ThrowOnError extends boolean = false>(options?: Options<Ge
 export const listManagedModelProviders = <ThrowOnError extends boolean = false>(options?: Options<ListManagedModelProvidersData, ThrowOnError>): RequestResult<ListManagedModelProvidersResponses, ListManagedModelProvidersErrors, ThrowOnError> => (options?.client ?? client).get<ListManagedModelProvidersResponses, ListManagedModelProvidersErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v2/model-providers',
+    ...options
+});
+
+/**
+ * List runtimes
+ *
+ * Cursor-paginated. The cursor parameter is named `after`, not `cursor`.
+ */
+export const listRuntimes = <ThrowOnError extends boolean = false>(options?: Options<ListRuntimesData, ThrowOnError>): RequestResult<ListRuntimesResponses, ListRuntimesErrors, ThrowOnError> => (options?.client ?? client).get<ListRuntimesResponses, ListRuntimesErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/runtimes',
+    ...options
+});
+
+/**
+ * Create a runtime
+ *
+ * Asynchronous: returns 201 with status `creating`. Poll until the runtime is usable.
+ */
+export const createRuntime = <ThrowOnError extends boolean = false>(options: Options<CreateRuntimeData, ThrowOnError>): RequestResult<CreateRuntimeResponses, CreateRuntimeErrors, ThrowOnError> => (options.client ?? client).post<CreateRuntimeResponses, CreateRuntimeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/runtimes',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete a runtime
+ *
+ * Optimistic concurrency: `expected_revision` is required and must match the runtime's current `revision`, so a caller has to read the runtime first. A stale revision is a 409.
+ */
+export const deleteRuntime = <ThrowOnError extends boolean = false>(options: Options<DeleteRuntimeData, ThrowOnError>): RequestResult<DeleteRuntimeResponses, DeleteRuntimeErrors, ThrowOnError> => (options.client ?? client).delete<DeleteRuntimeResponses, DeleteRuntimeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/runtimes/{runtime_id}',
+    ...options
+});
+
+/**
+ * Get a runtime
+ */
+export const getRuntime = <ThrowOnError extends boolean = false>(options: Options<GetRuntimeData, ThrowOnError>): RequestResult<GetRuntimeResponses, GetRuntimeErrors, ThrowOnError> => (options.client ?? client).get<GetRuntimeResponses, GetRuntimeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/runtimes/{runtime_id}',
     ...options
 });

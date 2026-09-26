@@ -146,6 +146,269 @@ export type ModelProvidersResponse = {
     model_providers: Array<ModelProvider>;
 };
 
+/**
+ * Observed runtime status.
+ */
+export type RuntimeStatus = 'running' | 'paused' | 'shutdown' | 'creating' | 'deleting' | 'error' | 'crashed' | 'suspended' | 'unavailable';
+
+/**
+ * Control-plane target state. A strict subset of RuntimeStatus — no creating, error, crashed or unavailable.
+ */
+export type RuntimeDesiredStatus = 'running' | 'paused' | 'suspended' | 'shutdown' | 'deleting';
+
+/**
+ * Egress policy. denylist denies the listed hosts and allows everything else; allowlist permits only the listed hosts.
+ */
+export type EgressPolicy = {
+    mode: 'denylist';
+    /**
+     * Hostnames, wildcard patterns, IPs or CIDRs. An empty list means unrestricted egress.
+     */
+    denied_hosts: Array<string>;
+} | {
+    mode: 'allowlist';
+    /**
+     * An empty list means no egress at all.
+     */
+    allowed_hosts: Array<string>;
+};
+
+/**
+ * Idle suspension and auto-wakeup policy.
+ */
+export type IdlePolicy = {
+    mode: 'disabled';
+} | {
+    mode: 'suspend_only';
+    suspend_after_secs: number;
+} | {
+    mode: 'suspend_and_wakeup';
+    suspend_after_secs: number;
+};
+
+export type IngressSpec = {
+    protocol: 'http' | 'https';
+    runtime_port: number;
+};
+
+/**
+ * Compression of large tool outputs. Omit on create to leave every method disabled.
+ */
+export type LlmTokenSavingPolicy = {
+    json_array_enabled?: boolean;
+    log_enabled?: boolean;
+    search_results_enabled?: boolean;
+    git_diff_enabled?: boolean;
+};
+
+export type SecretEnvironmentBinding = {
+    name: string;
+    value_template: string;
+};
+
+export type SecretEgressRule = {
+    host_pattern: string;
+    /**
+     * Defaults to every path.
+     */
+    path_pattern?: string | null;
+    /**
+     * Where the secret is injected.
+     */
+    action: 'header' | 'query';
+    /**
+     * Header or query-parameter name.
+     */
+    name: string;
+    value_template: string;
+};
+
+export type SecretFileBinding = {
+    /**
+     * Relative to the guest home directory.
+     */
+    path: string;
+    value_template: string;
+};
+
+export type SecretConfiguration = {
+    secret_id: string;
+    environment?: Array<SecretEnvironmentBinding>;
+    egress_rules?: Array<SecretEgressRule>;
+    files?: Array<SecretFileBinding>;
+};
+
+export type RepositoryCheckout = {
+    /**
+     * GitHub repository id.
+     */
+    repository_id: number;
+    branch?: string | null;
+};
+
+export type VncConnection = {
+    hostname: string;
+    port: number;
+    username: 'runta';
+    security_type: 'X509Plain';
+};
+
+/**
+ * Verified against the live API: disk_gib is under `requests`, not `resources`.
+ */
+export type RuntimeResources = {
+    current: {
+        memory_mib: number;
+        /**
+         * Worker-observed overlay capacity in GiB.
+         */
+        observed_disk_gib: number;
+    };
+    limits: {
+        /**
+         * Maximum memory for auto-scaling.
+         */
+        memory_mib: number;
+    };
+    requests: {
+        memory_mib: number;
+        vcpus: number;
+        disk_gib?: number;
+    };
+};
+
+export type Runtime = {
+    /**
+     * Stable runtime UUID.
+     */
+    id: string;
+    display_name: string;
+    status: RuntimeStatus;
+    desired_status: RuntimeDesiredStatus;
+    /**
+     * A running runtime with no successful heartbeat for 60s or more.
+     */
+    degraded: boolean;
+    /**
+     * RFC3339. No format declared upstream.
+     */
+    created_at: string;
+    /**
+     * RFC3339. No format declared upstream.
+     */
+    updated_at: string;
+    image_id: string;
+    /**
+     * Monotonic aggregate revision. DELETE requires this as `expected_revision`.
+     */
+    revision: number;
+    environment_variables?: {
+        [key: string]: string;
+    };
+    egress_policy: EgressPolicy;
+    idle_policy: IdlePolicy;
+    ingress_specs: Array<IngressSpec>;
+    resources: RuntimeResources;
+    ssh_enabled: boolean;
+    vnc_enabled: boolean;
+    vnc_ready: boolean;
+    /**
+     * Gateway parameters for the zone. Populated even when vnc_enabled is false.
+     */
+    vnc_connection: VncConnection;
+    /**
+     * Omitted when null.
+     */
+    vnc_error_code?: string | null;
+    /**
+     * Provisioning failure code. Omitted when null.
+     */
+    error_code?: string | null;
+    owner_user_id: string;
+    can_manage: boolean;
+    llm_tool_io_capture_enabled: boolean;
+    llm_session_content_capture_enabled: boolean;
+    llm_token_saving_policy: LlmTokenSavingPolicy;
+    secret_configuration: Array<SecretConfiguration>;
+};
+
+export type RuntimeResponse = {
+    data: Runtime;
+};
+
+export type RuntimeListResponse = {
+    data: Array<Runtime>;
+    pagination: Pagination;
+};
+
+/**
+ * Either a fresh runtime from a Runtime Image, or a restore from a checkpoint. Note there is no top-level cpus/memory/disk — those are resources.requests.*.
+ */
+export type CreateRuntimeRequest = {
+    /**
+     * Human-readable name. A random one is assigned when omitted.
+     */
+    name?: string | null;
+    egress_policy?: EgressPolicy;
+    /**
+     * Defaults to disabled.
+     */
+    idle_policy?: IdlePolicy;
+    ingress_specs?: Array<IngressSpec>;
+    secret_configuration?: Array<SecretConfiguration>;
+    ssh_key_ids?: Array<string>;
+    vnc_enabled?: boolean;
+    repositories?: Array<RepositoryCheckout>;
+    llm_tool_io_capture_enabled?: boolean;
+    llm_session_content_capture_enabled?: boolean;
+    llm_token_saving_policy?: LlmTokenSavingPolicy;
+    /**
+     * Names must match [A-Za-z_][A-Za-z0-9_]*. The RUNTA_ prefix is reserved.
+     */
+    environment_variables?: {
+        [key: string]: string;
+    };
+    resources?: {
+        limits?: {
+            memory_mib: number;
+        };
+        requests?: {
+            memory_mib?: number;
+            vcpus?: number;
+            disk_gib?: number;
+        };
+    };
+    image?: {
+        id: string;
+        model_provider_protocol?: string | null;
+        model_provider_base_url?: string | null;
+        model_provider_model?: string | null;
+        runtime_sign_in?: boolean;
+    };
+} | {
+    /**
+     * Human-readable name. A random one is assigned when omitted.
+     */
+    name?: string | null;
+    egress_policy?: EgressPolicy;
+    /**
+     * Defaults to disabled.
+     */
+    idle_policy?: IdlePolicy;
+    ingress_specs?: Array<IngressSpec>;
+    secret_configuration?: Array<SecretConfiguration>;
+    ssh_key_ids?: Array<string>;
+    vnc_enabled?: boolean;
+    repositories?: Array<RepositoryCheckout>;
+    llm_tool_io_capture_enabled?: boolean;
+    llm_session_content_capture_enabled?: boolean;
+    llm_token_saving_policy?: LlmTokenSavingPolicy;
+    /**
+     * Resources and image identity are fixed by the checkpoint.
+     */
+    checkpoint_id: string;
+};
+
 export type BeginDeviceAuthorizationData = {
     body: BeginDeviceAuthorizationRequest;
     path?: never;
@@ -486,3 +749,317 @@ export type ListManagedModelProvidersResponses = {
 };
 
 export type ListManagedModelProvidersResponse = ListManagedModelProvidersResponses[keyof ListManagedModelProvidersResponses];
+
+export type ListRuntimesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Comma-separated statuses. Upstream documents no enum; verified live to accept RuntimeStatus values, rejecting anything else with 422.
+         */
+        status?: string;
+        /**
+         * Page size. 0 and 101 both return 422.
+         */
+        limit?: number;
+        /**
+         * Opaque cursor from pagination.next_cursor.
+         */
+        after?: string;
+    };
+    url: '/v2/runtimes';
+};
+
+export type ListRuntimesErrors = {
+    /**
+     * Malformed or invalid request body.
+     */
+    400: ErrorResponse;
+    /**
+     * The bearer token was present but rejected.
+     */
+    401: ErrorResponse;
+    /**
+     * No bearer token was supplied, or the token's role does not allow this action.
+     */
+    403: ErrorResponse;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * The request conflicts with current resource state.
+     */
+    409: ErrorResponse;
+    /**
+     * Validation or application error.
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded.
+     */
+    429: ErrorResponse;
+    /**
+     * Internal error.
+     */
+    500: ErrorResponse;
+    /**
+     * Operation is not implemented.
+     */
+    501: ErrorResponse;
+    /**
+     * Upstream service is unavailable.
+     */
+    503: ErrorResponse;
+    /**
+     * Upstream request timed out.
+     */
+    504: ErrorResponse;
+    /**
+     * Error response.
+     */
+    default: ErrorResponse;
+};
+
+export type ListRuntimesError = ListRuntimesErrors[keyof ListRuntimesErrors];
+
+export type ListRuntimesResponses = {
+    /**
+     * A page of runtimes.
+     */
+    200: RuntimeListResponse;
+};
+
+export type ListRuntimesResponse = ListRuntimesResponses[keyof ListRuntimesResponses];
+
+export type CreateRuntimeData = {
+    body: CreateRuntimeRequest;
+    headers?: {
+        /**
+         * Reuse across retries of one logical creation so a retry cannot double-create.
+         */
+        'Idempotency-Key'?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/v2/runtimes';
+};
+
+export type CreateRuntimeErrors = {
+    /**
+     * Malformed or invalid request body.
+     */
+    400: ErrorResponse;
+    /**
+     * The bearer token was present but rejected.
+     */
+    401: ErrorResponse;
+    /**
+     * No bearer token was supplied, or the token's role does not allow this action.
+     */
+    403: ErrorResponse;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * The request conflicts with current resource state.
+     */
+    409: ErrorResponse;
+    /**
+     * Validation or application error.
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded.
+     */
+    429: ErrorResponse;
+    /**
+     * Internal error.
+     */
+    500: ErrorResponse;
+    /**
+     * Operation is not implemented.
+     */
+    501: ErrorResponse;
+    /**
+     * Upstream service is unavailable.
+     */
+    503: ErrorResponse;
+    /**
+     * Upstream request timed out.
+     */
+    504: ErrorResponse;
+    /**
+     * Error response.
+     */
+    default: ErrorResponse;
+};
+
+export type CreateRuntimeError = CreateRuntimeErrors[keyof CreateRuntimeErrors];
+
+export type CreateRuntimeResponses = {
+    /**
+     * Runtime created.
+     */
+    201: RuntimeResponse;
+};
+
+export type CreateRuntimeResponse = CreateRuntimeResponses[keyof CreateRuntimeResponses];
+
+export type DeleteRuntimeData = {
+    body?: never;
+    path: {
+        /**
+         * Runtime UUID or display name.
+         */
+        runtime_id: string;
+    };
+    query: {
+        /**
+         * The runtime's current `revision`.
+         */
+        expected_revision: number;
+    };
+    url: '/v2/runtimes/{runtime_id}';
+};
+
+export type DeleteRuntimeErrors = {
+    /**
+     * Malformed or invalid request body.
+     */
+    400: ErrorResponse;
+    /**
+     * The bearer token was present but rejected.
+     */
+    401: ErrorResponse;
+    /**
+     * No bearer token was supplied, or the token's role does not allow this action.
+     */
+    403: ErrorResponse;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * The request conflicts with current resource state.
+     */
+    409: ErrorResponse;
+    /**
+     * Validation or application error.
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded.
+     */
+    429: ErrorResponse;
+    /**
+     * Internal error.
+     */
+    500: ErrorResponse;
+    /**
+     * Operation is not implemented.
+     */
+    501: ErrorResponse;
+    /**
+     * Upstream service is unavailable.
+     */
+    503: ErrorResponse;
+    /**
+     * Upstream request timed out.
+     */
+    504: ErrorResponse;
+    /**
+     * Error response.
+     */
+    default: ErrorResponse;
+};
+
+export type DeleteRuntimeError = DeleteRuntimeErrors[keyof DeleteRuntimeErrors];
+
+export type DeleteRuntimeResponses = {
+    /**
+     * Deletion accepted.
+     */
+    202: RuntimeResponse;
+    /**
+     * Deletion was already complete. No content.
+     */
+    204: void;
+};
+
+export type DeleteRuntimeResponse = DeleteRuntimeResponses[keyof DeleteRuntimeResponses];
+
+export type GetRuntimeData = {
+    body?: never;
+    path: {
+        /**
+         * Runtime UUID or display name — despite the upstream title, a name is accepted.
+         */
+        runtime_id: string;
+    };
+    query?: never;
+    url: '/v2/runtimes/{runtime_id}';
+};
+
+export type GetRuntimeErrors = {
+    /**
+     * Malformed or invalid request body.
+     */
+    400: ErrorResponse;
+    /**
+     * The bearer token was present but rejected.
+     */
+    401: ErrorResponse;
+    /**
+     * No bearer token was supplied, or the token's role does not allow this action.
+     */
+    403: ErrorResponse;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * The request conflicts with current resource state.
+     */
+    409: ErrorResponse;
+    /**
+     * Validation or application error.
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded.
+     */
+    429: ErrorResponse;
+    /**
+     * Internal error.
+     */
+    500: ErrorResponse;
+    /**
+     * Operation is not implemented.
+     */
+    501: ErrorResponse;
+    /**
+     * Upstream service is unavailable.
+     */
+    503: ErrorResponse;
+    /**
+     * Upstream request timed out.
+     */
+    504: ErrorResponse;
+    /**
+     * Error response.
+     */
+    default: ErrorResponse;
+};
+
+export type GetRuntimeError = GetRuntimeErrors[keyof GetRuntimeErrors];
+
+export type GetRuntimeResponses = {
+    /**
+     * The runtime.
+     */
+    200: RuntimeResponse;
+};
+
+export type GetRuntimeResponse = GetRuntimeResponses[keyof GetRuntimeResponses];

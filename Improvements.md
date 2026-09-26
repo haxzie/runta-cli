@@ -15,7 +15,7 @@ merit for humans *and* agents, and we do not carry aliases for compatibility's s
 
 ---
 
-## I-1 — Rename the top-level runtime commands
+## I-1 — Rename the runtime commands
 
 **Status:** decided, 2026-09-26.
 
@@ -79,80 +79,115 @@ behind them. That last property is what makes the surface cheap for an agent: gi
 `list` / `inspect` / `delete` on one noun, it can predict the verbs on the next noun without reading
 help. We should not break that pattern later for the sake of a shorter name.
 
-It also means **`runta run` will not exist.** If someone types it, the error should say so and point
+It also means **`runta run` will not exist** in either form. If someone types it, the error should say so and point
 at both plausible intents — `create` and `exec` — rather than a bare "unknown command".
 
 ---
 
-## I-2 — Runtime verbs are top-level; other resources are grouped
+## I-2 — Noun-first is canonical; runtime verbs are also top-level
 
-**Status:** decided, 2026-09-26.
+**Status:** decided, 2026-09-26. **Supersedes** the earlier form of I-2, which had runtime verbs
+top-level *only*.
 
 ```
-runta create | list | inspect | delete | exec        # runtimes, flat
-runta checkpoint create | list | ...                 # everything else, grouped
-runta secret …   runta image …   runta ssh-key …
+runta runtime create | list | inspect | delete        # canonical
+runta create | list | inspect | delete                # same commands, shortcut
+runta checkpoint create | list | ...                  # every other resource, noun-first only
 ```
 
-The CLI is *about* runtimes. Checkpoints, secrets, images and SSH keys all modify or attach to a
-runtime, so they read naturally as groups under their noun, while the runtime itself does not need
-to be named twice. This is Docker's shape (`docker ps` but `docker volume ls`) and Daytona's.
+Noun-first everywhere is what makes the surface predictable: having seen `runta runtime list`, both
+a person and an agent can guess `runta checkpoint list` and `runta secret list` without reading
+help. That is Modal's shape, and the reason it is worth preferring over Docker's is that Docker's
+flat-for-the-primary-noun rule requires knowing *which* noun is primary — an exception you can only
+learn by being corrected.
 
-The alternative was noun-first with no exceptions — Modal's shape (`modal app list`,
-`modal container list`). That is marginally more predictable for an agent, which can infer every
-command from one example instead of learning that runtimes are special. We are accepting that one
-exception in exchange for not typing `runtime` in front of the commands used all day.
+Runtimes also get top-level shortcuts, because they are the noun you touch all day and typing
+`runtime` in front of every command gets old fast. Both forms are registered from one function, so
+a flag cannot exist on one and not the other; a test asserts they stay in step.
 
-**What this commits us to:** exactly one exception, and it is runtimes. Any *second* resource
-promoted to top-level verbs turns a documented exception into a pattern nobody can predict.
-
----
+**What this commits us to:** runtimes are the only resource with a shortcut. A second one turns a
+single documented convenience into a pattern nobody can predict, and at that point the canonical
+form has stopped being canonical.
 
 ## I-3 — No compatibility aliases
 
-**Status:** decided, 2026-09-26.
+**Status:** decided, 2026-09-26. Narrowed after I-2 was revised.
 
-No `ps` alias for `list`, no `run` for `create`, no `rm` for `delete`.
+No `ps` for `list`, no `run` for `create`, no `rm` for `delete`. Nothing carries a production-CLI
+name forward.
 
-Aliases looked cheap when the goal was serving both audiences at once, and they are the standard
-answer. They are the wrong answer here for two reasons. There is no installed base to protect, so
-the only thing an alias buys is recognition for someone arriving from another product — and every
-alias is a second name in `--help`, a second thing to document, and a fork in every example. Worse,
-aliases hide the decision: `runta ps` silently working means nobody ever learns that `list` is the
-name, and the ambiguity in I-1 survives in the surface we were trying to remove it from.
+The distinction worth keeping straight: the top-level runtime verbs in I-2 are **not** aliases in
+this sense. They are the same four names at a second path, chosen for ergonomics. What is ruled out
+is a *second vocabulary* — a different word for the same operation.
 
-The field shows both failure modes. E2B's aliases are abbreviations rather than synonyms — `in`,
-`kl`, `cr` — and `sandbox pause` is aliased **`ps`**, so the same two letters list containers in
-Docker and pause a sandbox in E2B. Daytona's alias map still carries keys (`install`, `code`,
-`forward`) for commands that no longer exist in the product.
+That matters because an alias hides a decision. `runta ps` silently working would mean nobody ever
+learns that `list` is the name, and the scope ambiguity I-1 exists to remove would survive in the
+surface we removed it from. The field shows both failure modes: E2B's aliases are abbreviations
+rather than synonyms — `in`, `kl`, `cr` — and `sandbox pause` is aliased **`ps`**, so the same two
+letters list containers in Docker and pause a sandbox in E2B. Daytona's alias map still carries keys
+(`install`, `code`, `forward`) for commands that no longer exist in the product.
+
+## I-4 — Shape decisions for the runtime commands
+
+**Status:** decided, 2026-09-26, and implemented.
+
+**Wait by default; `-d`/`--detach` opts out.** The production CLI returns immediately and offers
+`--wait`. No comparable CLI has a `--wait` flag at all — E2B and Modal wait by default with
+`--detach`, Daytona waits unconditionally. A runtime you cannot use yet is rarely what anyone asked
+for, and the happy path should not need a flag. Applies to `create` and `delete` alike, so the
+async-lifecycle inconsistency recorded as `CLI_ISSUES.md` C-14 cannot reappear.
+
+**`--json` only.** No `-o` and no `-f` short form. `-o` would import a collision rather than a
+convention: in E2B `-o` already means `--order`. `-f` collides inside both E2B and Daytona's own
+surfaces with `--follow`, `--force` and `--dockerfile`.
+
+**`--dry-run` and `-y`/`--yes` on `delete`.** `-y` is universal for destructive confirmation.
+`--dry-run` exists in **none** of the four CLIs surveyed, and the JSON form of it is the half that
+matters: without a machine-readable plan an agent cannot show a user what it is about to do, only
+describe its intent in prose. The plan is built from the API rather than from the arguments, so it
+reports what would actually be deleted.
+
+**`<RUNTIME>` positional, accepting a name or an id.** Universal in the field — nobody makes the
+target a flag. One placeholder word everywhere, not the production CLI's mix of `<RUNTIME_NAME>`,
+`<VM_NAME>` and `<RUNTIME_ID>`.
+
+Two things fell out of implementing this that were not obvious beforehand:
+
+- **Name resolution is the client's job.** The published reference describes
+  `GET /v2/runtimes/{runtime_id}` as accepting a "Runtime UUID or display name". It does not —
+  a name returns `invalid_argument: runtime_id must be a UUID`, verified live. So the CLI lists and
+  matches. Because names are not guaranteed unique, an ambiguous name is an error rather than a
+  guess; deleting the wrong runtime is not an acceptable outcome of a coin toss.
+- **Deletion is unavoidably read-then-write.** `DELETE` requires `expected_revision` matching the
+  runtime's current `revision`, so the CLI reads first. A 409 means something else changed the
+  runtime in between — which is the race optimistic concurrency exists to catch — so the CLI
+  re-reads and retries once rather than making the user retry a command that would have worked.
 
 ---
 
-## Proposed, not yet decided
+## I-5 — Runtime configuration is not a resource
 
-Recorded so the reasoning is not lost, but none of these is settled.
+**Status:** proposed.
 
-### P-1 — Wait by default, `-d`/`--detach` to opt out
+The production CLI has 12 non-lifecycle command groups, and at least three of them are not
+resources at all. `egress` and `ports` are *fields on a runtime* — `egress_policy` and
+`ingress_specs` in the runtime object — with no endpoint of their own; `runta egress list` actually
+calls `GET /v2/runtimes?limit=100` and reads a field off each result. The `runtime` group's
+`ssh-key` subcommands duplicate the per-runtime `ssh-keys` sub-resource.
 
-The production CLI returns immediately and offers `--wait`. No comparable CLI has a `--wait` flag at
-all: E2B and Modal wait by default with `-d/--detach` to opt out, Daytona waits unconditionally. A
-runtime you cannot use yet is rarely what anyone asked for, and the happy path should not need a
-flag. With I-3 in force there is no compatibility argument left on the other side.
+Proposal: configuration lives on the runtime, not in its own namespace. Egress and published ports
+become flags on `create` and on a future `update`, and `inspect` reports them — which it already
+does, including rendering the effective egress posture rather than the raw fields, since a
+`denylist` with no hosts means unrestricted and an `allowlist` with none means fully blocked
+(`CLI_ISSUES.md` C-10).
 
-### P-2 — `--json` only, no `-o` and no `-f`
+This is recorded as proposed rather than decided because it concerns resources we have not built
+yet. It is worth settling before the first of them exists: "configuration is not a resource" is
+cheap now and expensive after three groups have shipped.
 
-`--json` is what Modal and the production CLI use. `-o` would import a collision rather than a
-convention — in E2B `-o` already means `--order`. `-f` for format collides inside both E2B and
-Daytona's own surfaces (`--follow`, `--force`, `--dockerfile`). One long flag, no short form.
+### A note on counting resources
 
-### P-3 — `delete` gets `--dry-run` and `-y`/`--yes`
-
-`-y` is universal for destructive confirmation. **`--dry-run` exists in none of the four CLIs
-surveyed** — it is the clearest place to be better than the field rather than level with it, and
-`CLI_ISSUES.md` C-09 is the argument for it.
-
-### P-4 — `<RUNTIME>` positional, accepting id or name
-
-Universal in the field: nobody makes the target a flag. One placeholder word everywhere, rather than
-the production CLI's mix of `<RUNTIME_NAME>`, `<VM_NAME>` and `<RUNTIME_ID>`, and rather than
-Daytona's accurate but unreadable `[SANDBOX_ID] | [SANDBOX_NAME]`.
+An earlier draft of this document said Runta has "~12 resources". That was loose. There are **12
+documented API groups**, **15 distinct top-level `/v2` path segments** (11 once `healthz`,
+`ssh-host-key` and the three observability paths are folded in), and — separately — **12
+non-lifecycle command groups in the production CLI**. The three counts coincide at 12 by accident.

@@ -8,3 +8,13 @@ export {
   type DeviceToken,
   runDeviceAuthorization,
 } from './device-auth.js';
+export {
+  type DeleteResult,
+  deleteAtCurrentRevision,
+  RuntimeWaitError,
+  resolveRuntimeId,
+  type WaitDeps,
+  type WaitOptions,
+  waitUntilDeleted,
+  waitUntilRunning,
+} from './runtimes.js';
