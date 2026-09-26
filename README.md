@@ -19,6 +19,137 @@ published to npm — there is no Node.js runtime requirement.
 
 Supported targets: macOS and Linux, on `x64` and `arm64` (glibc and musl).
 
+## Using the CLI
+
+```
+runta [global options] <command> [command options]
+```
+
+| Command | Does |
+| --- | --- |
+| `runta auth login` | Sign in through a browser using a one-time device code |
+| `runta auth logout` | Revoke the stored credential and remove it locally |
+| `runta whoami` | Show the currently authenticated user |
+| `runta hello [name]` | Print a greeting — smoke test, no network, no credential |
+
+| Global option | Does |
+| --- | --- |
+| `-v`, `--version` | Print the version and exit |
+| `-h`, `--help` | Help for the program or any subcommand |
+| `--verbose` | Debug logging on stderr, including the resolved endpoint |
+| `--quiet` | Errors only |
+
+`--verbose` and `--quiet` are program-level, so they go *before* the command:
+`runta --verbose whoami`, not `runta whoami --verbose`.
+
+`--help` is generated from the program itself and can never drift from what the binary
+accepts. If it disagrees with the docs, believe `--help`.
+
+The API exposes 85 operations; the CLI covers four. Runtimes, checkpoints, secrets, egress,
+file transfer and agents are not implemented yet — see
+[docs/commands](./docs/commands/index.md#not-yet-implemented).
+
+### Authenticating
+
+Interactively, via the device flow:
+
+```console
+$ runta auth login
+Your code is ABCD-1234
+Opened your browser to approve it.
+Waiting for authorization…
+Authorized. Token saved to /Users/you/.runta/config.json
+```
+
+The browser is opened for you, and skipped automatically when stdout is not a TTY or an SSH
+session is detected; `--no-browser` forces the URL to be printed instead. The poller tolerates
+a flaky API — 5xx responses, dropped connections and timeouts keep polling, and the flow only
+ends on denial, expiry, or `expires_at`. Nothing is written to disk until a token is issued.
+
+Non-interactively, skip the login entirely:
+
+```sh
+export RUNTA_TOKEN=rt_…
+runta whoami
+```
+
+### Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `RUNTA_TOKEN` | — | Bearer credential; skips `auth login` |
+| `RUNTA_API_URL` | `https://api.runta.com` | API base URL |
+| `RUNTA_CONFIG_HOME` | `~/.runta` | Directory holding `config.json` |
+| `RUNTA_LOG_LEVEL` | `info` | `silent`, `error`, `warn`, `info`, `debug` |
+| `NO_COLOR` | — | Any value disables colour |
+
+Precedence, highest first:
+
+```
+token:    RUNTA_TOKEN    >  config.json "token"   >  (none)
+endpoint: RUNTA_API_URL  >  config.json "apiUrl"  >  https://api.runta.com
+```
+
+Credentials live in `~/.runta/config.json` — plaintext JSON, file `0600`, directory `0700`,
+created on demand. Other keys in the file are preserved when the token is written or cleared.
+`rm -rf ~/.runta` removes the binary and the credential together.
+
+### Output and exit codes
+
+stdout is data; progress, hints and errors go to stderr, so pipes stay clean. Output does
+**not** change shape based on whether stdout is a TTY — pass `--json` explicitly.
+
+`whoami --json` prints the API envelope verbatim. `auth login --json` is a progress stream, so
+it emits NDJSON — one compact object per line, the code arriving before polling starts:
+
+```console
+$ runta auth login --json --no-browser
+{"status":"authorization_pending","user_code":"ABCD-1234","verification_uri_complete":"…?code=ABCD-1234","expires_at":"2026-09-26T09:50:41Z"}
+{"status":"authorized","config_path":"/Users/you/.runta/config.json"}
+```
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Request failed, or the API was unreachable |
+| `2` | Credential problem: missing, rejected, wrongly scoped, denied or expired |
+
+### Nuances worth knowing
+
+- **`RUNTA_TOKEN` silently shadows a stored login.** You can `auth login` successfully and
+  still be acting as a different identity, with nothing in the output saying so. Check
+  `env | grep RUNTA_TOKEN` when results look wrong.
+- **`auth logout` revokes env tokens too, permanently.** If `RUNTA_TOKEN` is set, that key is
+  destroyed for everyone using it, and the CLI cannot unset your environment variable —
+  `{"revoked":true,"cleared":false}` is the tell.
+- **`whoami` rejects organization API keys.** `GET /v2/me` accepts only a user credential from
+  the device flow; an `rt_…` org key authenticates but returns 403 `permission_denied`. That is
+  the API's design, and org keys remain correct for automation.
+- **`whoami` cannot tell you your org, scopes or expiry.** The endpoint returns only
+  `user_id`, `email` and `display_name`, and the API has no token-introspection operation.
+- **Unrecognised `RUNTA_*` variables are ignored silently.** In particular `RUNTA_ENDPOINT`
+  and `RUNTA_CONFIG` — names used by Runta's own Rust CLI — do nothing here; use
+  `RUNTA_API_URL` and `RUNTA_CONFIG_HOME`. There are no `--endpoint` or `--token` flags yet.
+  Verify the target with `--verbose` whenever it matters.
+- **A missing credential returns 403, a rejected one 401.** The CLI's hints distinguish the
+  two; the status codes alone do not.
+
+## Documentation
+
+Long-form docs live in [`docs/`](./docs) as plain markdown with frontmatter, ready for the
+docs web app:
+
+| Page | Covers |
+| --- | --- |
+| [Overview](./docs/index.md) | Quick start and current scope |
+| [Installation](./docs/installation.md) | Install, pin a version, uninstall |
+| [Authentication](./docs/authentication.md) | Device flow, CI tokens, credential storage |
+| [Configuration](./docs/configuration.md) | Every variable, the config file, precedence |
+| [Output and scripting](./docs/output-and-scripting.md) | `--json`, NDJSON, exit codes, agents |
+| [Commands](./docs/commands/index.md) | Per-command reference |
+
+Keep them in step with the code: a flag added without a docs change is a bug.
+
 ## Development
 
 Requires [Bun](https://bun.sh) 1.3+, Node 22 (see `.nvmrc`) and pnpm 10.
@@ -32,8 +163,7 @@ pnpm dev:once whoami      # same, single run
 
 Configuration for local development goes in a single **`.env` at the repo root**
 (gitignored — see `.env.example` for the full list). Bun loads it automatically for
-`pnpm dev`, and the codegen scripts pass `--env-file=../../.env` explicitly, since pnpm
-runs them with their own package as the working directory.
+`pnpm dev`. Codegen reads nothing from the environment — see [The API SDK](#the-api-sdk).
 
 `pnpm dev` runs `apps/cli/src/index.ts` through Bun directly. Workspace packages expose
 their TypeScript source under the `bun` export condition, so an edit anywhere in
