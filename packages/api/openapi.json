@@ -3,7 +3,7 @@
   "info": {
     "title": "Runta API",
     "version": "0.1.0",
-    "description": "Hand-written from https://runta.com/docs/reference/api/ and verified against live https://api.runta.com. Runta does not publish an openapi.json (all candidate URLs 404), so this file is source rather than a generated snapshot \u2014 it is maintained by hand, operation group by operation group, and codegen reads it directly with no network access. Where the published docs and the live API disagree, this spec follows the live API; see NOTES.md for the list of divergences.\n\nCoverage: auth + identity. 81 of the 85 documented operations are not yet described."
+    "description": "Hand-written from https://runta.com/docs/reference/api/ and verified against live https://api.runta.com. Runta does not publish an openapi.json (all candidate URLs 404), so this file is source rather than a generated snapshot \u2014 it is maintained by hand, operation group by operation group, and codegen reads it directly with no network access. Where the published docs and the live API disagree, this spec follows the live API; see NOTES.md for the list of divergences.\n\nCoverage: auth, identity, and the model-providers list (for its organization_id). 80 of the 85 documented operations are not yet described."
   },
   "servers": [
     {
@@ -24,6 +24,10 @@
     {
       "name": "identity",
       "description": "Who the current credential belongs to."
+    },
+    {
+      "name": "model-providers",
+      "description": "Organization-managed model providers. Also the only endpoint that reveals the organization id."
     }
   ],
   "paths": {
@@ -277,6 +281,65 @@
           },
           "400": {
             "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          }
+        }
+      }
+    },
+    "/v2/model-providers": {
+      "get": {
+        "operationId": "listManagedModelProviders",
+        "summary": "List managed model providers",
+        "description": "Lists the organization-managed model providers. Incidentally the only operation that returns the calling credential's `organization_id`, which is why `runta whoami` calls it.",
+        "tags": [
+          "model-providers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Managed model providers, plus the organization the credential belongs to.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProvidersResponse"
+                },
+                "example": {
+                  "organization_id": "b2d2ce6e-7f85-4178-bf2a-56547cf3e4b8",
+                  "model_providers": []
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Error401"
@@ -576,6 +639,68 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "ModelProvider": {
+        "type": "object",
+        "required": [
+          "id",
+          "secret_id",
+          "display_name",
+          "protocol",
+          "base_url",
+          "default_model",
+          "header_name",
+          "value_template"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "secret_id": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "base_url": {
+            "type": "string"
+          },
+          "default_model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "header_name": {
+            "type": "string"
+          },
+          "value_template": {
+            "type": "string"
+          }
+        }
+      },
+      "ModelProvidersResponse": {
+        "type": "object",
+        "description": "Note this response is not wrapped in `data`, and that `organization_id` is the only place in the entire API where the calling credential's organization is exposed \u2014 there is no organization or team endpoint, and no organization *name* anywhere. See NOTES.md.",
+        "required": [
+          "organization_id",
+          "model_providers"
+        ],
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "description": "The organization the bearer credential is bound to."
+          },
+          "model_providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelProvider"
+            }
           }
         }
       }

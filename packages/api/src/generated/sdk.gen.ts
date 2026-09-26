@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BeginDeviceAuthorizationData, BeginDeviceAuthorizationErrors, BeginDeviceAuthorizationResponses, ExchangeDeviceTokenData, ExchangeDeviceTokenErrors, ExchangeDeviceTokenResponses, GetMeData, GetMeErrors, GetMeResponses, RevokeCurrentTokenData, RevokeCurrentTokenErrors, RevokeCurrentTokenResponses } from './types.gen';
+import type { BeginDeviceAuthorizationData, BeginDeviceAuthorizationErrors, BeginDeviceAuthorizationResponses, ExchangeDeviceTokenData, ExchangeDeviceTokenErrors, ExchangeDeviceTokenResponses, GetMeData, GetMeErrors, GetMeResponses, ListManagedModelProvidersData, ListManagedModelProvidersErrors, ListManagedModelProvidersResponses, RevokeCurrentTokenData, RevokeCurrentTokenErrors, RevokeCurrentTokenResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -69,5 +69,16 @@ export const revokeCurrentToken = <ThrowOnError extends boolean = false>(options
 export const getMe = <ThrowOnError extends boolean = false>(options?: Options<GetMeData, ThrowOnError>): RequestResult<GetMeResponses, GetMeErrors, ThrowOnError> => (options?.client ?? client).get<GetMeResponses, GetMeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v2/me',
+    ...options
+});
+
+/**
+ * List managed model providers
+ *
+ * Lists the organization-managed model providers. Incidentally the only operation that returns the calling credential's `organization_id`, which is why `runta whoami` calls it.
+ */
+export const listManagedModelProviders = <ThrowOnError extends boolean = false>(options?: Options<ListManagedModelProvidersData, ThrowOnError>): RequestResult<ListManagedModelProvidersResponses, ListManagedModelProvidersErrors, ThrowOnError> => (options?.client ?? client).get<ListManagedModelProvidersResponses, ListManagedModelProvidersErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/model-providers',
     ...options
 });

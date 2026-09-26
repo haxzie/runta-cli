@@ -29,7 +29,7 @@ runta [global options] <command> [command options]
 | --- | --- |
 | `runta login` | Sign in through a browser using a one-time device code |
 | `runta logout` | Revoke the stored credential and remove it locally |
-| `runta whoami` | Show the currently authenticated user |
+| `runta whoami` | Show the authenticated user and active team |
 | `runta hello [name]` | Print a greeting — smoke test, no network, no credential |
 
 | Global option | Does |

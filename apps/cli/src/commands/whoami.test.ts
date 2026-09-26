@@ -1,6 +1,6 @@
 import { isCliError } from '@runta/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { API, captureStdout, isolateEnv, stubFetch } from '../test/harness.js';
+import { API, captureStdout, isolateEnv, type Route, stubFetch } from '../test/harness.js';
 import { whoami } from './whoami.js';
 
 let env: Awaited<ReturnType<typeof isolateEnv>>;
@@ -20,8 +20,20 @@ const profile = {
   data: { user_id: 'u_1', email: 'ada@example.com', display_name: 'Ada Lovelace' },
 };
 
-const meRoute = (status: number, body?: unknown, text?: string) => [
+const ORG = 'b2d2ce6e-7f85-4178-bf2a-56547cf3e4b8';
+
+/**
+ * `whoami` makes two calls: `/v2/me` for the identity and `/v2/model-providers` for the
+ * organization id, which is the only place the API exposes it.
+ */
+const meRoute = (status: number, body?: unknown, text?: string): Route[] => [
   { method: 'GET', path: '/v2/me', status, ...(text === undefined ? { body } : { text }) },
+  {
+    method: 'GET',
+    path: '/v2/model-providers',
+    status: 200,
+    body: { organization_id: ORG, model_providers: [] },
+  },
 ];
 
 describe('whoami', () => {
@@ -32,7 +44,26 @@ describe('whoami', () => {
 
     await whoami({}, out);
 
-    expect(out.text).toBe('Ada Lovelace <ada@example.com>\n');
+    expect(out.text).toBe(`Logged in as Ada Lovelace <ada@example.com>\nActive team: ${ORG}\n`);
+  });
+
+  it('omits the team line when the organization cannot be resolved', async () => {
+    // Identity is the point of whoami; a second, unrelated call must not be able to fail it.
+    const { fetch } = stubFetch([
+      { method: 'GET', path: '/v2/me', status: 200, body: profile },
+      {
+        method: 'GET',
+        path: '/v2/model-providers',
+        status: 503,
+        body: { error: { code: 'unavailable', message: 'nope' } },
+      },
+    ]);
+    globalThis.fetch = fetch as unknown as typeof globalThis.fetch;
+    const out = captureStdout();
+
+    await whoami({}, out);
+
+    expect(out.text).toBe('Logged in as Ada Lovelace <ada@example.com>\n');
   });
 
   it('sends the configured token as a bearer credential', async () => {
@@ -54,17 +85,40 @@ describe('whoami', () => {
 
     await whoami({}, out);
 
-    expect(out.text).toBe('ada@example.com <ada@example.com>\n');
+    expect(out.text).toContain('Logged in as ada@example.com <ada@example.com>');
   });
 
-  it('prints the raw envelope with --json', async () => {
+  it('flattens the profile and the organization into one object with --json', async () => {
     const { fetch } = stubFetch(meRoute(200, profile));
     globalThis.fetch = fetch as unknown as typeof globalThis.fetch;
     const out = captureStdout();
 
     await whoami({ json: true }, out);
 
-    expect(JSON.parse(out.text)).toEqual(profile);
+    expect(JSON.parse(out.text)).toEqual({
+      user_id: 'u_1',
+      email: 'ada@example.com',
+      display_name: 'Ada Lovelace',
+      organization_id: ORG,
+    });
+  });
+
+  it('reports organization_id as undefined in --json when it cannot be resolved', async () => {
+    const { fetch } = stubFetch([
+      { method: 'GET', path: '/v2/me', status: 200, body: profile },
+      {
+        method: 'GET',
+        path: '/v2/model-providers',
+        status: 503,
+        body: { error: { code: 'unavailable', message: 'nope' } },
+      },
+    ]);
+    globalThis.fetch = fetch as unknown as typeof globalThis.fetch;
+    const out = captureStdout();
+
+    await whoami({ json: true }, out);
+
+    expect(JSON.parse(out.text)).not.toHaveProperty('organization_id');
   });
 
   it("explains that an organization API key can't be used here", async () => {

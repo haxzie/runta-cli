@@ -131,7 +131,7 @@ a client must branch on the status code before parsing `error`. The generated ty
 
 ## Coverage
 
-Done: **auth** (3) + **identity** (1).
+Done: **auth** (3) + **identity** (1) + **model providers** (1 of 2).
 
 | Group | Operations | Status |
 |---|---|---|
@@ -146,9 +146,9 @@ Done: **auth** (3) + **identity** (1).
 | Secrets | 5 | todo |
 | Checkpoints | 4 | todo |
 | Cloud Agents | 22 | todo |
-| Managed model providers | 2 | todo |
+| Managed model providers | 2 | 1 of 2 (`listManagedModelProviders`, for its `organization_id`) |
 
-85 documented operations total; 4 described here. Operation detail pages follow
+85 documented operations total; 5 described here. Operation detail pages follow
 `https://runta.com/docs/reference/api/operations/<slug>/`.
 
 Note for later: the docs list a **Cloud Agents** group (22 operations under `/v2/agents`) that the

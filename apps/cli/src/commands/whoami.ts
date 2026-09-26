@@ -1,4 +1,4 @@
-import { getMe, RuntaApiError } from '@runta/api';
+import { getMe, listManagedModelProviders, RuntaApiError, type RuntaClient } from '@runta/api';
 import { createContext } from '@runta/core';
 import { fail, logger } from '@runta/utils';
 import type { Command } from 'commander';
@@ -20,20 +20,42 @@ export async function whoami(
 
   try {
     const { data } = await getMe({ client, throwOnError: true });
+    const organizationId = await resolveOrganizationId(client);
 
     if (options.json) {
-      deps.write(`${JSON.stringify(data, null, 2)}\n`);
+      deps.write(`${JSON.stringify({ ...data.data, organization_id: organizationId }, null, 2)}\n`);
       return;
     }
-    // `GET /v2/me` wraps the profile in a `data` envelope, and `display_name` is nullable —
-    // fall back to the email, which is always present.
+
+    // `display_name` is nullable; the email is always present.
     const { email, display_name } = data.data;
-    deps.write(`${display_name ?? email} <${email}>\n`);
+    deps.write(`Logged in as ${display_name ?? email} <${email}>\n`);
+    if (organizationId) deps.write(`Active team: ${organizationId}\n`);
   } catch (error) {
     if (error instanceof RuntaApiError) {
       fail(error.message, { exitCode: exitCodeFor(error), hint: hintFor(error), cause: error });
     }
     throw error;
+  }
+}
+
+/**
+ * The organization is not on `/v2/me` — it is not on any dedicated endpoint either. The only
+ * place the API exposes the calling credential's organization is `organization_id` on
+ * `GET /v2/model-providers`, so that is what this asks for. See packages/api/NOTES.md.
+ *
+ * Best-effort on purpose: identity is the point of `whoami`, and a second, semantically
+ * unrelated call must not be able to fail it.
+ */
+async function resolveOrganizationId(client: RuntaClient): Promise<string | undefined> {
+  try {
+    const { data } = await listManagedModelProviders({ client, throwOnError: true });
+    return data.organization_id;
+  } catch (error) {
+    logger.debug(
+      `could not resolve the organization: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return undefined;
   }
 }
 
@@ -59,7 +81,7 @@ export function registerWhoami(program: Command): void {
   program
     .command('whoami')
     .description('Show the currently authenticated user')
-    .option('--json', 'print the raw API response')
+    .option('--json', 'print the result as JSON')
     .action(async (opts: { json?: boolean }) => {
       await whoami(opts);
     });

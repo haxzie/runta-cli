@@ -124,6 +124,28 @@ export type UserResponse = {
     data: User;
 };
 
+export type ModelProvider = {
+    id: string;
+    secret_id: string;
+    display_name: string;
+    protocol: string;
+    base_url: string;
+    default_model: string | null;
+    header_name: string;
+    value_template: string;
+};
+
+/**
+ * Note this response is not wrapped in `data`, and that `organization_id` is the only place in the entire API where the calling credential's organization is exposed — there is no organization or team endpoint, and no organization *name* anywhere. See NOTES.md.
+ */
+export type ModelProvidersResponse = {
+    /**
+     * The organization the bearer credential is bound to.
+     */
+    organization_id: string;
+    model_providers: Array<ModelProvider>;
+};
+
 export type BeginDeviceAuthorizationData = {
     body: BeginDeviceAuthorizationRequest;
     path?: never;
@@ -399,3 +421,68 @@ export type GetMeResponses = {
 };
 
 export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
+
+export type ListManagedModelProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v2/model-providers';
+};
+
+export type ListManagedModelProvidersErrors = {
+    /**
+     * The bearer token was present but rejected.
+     */
+    401: ErrorResponse;
+    /**
+     * No bearer token was supplied, or the token's role does not allow this action.
+     */
+    403: ErrorResponse;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * The request conflicts with current resource state.
+     */
+    409: ErrorResponse;
+    /**
+     * Validation or application error.
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded.
+     */
+    429: ErrorResponse;
+    /**
+     * Internal error.
+     */
+    500: ErrorResponse;
+    /**
+     * Operation is not implemented.
+     */
+    501: ErrorResponse;
+    /**
+     * Upstream service is unavailable.
+     */
+    503: ErrorResponse;
+    /**
+     * Upstream request timed out.
+     */
+    504: ErrorResponse;
+    /**
+     * Error response.
+     */
+    default: ErrorResponse;
+};
+
+export type ListManagedModelProvidersError = ListManagedModelProvidersErrors[keyof ListManagedModelProvidersErrors];
+
+export type ListManagedModelProvidersResponses = {
+    /**
+     * Managed model providers, plus the organization the credential belongs to.
+     */
+    200: ModelProvidersResponse;
+};
+
+export type ListManagedModelProvidersResponse = ListManagedModelProvidersResponses[keyof ListManagedModelProvidersResponses];

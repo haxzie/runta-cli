@@ -14,41 +14,68 @@ runta whoami [options]
 
 | Option | Does |
 | --- | --- |
-| `--json` | Print the raw API response |
+| `--json` | Print the result as JSON |
 
 ```console
 $ runta whoami
-Ada Lovelace <ada@example.com>
+Logged in as Ada Lovelace <ada@example.com>
+Active team: b2d2ce6e-7f85-4178-bf2a-56547cf3e4b8
 ```
 
 `display_name` is nullable in the API, so the email is used when there is no name:
 
 ```console
 $ runta whoami
-ada@example.com <ada@example.com>
+Logged in as ada@example.com <ada@example.com>
+Active team: b2d2ce6e-7f85-4178-bf2a-56547cf3e4b8
 ```
+
+## Two calls, one of them optional
+
+`whoami` calls `GET /v2/me` for the identity and `GET /v2/model-providers` for the
+organization id — because **that is the only place the API exposes it**. There is no
+organization, team or tenant endpoint, and `/v2/me` carries no organization field.
+
+The second call is best-effort. Identity is the point of the command, so if the
+model-providers call fails the team line is simply omitted rather than failing the whole
+command:
+
+```console
+$ runta whoami
+Logged in as Ada Lovelace <ada@example.com>
+```
+
+`--verbose` says why it was dropped.
+
+## The team is a UUID, not a name
+
+`Active team:` shows `organization_id`, because a human-readable organization name **does not
+exist anywhere in the API**. No endpoint returns one, and Runta's own CLI binary contains no
+`organization_name` or slug field either. Showing a name requires an API change; until then a
+UUID is the honest answer.
 
 ## `--json`
 
-Prints the response envelope exactly as the API returned it, so `jq` paths match the
-[API reference](https://runta.com/docs/reference/api/operations/getme/):
+Flattens both calls into one object. The `data` envelope the API wraps `/v2/me` in is
+unwrapped, and `organization_id` is merged in:
 
 ```console
 $ runta whoami --json
 {
-  "data": {
-    "user_id": "800d9aa5-479a-4773-9a15-53d5a4193701",
-    "email": "ada@example.com",
-    "display_name": "Ada Lovelace"
-  }
+  "user_id": "800d9aa5-479a-4773-9a15-53d5a4193701",
+  "email": "ada@example.com",
+  "display_name": "Ada Lovelace",
+  "organization_id": "b2d2ce6e-7f85-4178-bf2a-56547cf3e4b8"
 }
 ```
 
 ```sh
-runta whoami --json | jq -r .data.email
+runta whoami --json | jq -r .email
+runta whoami --json | jq -r '.organization_id // "unknown"'
 ```
 
-Note the `data` wrapper — the API envelopes this response, and the CLI does not flatten it.
+`organization_id` is **absent** when it could not be resolved, so use `//` rather than
+assuming it is there.
 
 ## Organization API keys
 
@@ -67,11 +94,11 @@ automation — it just cannot answer "which human am I".
 
 ## What it cannot tell you
 
-`GET /v2/me` returns only `user_id`, `email` and `display_name`. It carries **no**
-organization, scope or expiry information, and the API has no token-introspection operation,
-so none of these are currently answerable:
+`GET /v2/me` returns only `user_id`, `email` and `display_name`. The organization id is
+recovered from a second endpoint, but everything else is still unavailable — the API has no
+token-introspection operation, so none of these are answerable:
 
-- which organization this credential belongs to
+- the organization's **name** (only its UUID exists, anywhere)
 - what the token is allowed to do
 - when it expires
 - whether the token came from `RUNTA_TOKEN` or from `login`
