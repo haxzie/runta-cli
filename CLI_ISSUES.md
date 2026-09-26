@@ -47,6 +47,9 @@ npm packages, the Homebrew tap, and the shipped binary (the source repo is priva
 | [C-29](#c-29-the-npm-shim-flattens-signal-death-to-exit-1) | npm shim flattens signal death to exit 1 | low |
 | [C-30](#c-30-the-official-agent-skill-documents-commands-that-dont-exist) | The official agent skill documents commands and flags that don't exist | 🔴 blocker |
 | [C-31](#c-31-agent-discovery-costs-20k-tokens-and-cant-be-narrowed) | `runta help --json` costs ~20k tokens; no compact JSON, no narrowing | high |
+| [C-32](#c-32-runta-sub---help-returns-the-entire-root-tree-in-json-mode) | `runta <sub> --help` returns the whole 78 KB root tree off-TTY | high |
+| [C-33](#c-33---runtime-sign-in-reports-a-ready-runtime-whose-agent-cant-run) | `--runtime-sign-in` reports a ready runtime whose agent isn't logged in | high |
+| [C-34](#c-34-the-runtime-argument-is-a-flag-on-two-commands-and-positional-on-34) | Runtime arg is a flag on 2 commands, positional on 34 | medium |
 
 ---
 
@@ -75,6 +78,8 @@ this audit's findings:
 | C-01 | `exec` fails spuriously ~10% of the time | The agent cannot distinguish "the user's build broke" from "the websocket hiccuped", so it either reports false failures or retries operations that may not be idempotent |
 | C-30 | The official `SKILL.md` documents commands and flags that don't exist | The agent has no reason to doubt its own skill file, so it confidently runs `runta agents ls` and `--no-shell` and fails in front of the user |
 | C-06 | `help --json` misreports every boolean flag's arity | Read literally — which is the whole point of a machine-readable contract — the agent writes `runta ps --all true` and errors |
+| C-33 | `--runtime-sign-in` returns `status: running`, `degraded: false`, `error_code: null` on a runtime whose agent is logged out | The agent has no signal to check — not in `run`'s output, not on the runtime object — so it reports success on a runtime that cannot serve a single prompt |
+| C-32 | `runta <sub> --help` silently returns the root tree off-TTY | The agent thinks it is reading one subcommand's contract and is reading the root's — and pays 78 KB to do it |
 | C-09 | No machine-readable `--dry-run` | Removes the "resolve → show the user → execute" pattern; the agent must describe intent in prose |
 | C-31 | Discovery costs ~19.6k tokens and can't be narrowed | A meaningful slice of the working context spent on formatting, before any work happens |
 | C-16 | `exec` buffers all output into a JSON string | No incremental progress on long commands, and stdout/stderr interleaving is lost |
@@ -83,10 +88,11 @@ this audit's findings:
 | C-22 | Lifecycle responses embed all 45 runtime fields | ~346 tokens to learn that one state changed |
 | C-04 | Raw `websocket error: HTTP error: 409 Conflict` | The agent can't explain the failure or recover from it; the cause ("runtime is shut down") is recoverable and knowable |
 
-The through-line: the **shape** of the machine interface is good, but its **contract** (C-06, C-30),
-its **reliability** (C-01), and its **cost** (C-31, C-22) are not yet at the level the positioning
-implies. C-06 and C-30 are the cheapest to fix and would have the largest immediate effect, because
-both are generated-artifact problems rather than product design.
+The through-line: the **shape** of the machine interface is good, but its **contract** (C-06, C-30,
+C-32), its **reliability** (C-01), its **honesty about readiness** (C-33) and its **cost** (C-31,
+C-22) are not yet at the level the positioning implies. C-06, C-30 and C-32 are the cheapest to fix
+and would have the largest immediate effect, because all three are generated-artifact problems rather
+than product design.
 
 ## Issues
 
@@ -961,6 +967,137 @@ roughly half.
 
 ---
 
+### C-32 — `runta <sub> --help` returns the entire root tree in JSON mode
+_Severity: high._
+
+On a TTY, `--help` works correctly at every level — `runta image --help` prints the `image` about
+line, its three subcommands and its examples. Off-TTY, where `--json` is implied, the same command
+returns the **root** command tree instead of the requested node:
+
+```console
+$ runta image --help | jq -r '.command.name'
+runta                       # expected: image
+
+$ runta help image | jq -r '.command.name'
+image                       # correct
+
+$ runta image --help | wc -c
+78370
+$ runta help image  | wc -c
+3100
+```
+
+Reproduced identically on `image`, `github`, `ssh`, `vnc credential` and `secret rule` — every
+subcommand level, not just the top. So the two help forms agree on a TTY and disagree off it, and
+the only correct off-TTY form (`runta help <sub>`) is the one a human would never reach for.
+
+This compounds [C-31](#c-31-agent-discovery-costs-20k-tokens-and-cant-be-narrowed) rather than
+merely duplicating it: an agent trying to *narrow* its discovery cost by asking for one subcommand
+gets 78 KB — 25× the 3.1 KB it asked for, and ~4× the whole-tree cost it was trying to avoid. It also
+silently answers a different question than the one asked, which is worse than being expensive: the
+agent believes it is reading `image`'s contract and is in fact reading the root's.
+
+This is how I mis-audited the CLI in this very session. `runta image --help` returned the root node,
+I read its `args` as `image`'s, and concluded per-subcommand `--help` was unimplemented. It isn't.
+
+→ Make `--help` at any level return that level's node in JSON, exactly as it does on a TTY.
+
+### C-33 — `--runtime-sign-in` reports a ready runtime whose agent can't run
+_Severity: high._
+
+`runta run --image claude` refuses without a model provider, and points at three escapes — one of
+which, `--runtime-sign-in` ("Configure provider authentication inside the Runtime"), succeeds:
+
+```console
+$ runta run --image claude --name prequel-dev --runtime-sign-in --wait --timeout-secs 240
+{ "accepted": true, "runtime": { "status": "running", "degraded": false, "error_code": null, … } }
+```
+
+The runtime is genuinely up — `exec` works, `git clone` works, `claude` is on `PATH` at v2.1.234.
+But the one thing the image exists to do doesn't:
+
+```console
+$ runta exec prequel-dev -- bash -lc 'claude -p "Reply OK"'
+Not logged in · Please run /login
+```
+
+Nothing anywhere signals this. `run` prints no follow-up instruction; the 45-field runtime object has
+no sign-in field, `secret_configuration` is `[]`, `status` is `running`, `degraded` is `false` and
+`error_code` is `null`. So the pending login is invisible to `inspect`, invisible to `ps`, and
+invisible in the output of the flag that created it. The flag's help text promises configuration it
+does not perform.
+
+The cost is worst for the audience the image is for. An unattended agent has every reason to report
+success here: it asked for a Claude runtime, got `status: running` with no error, and only discovers
+otherwise if it happens to probe the agent binary — and even then `claude -p` exits **0** while
+printing `Not logged in`, so an exit-code check passes too. The honest recovery needs a human at a
+terminal:
+
+```console
+$ runta exec prequel-dev --interactive --tty -- bash -lc 'claude'    # then /login
+```
+
+→ Either complete the sign-in (device-code handoff, as `runta login` already does well) or state
+plainly in `run`'s output that the runtime is up but authentication is pending, with that exact
+command as the next step. Surface the state on the runtime object so `inspect` can be trusted, and
+consider `degraded: true` until an agent runtime can actually reach a model.
+
+### C-34 — The runtime argument is a flag on two commands and positional on 34
+_Severity: medium. Extends [C-26](#c-26-verb-and-convention-salad-across-84-commands)._
+
+Walking the full tree (`runta help --json`, 26 top-level commands, 60 leaves) and classifying every
+argument whose help is "Runtime name or ID": **34 take it as a required positional, 2 take it as an
+optional flag.**
+
+```console
+$ runta exec --help           | grep Usage
+Usage: runta exec [OPTIONS] <VM_NAME> [COMMAND_AND_ARGS]...
+$ runta tokens analyze --help  | grep Usage
+Usage: runta tokens analyze [OPTIONS]        # --runtime <RUNTIME>, optional
+$ runta tokens savings --help  | grep Usage
+Usage: runta tokens savings [OPTIONS]        # --runtime <RUNTIME>, optional
+```
+
+`tokens analyze` and `tokens savings` are the only two, and they differ twice over — flag rather than
+positional, optional rather than required. The optionality is defensible (both default to every
+runtime), but it means "the runtime I am targeting" is typed one way in 34 places and another way in
+2, with nothing marking the exception.
+
+**Naming a *new* runtime is inconsistent the same way.** Two commands create a runtime and name it:
+
+```console
+runta run              [OPTIONS]                              # --name <NAME>, optional
+runta checkpoint restore <CHECKPOINT_NAME> <RUNTIME_NAME>      # positional, required
+```
+
+`checkpoint restore`'s second positional is documented as "Name for the restored runtime" — the same
+concept as `run --name`, opposite shape, opposite optionality. C-26's proposed
+`checkpoint restore --into <RUNTIME>` fixes the swap-a-typo hazard; `--name` would additionally make
+the two creation paths match.
+
+**`--name` carries four meanings**, two of them behind a different argument id:
+
+| Command | Means | arg id |
+|---|---|---|
+| `run --name` | name of the new runtime | `name` |
+| `image build --name` | name of the image | `name` |
+| `ssh key add --name` | human label for a key | `display_name` |
+| `vnc credential create --name` | human label for a credential | `display_name` |
+
+The last produces `runta vnc credential create --name <DISPLAY_NAME> <RUNTIME_ID>` — a required flag
+ahead of the positional subject it belongs to.
+
+For the record, two things that look like this class of problem and are not: `runta run --name` vs
+`runta github configure <VM_NAME>` is *not* an inconsistency (one names a new runtime, the other
+references an existing one), and `runta model-provider authorize` — which the missing-provider error
+recommends — does exist, as a documented alias of `create`.
+
+→ Give `tokens analyze|savings` an optional positional alongside `--runtime`. Add
+`checkpoint restore --name` as C-26's `--into`. Rename the two `display_name` flags to
+`--display-name`, keeping `--name` as an alias.
+
+---
+
 ## Confirmed working
 
 Worth stating explicitly — these were verified live and are solid:
@@ -988,7 +1125,14 @@ Worth stating explicitly — these were verified live and are solid:
 
 ## Not exercised
 
-Would need more setup or incur real cost/side effects: `image build`, `github connect/configure`,
-`ssh` and `ssh key`, `vnc`, `runtime ssh-key`, `tls generate-certs`, `tokens analyze/savings`,
-`model-provider create/update`, `--idle-mode` wake-from-suspend behaviour, and interactive
-`exec -it` signal forwarding (needs a real interactive terminal).
+Would need more setup or incur real cost/side effects: `image build`, `ssh` and `ssh key`, `vnc`,
+`runtime ssh-key`, `tls generate-certs`, `tokens analyze/savings`, `model-provider create/update`,
+`--idle-mode` wake-from-suspend behaviour, and interactive `exec -it` signal forwarding (needs a real
+interactive terminal).
+
+`github connect` and `github configure` were attempted on a second pass and could not be exercised:
+both return `PERMISSION_DENIED` — "principal's role does not allow this organization action", with
+`required_action: contact_admin` — for the account that owns the tenant's runtimes. The error names
+neither the role held nor the role required, and with no `whoami`
+([C-20](#c-20-no-whoami-no-version-no-completions)) there is no way to find out from the CLI. A public
+repo can be worked around with a plain `git clone` inside the runtime; a private one cannot.
