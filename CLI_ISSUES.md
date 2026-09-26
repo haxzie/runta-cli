@@ -30,7 +30,7 @@ npm packages, the Homebrew tap, and the shipped binary (the source repo is priva
 | [C-12](#c-12-the-table-renderer-collapses-to-one-character-per-column) | Table renderer collapses to 1 char/column at zero winsize | high |
 | [C-13](#c-13---publish-gives-you-a-port-but-never-a-url) | `--publish` gives you a port but never a URL | high |
 | [C-14](#c-14-async-lifecycle-with-almost-no-wait-primitives) | Async lifecycle with almost no `--wait`, and a stale `status` | high |
-| [C-15](#c-15-list-commands-silently-truncate-at-100) | List commands silently truncate at 100 | high |
+| [C-15](#c-15-list-commands-give-no-control-over-how-much-they-fetch) | List commands give no control over how much they fetch | low |
 | [C-16](#c-16-exec-buffers-all-output-inside-json-strings) | `exec` buffers all output inside JSON strings | high |
 | [C-17](#c-17-runta-help-sub-prints-a-usage-line-you-cant-copy) | `runta help <sub>` prints an uncopyable usage line | medium |
 | [C-18](#c-18-jq-hostile-json-shapes) | `jq`-hostile JSON shapes; no `request_id` | medium |
@@ -76,7 +76,7 @@ this audit's findings:
 
 | # | Issue | Why it hurts an agent specifically |
 |---|---|---|
-| C-01 | `exec` fails spuriously ~10% of the time | The agent cannot distinguish "the user's build broke" from "the websocket hiccuped", so it either reports false failures or retries operations that may not be idempotent |
+| C-01 | `exec` fails spuriously ~10% of the time | The agent cannot distinguish "the user's build broke" from "the websocket dropped mid-stream", so it either reports false failures or retries operations that may not be idempotent |
 | C-30 | The official `SKILL.md` documents commands and flags that don't exist | The agent has no reason to doubt its own skill file, so it confidently runs `runta agents ls` and `--no-shell` and fails in front of the user |
 | C-06 | `help --json` misreports every boolean flag's arity | Read literally — which is the whole point of a machine-readable contract — the agent writes `runta ps --all true` and errors |
 | C-33 | `--runtime-sign-in` returns `status: running`, `degraded: false`, `error_code: null` on a runtime whose agent is logged out | The agent has no signal to check — not in `run`'s output, not on the runtime object — so it reports success on a runtime that cannot serve a single prompt |
@@ -125,17 +125,25 @@ cli=42 cli=1/EXEC_INCOMPLETE cli=42 cli=42 cli=42 cli=42 cli=42 cli=42 cli=42 cl
 ```
 
 In both cases `status` is `null` and the CLI exits `1` — so **a command that succeeded remotely is
-reported to the caller as a failure**. There is no retry and no idempotency token. Any CI pipeline
-or agent loop built on `runta exec` will fail roughly every tenth step for no reason. This is the
-single most important item in this document.
+reported to the caller as a failure**. Any CI pipeline or agent loop built on `runta exec` will fail
+roughly every tenth step for no reason. This is the single most important item in this document.
+
+**Correction (2026-09-26):** an earlier version of this finding said "there is no retry". That is
+wrong. The binary contains `retrying exec WebSocket upgrade after service overload` and a
+`runta_client_exec_connect_retry` counter, so the *upgrade* is retried on overload. What is not
+retried is a reset **after** the stream is established — which is precisely the failure measured
+above, `exec stream ended without an exit status`. The 10% rate stands; the cause is narrower than
+first recorded. The binary also has a matching `.exec websocket closed before terminal status:`
+message, so the case is recognised in code and simply has no recovery path.
 
 When exit statuses *do* arrive they are exact — verified across `0, 1, 2, 5, 42, 127, 255`, each
 propagated to the CLI's own exit code. The plumbing is right; the transport is not.
 
-→ Retry the websocket attach on connection-reset/timeout before the command starts. Once started,
-allow re-attaching to the same exec session (needs a server-side exec id). At minimum, distinguish
-"could not start" (safe to retry automatically) from "started but lost the exit status" — and give
-the latter its own exit code rather than `1`, so a lost status is never silently a command failure.
+→ Extend the existing retry past the upgrade. Once a stream is established, allow re-attaching to
+the same exec session — which needs a server-side exec id, so this is an API change, not only a
+client one. Until that exists, distinguish "could not start" (already retried, safe to retry again)
+from "started but lost the exit status" — and give the latter its own exit code rather than `1`, so
+an unknown outcome is never silently reported as a command failure.
 
 ### C-02 — `runta login` fails on every clean machine
 _Severity: **blocker**._
@@ -578,10 +586,16 @@ caller cannot tell whether it caused the state it observes.
 responses or return the post-transition value. Distinguish a no-op from a transition (a `changed:
 false`, or `202` vs `200` semantics).
 
-### C-15 — List commands silently truncate at 100
-_Severity: high._
+### C-15 — List commands give no control over how much they fetch
+_Severity: low._
 
-Proven by pointing the CLI at a dead endpoint and reading the URL it builds:
+**Correction (2026-09-26):** this finding originally claimed lists "silently truncate at 100". That
+was wrong, and it was the more serious half of the claim. The page size is hard-coded, but the CLI
+does follow cursors — the binary contains `runtime page omitted its next cursor`, `checkpoint page
+omitted its next cursor` and `runtime page repeated its next cursor`, all of which are diagnostics
+emitted *while* walking pages. Results are complete. Downgraded from high to low accordingly.
+
+What remains is a missing control. Every list request is built the same way:
 
 ```console
 $ runta --endpoint http://127.0.0.1:9 ps             →  /v2/runtimes?limit=100&status=running,suspended
@@ -590,15 +604,16 @@ $ runta --endpoint http://127.0.0.1:9 checkpoint ls  →  /v2/checkpoints?limit=
 $ runta --endpoint http://127.0.0.1:9 egress list    →  /v2/runtimes?limit=100
 ```
 
-There is no `--limit`, no `--page`, no `--all-pages` and no "showing 100 of N" notice — even though
-the API client has a `pagination.rs`. A tenant with more than 100 runtimes gets a silently
-incomplete `ps`, which is dangerous for a cleanup script.
+There is no `--limit` and no way to ask for a single page. On a large tenant `runta ps` walks every
+page before printing anything, with no way to say "just show me twenty" — and an agent paying per
+token cannot cap the response size at all (see C-31).
 
-Related: plain `ps` filters to `status=running,suspended`, so a runtime in a transitional state is
-**missing from `ps` moments after you create it** (hit live with a freshly restored runtime). `ps -a`
-correctly drops the filter; `--full` does not.
+Separately, and still worth fixing: plain `ps` filters to `status=running,suspended`, so a runtime
+in a transitional state is **missing from `ps` moments after you create it** (hit live with a freshly
+restored runtime). `ps -a` correctly drops the filter; `--full` does not.
 
-→ Add `--limit` and pagination (or auto-follow), and always say when a list was truncated.
+→ Add `--limit N` that caps results rather than only the page size, and let `ps` include
+transitional states or say that it is filtering.
 
 ### C-16 — `exec` buffers all output inside JSON strings
 _Severity: high._

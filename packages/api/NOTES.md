@@ -92,7 +92,8 @@ $ curl -H "Authorization: Bearer $RUNTA_TOKEN" 'https://api.runta.com/v2/runtime
 ```
 
 The `Pagination` schema is already defined here so the list operations can use it when we add them.
-Note the CLI hard-codes `limit=100` and never follows `next_cursor` (see `CLI_ISSUES.md` C-15).
+Note the CLI hard-codes the page size at 100 and exposes no `--limit`; it does follow
+`next_cursor` internally (see `CLI_ISSUES.md` C-15).
 
 ### 5. `GET /v2/me` rejects organization API keys
 
@@ -128,6 +129,44 @@ $ curl -X POST -H 'content-type: application/json' -d '{"device_code":"deadbeef"
 a client must branch on the status code before parsing `error`. The generated types get this right —
 `ExchangeDeviceTokenErrors[400]` is `DeviceTokenPendingError` while every other code is
 `ErrorResponse`.
+
+## The exec WebSocket is a second spec
+
+`runta exec` does **not** go through the REST API. It is a WebSocket at
+
+```
+wss://api.runta.com/v2/runtimes/{runtime_id}/exec/stream
+```
+
+which appears in none of the 85 documented REST operations. It has its own AsyncAPI 3.1
+description, committed here as `asyncapi.yaml`.
+
+Nothing generates code from it — `@hey-api/openapi-ts` reads OpenAPI only — so the exec client will
+be hand-written against this file. Treat `asyncapi.yaml` the same way as `openapi.json`: the
+source of truth, updated by hand, verified against the live service.
+
+The protocol in one paragraph: HTTP GET upgrade carrying `Authorization: Bearer <token>`, one
+command per connection. The client sends `start` first and exactly once, then any of `stdin`,
+`resize`, `signal` (INT/TERM only), `close_stdin`, `heartbeat`. The server sends `stdout`,
+`stderr`, `heartbeat`, and exactly one terminal frame: `exit` (with a code — nonzero is a *command*
+failure, not a protocol failure) or `error`. Payload bytes are standard Base64. With `tty: true`,
+stderr is folded into `stdout`. The server may hold the connection for up to 300 seconds or 16
+access attempts while the runtime becomes ready, which is why `exec` can appear to hang on a
+cold runtime.
+
+Two lines from the spec deserve to survive into our implementation:
+
+> An `error` frame or a connection closed before `exit` leaves the command's result **unknown**;
+> do not automatically retry a command with side effects.
+
+That is the correct framing of `CLI_ISSUES.md` C-01. The production CLI reports this case as exit
+`1`, i.e. as a failure, when the truthful answer is that it does not know. Our `exec` must surface
+"unknown" distinctly and must not auto-retry.
+
+> Runtime UUID or display name. The Runta CLI resolves names to IDs first.
+
+So name→id resolution is a client responsibility for this endpoint, even though the REST endpoints
+accept either. One shared resolver, used by every command.
 
 ## Coverage
 

@@ -1,0 +1,274 @@
+asyncapi: 3.1.0
+info:
+  title: Runta Public Exec WebSocket API
+  version: 0.1.0
+  description: |
+    Execute one command per WebSocket connection in an existing runtime.
+    This document describes the public client protocol; operations are named
+    from the client's perspective. Each WebSocket message contains one JSON
+    object. The handshake is an HTTP GET upgrade request with an Authorization
+    header. The token must be authorized to exec in the selected runtime.
+
+    Send `start` as the first application message. For a non-interactive
+    command, send `close_stdin` after `start` if no input will be supplied.
+    Output bytes are standard Base64 strings. `exit` is the successful terminal
+    frame, even when its code is nonzero. An `error` frame or a connection
+    closed before `exit` leaves the command's result unknown; do not
+    automatically retry a command with side effects.
+servers:
+  production:
+    host: api.runta.com
+    protocol: wss
+    description: Default public API endpoint used by the Runta CLI.
+    security:
+      - $ref: '#/components/securitySchemes/bearerAuth'
+defaultContentType: application/json
+channels:
+  runtimeExec:
+    address: /v2/runtimes/{runtime_id}/exec/stream
+    description: One command execution session over one WebSocket connection.
+    servers:
+      - $ref: '#/servers/production'
+    parameters:
+      runtime_id:
+        description: Runtime UUID or display name. The Runta CLI resolves names to IDs first.
+    bindings:
+      ws:
+        method: GET
+        headers:
+          type: object
+          properties:
+            Authorization:
+              type: string
+              description: 'Bearer <API key>'
+          required: [Authorization]
+        bindingVersion: 0.1.0
+    messages:
+      start:
+        $ref: '#/components/messages/start'
+      stdin:
+        $ref: '#/components/messages/stdin'
+      resize:
+        $ref: '#/components/messages/resize'
+      signal:
+        $ref: '#/components/messages/signal'
+      closeStdin:
+        $ref: '#/components/messages/closeStdin'
+      clientHeartbeat:
+        $ref: '#/components/messages/clientHeartbeat'
+      stdout:
+        $ref: '#/components/messages/stdout'
+      stderr:
+        $ref: '#/components/messages/stderr'
+      exit:
+        $ref: '#/components/messages/exit'
+      error:
+        $ref: '#/components/messages/error'
+      serverHeartbeat:
+        $ref: '#/components/messages/serverHeartbeat'
+operations:
+  sendExecInput:
+    action: send
+    channel:
+      $ref: '#/channels/runtimeExec'
+    description: |
+      Send `start` first and only once. `stdin` and `close_stdin` control the
+      process input. `resize` applies to TTY sessions. Supported signals are
+      INT and TERM. A signal sent while the runtime is still becoming ready
+      cancels the pending execution before dispatch.
+    messages:
+      - $ref: '#/channels/runtimeExec/messages/start'
+      - $ref: '#/channels/runtimeExec/messages/stdin'
+      - $ref: '#/channels/runtimeExec/messages/resize'
+      - $ref: '#/channels/runtimeExec/messages/signal'
+      - $ref: '#/channels/runtimeExec/messages/closeStdin'
+      - $ref: '#/channels/runtimeExec/messages/clientHeartbeat'
+  receiveExecOutput:
+    action: receive
+    channel:
+      $ref: '#/channels/runtimeExec'
+    description: |
+      Read until `exit` or `error`. Ignore application heartbeat messages.
+      For TTY sessions, output arrives as `stdout` and is not split into
+      separate stdout and stderr streams. The server can hold the connection
+      while the runtime becomes ready, up to 300 seconds or 16 access attempts.
+    messages:
+      - $ref: '#/channels/runtimeExec/messages/stdout'
+      - $ref: '#/channels/runtimeExec/messages/stderr'
+      - $ref: '#/channels/runtimeExec/messages/exit'
+      - $ref: '#/channels/runtimeExec/messages/error'
+      - $ref: '#/channels/runtimeExec/messages/serverHeartbeat'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: API key in the HTTP Authorization header of the upgrade request.
+  messages:
+    start:
+      name: start
+      title: Start command
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            enum: [start]
+          command:
+            type: string
+            minLength: 1
+            description: Executable name or path. Shell syntax requires an explicit shell.
+          args:
+            type: array
+            items:
+              type: string
+            default: []
+          env:
+            type: object
+            additionalProperties:
+              type: string
+            default: {}
+            description: Additional environment variables; keys must be POSIX names.
+          tty:
+            type: boolean
+            default: false
+          rows:
+            type: integer
+            minimum: 0
+            maximum: 65535
+            description: Initial TTY rows, when tty is true.
+          cols:
+            type: integer
+            minimum: 0
+            maximum: 65535
+            description: Initial TTY columns, when tty is true.
+        required: [type, command]
+      examples:
+        - payload:
+            type: start
+            command: sh
+            args: [-lc, 'pwd && ls']
+            env: {}
+            tty: false
+    stdin:
+      name: stdin
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            enum: [stdin]
+          data_base64:
+            type: string
+            format: byte
+            description: Standard Base64 encoding of raw stdin bytes.
+        required: [type, data_base64]
+    resize:
+      name: resize
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            enum: [resize]
+          rows:
+            type: integer
+            minimum: 0
+            maximum: 65535
+          cols:
+            type: integer
+            minimum: 0
+            maximum: 65535
+        required: [type, rows, cols]
+    signal:
+      name: signal
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            enum: [signal]
+          signal:
+            type: string
+            enum: [int, INT, sigint, SIGINT, term, TERM, sigterm, SIGTERM]
+        required: [type, signal]
+    closeStdin:
+      name: close_stdin
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            enum: [close_stdin]
+        required: [type]
+    clientHeartbeat:
+      name: heartbeat
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            enum: [heartbeat]
+        required: [type]
+    stdout:
+      name: stdout
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            enum: [stdout]
+          data_base64:
+            type: string
+            format: byte
+            description: Standard Base64 encoding of raw output bytes.
+        required: [type, data_base64]
+    stderr:
+      name: stderr
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            enum: [stderr]
+          data_base64:
+            type: string
+            format: byte
+            description: Standard Base64 encoding of raw error bytes.
+        required: [type, data_base64]
+    exit:
+      name: exit
+      description: Terminal command result. A nonzero code is a command failure.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            enum: [exit]
+          code:
+            type: integer
+            minimum: -2147483648
+            maximum: 2147483647
+        required: [type, code]
+    error:
+      name: error
+      description: Terminal execution failure; no reliable exit code is available.
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            enum: [error]
+          message:
+            type: string
+            description: Safe error message suitable for the caller.
+        required: [type, message]
+    serverHeartbeat:
+      name: heartbeat
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            enum: [heartbeat]
+        required: [type]

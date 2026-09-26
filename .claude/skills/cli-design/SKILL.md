@@ -94,9 +94,10 @@ prose stuffed into a structured field. Upstream returns the whole help screen in
 the URL; you have to know to run `ports ls` (C-13). If a flag's purpose is to produce an
 artefact, print the artefact.
 
-**Say when output is incomplete.** Upstream's list commands hard-cap at `limit=100` with no
-`--limit`, no pagination and no notice (C-15). A silently truncated list is worse than an error,
-because scripts act on it.
+**Give the caller control over how much you fetch.** Upstream pages through everything with a
+hard-coded page size and no `--limit`, so a large tenant waits for every page and an agent
+cannot cap the response at all (C-15). Offer a real result limit, and if you ever do truncate,
+say so — a silently short list is worse than an error, because scripts act on it.
 
 **Don't return more than was asked.** Upstream's `pause` returns the entire 45-field runtime
 object to convey one state change (C-22). For an agent that is ~350 tokens of context for one
@@ -140,10 +141,13 @@ it's for — loops. If the required action is to wait, say wait.
 
 ## Retries and transient failure
 
-**Distinguish "cannot" from "not yet".** Upstream's `exec` fails spuriously about 10% of the
-time (5 of 50 successful commands returned `status: null` and exit 1) with no retry (C-01). At
-that rate an agent cannot tell a broken build from a dropped websocket, and a CI pipeline breaks
-every tenth step.
+**Distinguish "cannot", "not yet", and "don't know".** Upstream's `exec` fails spuriously about
+10% of the time — 5 of 50 successful commands returned `status: null` and exit `1` (C-01). It
+does retry the websocket *upgrade*; what it cannot survive is a reset after the stream starts.
+The right answer there is not a retry, because the command may have had side effects — it is to
+report the outcome as **unknown**, with its own exit code, so a caller can decide. Reporting an
+unknown outcome as a failure is how a CI pipeline ends up re-running work that already
+succeeded.
 
 **A poller stops on a terminal answer, not on a bad connection.** Our device flow retries
 `begin` with backoff, treats 5xx / dropped connections / timeouts as noise, and ends only on

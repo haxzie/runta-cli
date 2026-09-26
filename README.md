@@ -226,6 +226,10 @@ Consequences worth knowing:
 - If Runta ever publishes a spec, this becomes a generated artifact again and the
   hand-written file can go away. Until then, treat `openapi.json` as source.
 
+`runta exec` is not REST. It is a WebSocket described by a separate AsyncAPI document,
+`packages/api/asyncapi.yaml`. No generator reads it — `openapi-ts` is OpenAPI-only — so the exec
+client will be hand-written against that file, which is source of truth in the same way.
+
 Nothing outside `@runta/api` should import from `./generated` directly. The hand-written
 shell (`client.ts`, `errors.ts`) owns auth headers, the user agent, and turning every
 failure — including network failures — into a single `RuntaApiError`.

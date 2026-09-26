@@ -9,7 +9,7 @@ generalises further than the rule.
 
 | Finding | Severity | One-line |
 | --- | --- | --- |
-| C-01 | blocker | `exec` fails spuriously ~10% of the time; 5 of 50 successful commands returned `status: null` and exit 1 |
+| C-01 | blocker | `exec` fails spuriously ~10% of the time; 5 of 50 successful commands returned `status: null` and exit 1. Retries the upgrade, but not a mid-stream reset |
 | C-02 | blocker | `login` fails on every clean machine — writes its state file without creating the directory |
 | C-03 | blocker | The device poller abandons the login on one transient error *and* deletes its own pending state |
 | C-04 | blocker | `exec` on a stopped runtime returns only `websocket error: HTTP error: 409 Conflict` |
@@ -24,7 +24,7 @@ generalises further than the rule.
 | C-12 | high | Table collapses to one char per column at zero winsize; ignores `COLUMNS` |
 | C-13 | high | `--publish` returns a port and never the URL |
 | C-14 | high | `--wait` on 2 of 9 async commands; responses echo the pre-transition status |
-| C-15 | high | Lists hard-cap at `limit=100`, no `--limit`, no truncation notice |
+
 | C-16 | high | `exec` buffers all output into a JSON string field — no streaming |
 | C-18 | high | Help text inside `error.message`; a different array key per list command; no `request_id` |
 | C-31 | high | `help --json` costs ~19.6k tokens, can't be narrowed; compacting alone saves 54% |
@@ -42,6 +42,7 @@ generalises further than the rule.
 | C-26 | medium | `ls`/`list`, `rm`/`delete`/`revoke`/`detach`, mixed booleans, two id vocabularies |
 | C-28 | medium | No Windows or Intel-Mac build, missing npm `os` field, stale `next` dist-tag |
 | C-34 | medium | Runtime arg is a flag on 2 commands and positional on 34 |
+| C-15 | low | Hard-coded page size and no `--limit`; results are complete, it does follow cursors |
 | C-27 | low | `Runtime 'x' is absent from the API.` as a success message; 15 s of silence in `run --wait` |
 | C-29 | low | npm shim flattens signal death to exit 1 instead of `128+signo` |
 
@@ -61,5 +62,10 @@ Not in `CLI_ISSUES.md`, because they were ours:
 - **Revoking a real credential while testing.** `logout` was smoke-tested with the user's live
   API key in the environment. It did exactly what it says and the key was destroyed for every
   consumer. Test destructive commands with a throwaway credential.
+- **Recording two findings I had not fully verified.** C-15 claimed lists "silently truncate at
+  100" and C-01 claimed `exec` had no retry. Reading the binary's strings later showed the CLI
+  follows pagination cursors and does retry the websocket upgrade. The measurements were sound; the
+  explanations were guesses stated as fact. Both are now corrected in place with a dated note —
+  quietly editing them would have been worse than the original error.
 - **Running `vitest` inside a package.** Tests silently ran against stale `dist/` of workspace
   deps and failed confusingly. `pnpm test` at the root builds deps first.
