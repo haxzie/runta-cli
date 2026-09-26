@@ -3,33 +3,38 @@ import { createContext } from '@runta/core';
 import { fail, logger } from '@runta/utils';
 import type { Command } from 'commander';
 
-export function registerWhoami(program: Command): void {
-  program
-    .command('whoami')
-    .description('Show the currently authenticated user')
-    .option('--json', 'print the raw API response')
-    .action(async (opts: { json?: boolean }) => {
-      const { client, config } = await createContext();
-      logger.debug(`calling ${config.apiUrl}/v2/me`);
+export interface WhoamiDeps {
+  write: (text: string) => void;
+}
 
-      try {
-        const { data } = await getMe({ client, throwOnError: true });
+export const defaultWhoamiDeps: WhoamiDeps = {
+  write: (text) => process.stdout.write(text),
+};
 
-        if (opts.json) {
-          process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
-          return;
-        }
-        // `GET /v2/me` wraps the profile in a `data` envelope, and `display_name` is
-        // nullable — fall back to the email, which is always present.
-        const { email, display_name } = data.data;
-        process.stdout.write(`${display_name ?? email} <${email}>\n`);
-      } catch (error) {
-        if (error instanceof RuntaApiError) {
-          fail(error.message, { exitCode: exitCodeFor(error), hint: hintFor(error), cause: error });
-        }
-        throw error;
-      }
-    });
+export async function whoami(
+  options: { json?: boolean } = {},
+  deps: WhoamiDeps = defaultWhoamiDeps,
+): Promise<void> {
+  const { client, config } = await createContext();
+  logger.debug(`calling ${config.apiUrl}/v2/me`);
+
+  try {
+    const { data } = await getMe({ client, throwOnError: true });
+
+    if (options.json) {
+      deps.write(`${JSON.stringify(data, null, 2)}\n`);
+      return;
+    }
+    // `GET /v2/me` wraps the profile in a `data` envelope, and `display_name` is nullable —
+    // fall back to the email, which is always present.
+    const { email, display_name } = data.data;
+    deps.write(`${display_name ?? email} <${email}>\n`);
+  } catch (error) {
+    if (error instanceof RuntaApiError) {
+      fail(error.message, { exitCode: exitCodeFor(error), hint: hintFor(error), cause: error });
+    }
+    throw error;
+  }
 }
 
 const exitCodeFor = (error: RuntaApiError): number =>
@@ -41,11 +46,23 @@ const exitCodeFor = (error: RuntaApiError): number =>
  * problem from "you aren't logged in" and needs a different instruction. Verified live —
  * see packages/api/NOTES.md.
  */
-function hintFor(error: RuntaApiError): string | undefined {
+export function hintFor(error: RuntaApiError): string | undefined {
   if (error.status === 403 && error.code === 'permission_denied') {
-    return 'This looks like an organization API key. `whoami` needs a user credential — sign in with the device flow instead.';
+    return 'This looks like an organization API key. `whoami` needs a user credential — run `runta auth login`.';
   }
-  if (error.status === 403) return 'No credential was sent. Set RUNTA_TOKEN.';
-  if (error.status === 401) return 'The token was rejected. Set a valid RUNTA_TOKEN.';
+  if (error.status === 403)
+    return 'No credential was sent. Run `runta auth login` or set RUNTA_TOKEN.';
+  if (error.status === 401)
+    return 'The token was rejected. Run `runta auth login` to get a new one.';
   return undefined;
+}
+
+export function registerWhoami(program: Command): void {
+  program
+    .command('whoami')
+    .description('Show the currently authenticated user')
+    .option('--json', 'print the raw API response')
+    .action(async (opts: { json?: boolean }) => {
+      await whoami(opts);
+    });
 }
