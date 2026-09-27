@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - workers/*
 
 onlyBuiltDependencies:
   - '@biomejs/biome'

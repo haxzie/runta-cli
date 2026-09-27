@@ -168,6 +168,15 @@ destructive-action safety, agent-friendliness. Every rule traces to a specific d
 one and `references/checklist.md` is the pre-PR pass. Claude Code loads it automatically when you
 touch a command; read it yourself before designing one.
 
+The install URL is served by a Cloudflare Worker in [`workers/install`](./workers/install), which
+fetches `scripts/install.sh` from the default branch so the script can be updated without
+redeploying anything. `?ref=<branch|tag|sha>` pins a specific version of the installer itself.
+
+Because whatever it returns gets piped into `sh`, the Worker never answers a failure with a 200:
+upstream errors become 5xx, unknown paths become 404, and a body that does not start with a shell
+shebang is refused. `curl -fsSL` aborts on all of those, so a broken fetch is an install that
+declines to start rather than an arbitrary body handed to a shell.
+
 ## Development
 
 Requires [Bun](https://bun.sh) 1.3+, Node 22 (see `.nvmrc`) and pnpm 10.
@@ -197,6 +206,7 @@ their TypeScript source under the `bun` export condition, so an edit anywhere in
 | `pnpm lint` / `pnpm lint:fix` | Biome check / autofix |
 | `pnpm api:generate` | Regenerate the SDK from `packages/api/openapi.json` |
 | `pnpm build:binaries` | Cross-compile release binaries into `dist/` |
+| `pnpm --filter @runta/install-worker deploy` | Deploy the install-script Worker |
 | `pnpm changeset` | Record a change for the next release |
 
 ## Layout
@@ -207,6 +217,7 @@ packages/api      @runta/api       Generated OpenAPI SDK + hand-written client s
 packages/core     @runta/core      Config loading and command context
 packages/utils    @runta/utils     Logger and error types
 packages/tsconfig @runta/tsconfig  Shared TypeScript configs
+workers/install   @runta/install-worker  Cloudflare Worker serving install.sh
 ```
 
 Every package is private. Changesets versions them as one fixed group, so
