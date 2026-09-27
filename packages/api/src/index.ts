@@ -8,6 +8,18 @@
  */
 export { createRuntaClient, type RuntaClient, type RuntaClientOptions } from './client.js';
 export { errorFromResponse, isRuntaApiError, RuntaApiError } from './errors.js';
+export {
+  type ExecHandlers,
+  type ExecOptions,
+  type ExecRequest,
+  type ExecSession,
+  type ExecSignal,
+  type ExecSocket,
+  ExecUnknownError,
+  execCollect,
+  execUrl,
+  startExec,
+} from './exec.js';
 
 // Generated operations and models.
 export * from './generated/index.js';

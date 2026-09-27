@@ -610,13 +610,7 @@ function describe(runtime: Runtime): string {
     .join('\n');
 }
 
-/**
- * What to do with a runtime that was just created.
- *
- * Deliberately does not suggest `runta exec` — that command does not exist yet, and pointing at a
- * command the binary lacks is the defect we recorded against Runta's own agent skill (C-30).
- * Add it here when `exec` ships.
- */
+/** What to do with a runtime that was just created. */
 function createNextSteps(runtime: Runtime, waited: boolean): NextStep[] {
   const name = runtime.display_name;
   const steps: NextStep[] = [];
@@ -625,6 +619,7 @@ function createNextSteps(runtime: Runtime, waited: boolean): NextStep[] {
     // Without waiting the runtime is not usable yet, so watching it is the only sensible step.
     steps.push({ command: `runta inspect ${name}`, why: 'check whether it is running yet' });
   } else {
+    steps.push({ command: `runta exec ${name} -- uname -a`, why: 'run a command inside it' });
     steps.push({ command: `runta inspect ${name}`, why: 'see its full state' });
   }
 

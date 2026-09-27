@@ -17,7 +17,10 @@
       "inputs": ["src/**", "tsconfig*.json", "package.json"]
     },
     "test": {
-      "dependsOn": ["^build"],
+      // `generate` as well as upstream builds: @runta/api's tests import src/generated, which
+      // does not exist in a fresh clone. Without this, `pnpm test` before `pnpm build` fails with
+      // "Cannot find module './client.gen'" — which looks like flakiness and is not.
+      "dependsOn": ["^build", "generate"],
       "inputs": ["src/**", "test/**", "tsconfig*.json", "package.json"]
     },
     "clean": {

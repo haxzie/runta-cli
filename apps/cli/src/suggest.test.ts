@@ -109,9 +109,11 @@ describe('suggested commands exist', () => {
   });
 
   it('fails when a suggestion names a command that does not exist', () => {
-    // Guards the guard: proves resolve() actually rejects.
-    expect(resolve(buildProgram(), ['exec'])).toBe(false);
-    expect(resolve(buildProgram(), ['list'])).toBe(true);
+    // Guards the guard: proves resolve() actually rejects. `checkpoint` is the next resource we
+    // expect to build, which makes it a good stand-in for "documented but not shipped".
+    expect(resolve(buildProgram(), ['checkpoint'])).toBe(false);
+    expect(resolve(buildProgram(), ['runtime', 'nope'])).toBe(false);
+    expect(resolve(buildProgram(), ['exec'])).toBe(true);
     expect(resolve(buildProgram(), ['runtime', 'list'])).toBe(true);
   });
 });

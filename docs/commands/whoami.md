@@ -1,7 +1,7 @@
 ---
 title: runta whoami
 description: Show the authenticated user, and why an organization API key is rejected here.
-sidebar_position: 13
+sidebar_position: 14
 ---
 
 # `runta whoami`

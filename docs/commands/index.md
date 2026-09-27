@@ -18,6 +18,7 @@ runta [global options] <command> [command options]
 | [`runta list`](./list.md) | List runtimes |
 | [`runta inspect`](./inspect.md) | Show everything about one runtime |
 | [`runta delete`](./delete.md) | Delete one or more runtimes |
+| [`runta exec`](./exec.md) | Run a command inside a runtime |
 | [`runta login`](./login.md) | Sign in through a browser using a one-time device code |
 | [`runta logout`](./logout.md) | Revoke the stored credential and remove it locally |
 | [`runta whoami`](./whoami.md) | Show the authenticated user and active team |
@@ -113,7 +114,7 @@ currently covers four. Nothing below exists yet as a command:
 | --- | --- | --- |
 | Runtimes — create, list, inspect, delete | 4 | **Done** |
 | Runtimes — resize, pause, resume, start, stop, VNC | 17 | Not started |
-| `exec` — run a command in a runtime (WebSocket, not REST) | — | Not started |
+| `exec` — run a command in a runtime (WebSocket, not REST) | — | **Done** |
 | Cloud agents — create, run, follow up, artifacts, workspace | 22 | Not started |
 | GitHub — connect, repositories, runtime bindings | 9 | Not started |
 | SSH keys — tenant keys and per-runtime attachment | 7 | Not started |

@@ -89,12 +89,18 @@ export async function isolateEnv(overrides: Record<string, string | undefined> =
   };
 }
 
-/** Collects everything a command writes to stdout. */
+/**
+ * Collects everything a command writes to stdout.
+ *
+ * Accepts bytes as well as strings, because `process.stdout.write` does and `exec` streams raw
+ * output through as `Uint8Array` — stringifying those would give you "111,117,116" instead of "out".
+ */
 export function captureStdout() {
   const chunks: string[] = [];
+  const decoder = new TextDecoder();
   return {
-    write: (text: string) => {
-      chunks.push(text);
+    write: (data: string | Uint8Array) => {
+      chunks.push(typeof data === 'string' ? data : decoder.decode(data));
     },
     get text() {
       return chunks.join('');

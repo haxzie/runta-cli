@@ -259,6 +259,63 @@ it stays open rather than being assumed fixed.
 
 ---
 
+## I-8 — `exec` exit codes, and "unknown" as a third outcome
+
+**Status:** decided, 2026-09-27, and implemented.
+
+`runta exec` passes the remote command's exit status through verbatim, which is what every
+comparable CLI does and what any script wrapping it expects. That consumes the whole 0–255 range
+and leaves no room for the CLI's usual `1`/`2`, so failures of the exec *itself* use the high codes
+Docker established for the same reason:
+
+| Code | Meaning |
+| --- | --- |
+| `0`–`255` | The remote command's own exit status |
+| `2` | Bad flags or a credential problem — nothing ran |
+| `125` | The command could not be started; retrying is safe |
+| `126` | The command started, outcome **unknown** |
+
+The `125`/`126` split is the point. `asyncapi.yaml` says an `error` frame or a connection closing
+before `exit` leaves the result unknown, and that a command with side effects must not be retried
+automatically. So an unknown outcome is a **third outcome**, not a failure:
+
+```console
+$ runta exec demo -- ./deploy.sh
+error The connection closed before the command reported an exit status.
+The command may have run. Check before retrying — this is not a reported failure.
+```
+
+This is the correct fix for `CLI_ISSUES.md` C-01, where the production CLI reports exactly this case
+as exit `1` — indistinguishable from a command that genuinely failed, which is how a CI pipeline ends
+up re-running work that already succeeded. Reporting "I don't know" is more useful than reporting a
+wrong answer confidently.
+
+`--json` carries the same distinction as a frame, so an agent gets it without parsing prose:
+
+```json
+{"type":"error","message":"connection lost","before_start":false}
+```
+
+### Related decisions
+
+**`--json` mirrors the wire protocol** rather than inventing a shape: `{"type":"stdout",
+"data_base64":…}` then `{"type":"exit","code":N}`. Anything that has read `asyncapi.yaml` already
+knows it. Payloads are base64 because command output is bytes — a build emitting a control character
+or invalid UTF-8 would be corrupted by a text field.
+
+**Output streams, never buffers.** The production CLI collects everything into a JSON string field,
+so a ten-minute build shows nothing until it finishes and `| grep` needs `jq -r .stdout` first
+(C-16). Ours writes each frame as it arrives, keeping stdout and stderr separate.
+
+**A cold runtime says so.** The API holds the connection up to 300 seconds while a runtime becomes
+ready, which is why upstream's `exec` appears to hang. Ours prints "Waiting for the runtime to become
+ready…" after two seconds of silence.
+
+**`-t` is refused without a terminal on stdout**, because a pty with nowhere to render is not a
+session anyone wants — checked before connecting.
+
+---
+
 ## I-5 — Runtime configuration is not a resource
 
 **Status:** proposed.

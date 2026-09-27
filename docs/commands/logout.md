@@ -1,7 +1,7 @@
 ---
 title: runta logout
 description: Revoke the current credential and remove it locally, including why revoking an environment token is permanent.
-sidebar_position: 12
+sidebar_position: 13
 ---
 
 # `runta logout`

@@ -31,6 +31,7 @@ runta [global options] <command> [command options]
 | `runta list` | List runtimes |
 | `runta inspect <runtime>` | Show everything about one runtime |
 | `runta delete <runtime>...` | Delete runtimes, with `--dry-run` and confirmation |
+| `runta exec <runtime> -- <cmd>` | Run a command inside a runtime; `-it` for an interactive pty |
 | `runta login` | Sign in through a browser using a one-time device code |
 | `runta logout` | Revoke the stored credential and remove it locally |
 | `runta whoami` | Show the authenticated user and active team |

@@ -31,6 +31,7 @@ describe('command surface', () => {
     expect(names()).toEqual([
       'create',
       'delete',
+      'exec',
       'hello',
       'inspect',
       'list',
@@ -78,6 +79,10 @@ describe('command surface', () => {
 
   it('keeps the logout flag', () => {
     expect(optionsOf('logout')).toEqual(['--json']);
+  });
+
+  it('keeps the exec flags', () => {
+    expect(optionsOf('exec')).toEqual(['--env', '--interactive', '--json', '--tty']);
   });
 
   it('keeps the whoami flag', () => {

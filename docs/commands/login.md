@@ -1,7 +1,7 @@
 ---
 title: runta login
 description: Sign in through the browser with a one-time device code, including flags, NDJSON output, and how the poller tolerates a flaky API.
-sidebar_position: 11
+sidebar_position: 12
 ---
 
 # `runta login`

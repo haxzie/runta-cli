@@ -1,7 +1,7 @@
 ---
 title: runta hello
 description: A no-op greeting used to smoke-test the CLI and the development loop.
-sidebar_position: 14
+sidebar_position: 15
 ---
 
 # `runta hello`
