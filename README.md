@@ -285,18 +285,23 @@ deployment infrastructure are not things a user installs.
 
 ### Deploying the install Worker
 
-`workers/install` deploys on its own, only when the Worker changes — the install script is read
-from the default branch at request time, so editing the script needs no deploy. The workflow
-typechecks and tests first, then verifies the live URL still serves a shell script and still
-answers 404 on unknown paths.
+The Worker is deployed by hand, from a machine with `wrangler login`:
 
-It needs two repository secrets:
+```sh
+pnpm --filter @runta/install-worker deploy
+```
 
-| Secret | What |
-| --- | --- |
-| `CLOUDFLARE_API_TOKEN` | "Edit Cloudflare Workers" template, scoped to this account |
-| `CLOUDFLARE_ACCOUNT_ID` | the account the Worker lives in |
+There is no CI deploy and no Cloudflare credential in this repository, on purpose. The Worker reads
+`scripts/install.sh` from the default branch **at request time**, so editing the install script
+needs no deploy at all — the Worker itself changes about as often as the repo moves. Automating a
+once-a-year deploy is not worth a long-lived token in a repository secret.
 
-The Worker also holds a `GITHUB_TOKEN` secret of its own (set with `wrangler secret put`), needed
-only while this repo is private — `raw.githubusercontent.com` answers 404 for a private repo, so
-the Worker reads through the contents API instead.
+What *is* automated is noticing when the URL breaks. `install-health.yml` runs daily and needs no
+credential: it checks that `runta.haxzie.com/install.sh` returns a shell script byte-identical to
+the committed one, that an unknown path is not a 2xx, and that a path-traversal `?ref=` is refused.
+That is also the thing that will catch the Worker's `GITHUB_TOKEN` expiring, which would otherwise
+be discovered by whoever next tried to install.
+
+The Worker holds one secret of its own, set with `wrangler secret put GITHUB_TOKEN`. It is needed
+only while this repo is private — `raw.githubusercontent.com` answers 404 for a private repo, so the
+Worker reads through the contents API instead. Make the repo public and the secret can be deleted.

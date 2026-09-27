@@ -1,0 +1,64 @@
+name: Install URL health
+
+# The install one-liner is the first thing anyone runs, and it depends on two things outside
+# this repo: the Worker being deployed, and its GITHUB_TOKEN still being valid. Neither shows up
+# in a normal CI run, and a token expiry would otherwise be discovered by a user.
+#
+# Deliberately not part of `ci.yml`: a live external check belongs nowhere near a PR gate, where
+# a Cloudflare or GitHub hiccup would fail an unrelated change. On a schedule, a failure here
+# means exactly one thing — the install URL is broken.
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: The install URL serves a shell script
+        run: |
+          status=$(curl -sS -o served.sh -w '%{http_code}' https://runta.haxzie.com/install.sh)
+          if [ "$status" != "200" ]; then
+            echo "::error::install.sh returned $status"
+            head -5 served.sh || true
+            exit 1
+          fi
+
+          head -1 served.sh | grep -qE '^#!/(bin/sh|usr/bin/env sh)' || {
+            echo "::error::install.sh is not a shell script"
+            head -5 served.sh
+            exit 1
+          }
+
+      - name: It matches the script on the default branch
+        run: |
+          # The Worker relays the file verbatim, so a difference means it is serving something
+          # other than what is committed — a stale cache, or the wrong ref.
+          diff served.sh scripts/install.sh || {
+            echo "::error::Served script differs from scripts/install.sh on main"
+            exit 1
+          }
+
+      - name: An unknown path is not a 2xx
+        run: |
+          # Anything 2xx here could be piped into a shell by someone who mistyped the URL.
+          status=$(curl -sS -o /dev/null -w '%{http_code}' https://runta.haxzie.com/)
+          [ "$status" = "404" ] || {
+            echo "::error::Unknown path returned $status, expected 404"
+            exit 1
+          }
+
+      - name: A bad ref is refused rather than fetched
+        run: |
+          status=$(curl -sS -o /dev/null -w '%{http_code}' \
+            'https://runta.haxzie.com/install.sh?ref=../../etc/passwd')
+          [ "$status" = "400" ] || {
+            echo "::error::Path-traversal ref returned $status, expected 400"
+            exit 1
+          }
