@@ -63,18 +63,65 @@ jobs:
         if: steps.check.outputs.release == 'true'
         run: pnpm build:binaries
 
+      # A release whose binary does not run is worse than no release. The linux-x64 build is
+      # the one this runner can execute, and it exercises the same compile path as the rest.
+      - name: Smoke-test the linux-x64 binary
+        if: steps.check.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          tar -xzf dist/runta-linux-x64.tar.gz -C dist
+          ./dist/runta hello release
+          actual=$(./dist/runta --version)
+          if [ "$actual" != "$VERSION" ]; then
+            echo "::error::Binary reports $actual but the release is $VERSION"
+            exit 1
+          fi
+          rm -f dist/runta
+
+      # install.sh resolves a version, downloads a tarball and verifies it against
+      # checksums.txt. Run that against the freshly built artifacts before publishing them,
+      # so a broken installer is caught here rather than by the first person to use it.
+      - name: Verify install.sh against the built artifacts
+        if: steps.check.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          python3 -m http.server 8799 --directory dist >/dev/null 2>&1 &
+          server=$!
+          trap 'kill $server' EXIT
+          for _ in $(seq 1 20); do
+            curl -fsS -o /dev/null "http://127.0.0.1:8799/checksums.txt" && break
+            sleep 1
+          done
+          RUNTA_VERSION="v$VERSION" \
+          RUNTA_BASE_URL="http://127.0.0.1:8799" \
+          RUNTA_INSTALL_DIR="$RUNNER_TEMP/runta-bin" \
+            sh scripts/install.sh
+          "$RUNNER_TEMP/runta-bin/runta" --version
+
       - name: Publish GitHub Release
         if: steps.check.outputs.release == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.check.outputs.version }}
         run: |
-          # Only this version's changelog section, not the whole file.
+          # Only this version's changelog section, not the whole file. The "Patch Changes"
+          # block is dropped: every package is private and pinned to one version, so
+          # "Updated dependencies: @runta/core@X" is noise to anyone reading a release.
           awk -v ver="## $VERSION" '
             $0 == ver { inside = 1; next }
             inside && /^## / { exit }
+            inside && /^### Patch Changes/ { inside = 0; exit }
             inside { print }
           ' apps/cli/CHANGELOG.md > release-notes.md
+
+          # A release with empty notes means the changelog heading did not match the version,
+          # which would otherwise ship a silently empty release.
+          if ! grep -q '[^[:space:]]' release-notes.md; then
+            echo "::error::No changelog section found for $VERSION in apps/cli/CHANGELOG.md"
+            exit 1
+          fi
 
           {
             echo
@@ -90,4 +137,10 @@ jobs:
           gh release create "v$VERSION" \
             --title "v$VERSION" \
             --notes-file release-notes.md \
-            dist/*.tar.gz dist/checksums.txt
+            dist/runta-darwin-arm64.tar.gz \
+            dist/runta-darwin-x64.tar.gz \
+            dist/runta-linux-arm64.tar.gz \
+            dist/runta-linux-x64.tar.gz \
+            dist/runta-linux-arm64-musl.tar.gz \
+            dist/runta-linux-x64-musl.tar.gz \
+            dist/checksums.txt

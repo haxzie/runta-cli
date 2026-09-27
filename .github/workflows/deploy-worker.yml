@@ -1,0 +1,73 @@
+name: Deploy install Worker
+
+# The Worker serves scripts/install.sh from the default branch, so a change to the *script*
+# needs no deploy. This runs only when the Worker itself changes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/install/**'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # This URL is piped into a shell by everyone who installs the CLI, so it is not somewhere
+      # to deploy an untested change.
+      - run: pnpm --filter @runta/install-worker run typecheck
+      - run: pnpm --filter @runta/install-worker run test
+
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm --filter @runta/install-worker exec wrangler deploy
+
+      # A deploy that leaves the install URL broken should fail loudly here rather than be
+      # discovered by the next person running `curl … | sh`.
+      - name: Verify the live URL still serves a shell script
+        run: |
+          for attempt in $(seq 1 10); do
+            if curl -fsSL https://runta.haxzie.com/install.sh -o served.sh; then
+              break
+            fi
+            echo "attempt $attempt failed, retrying"
+            sleep 5
+          done
+
+          head -1 served.sh | grep -qE '^#!/(bin/sh|usr/bin/env sh)' || {
+            echo "::error::runta.haxzie.com/install.sh is not serving a shell script"
+            head -5 served.sh
+            exit 1
+          }
+
+          # The Worker relays the script verbatim, so a mismatch means it is serving something
+          # other than what is on this branch.
+          if ! diff -q served.sh scripts/install.sh; then
+            echo "::warning::Served script differs from scripts/install.sh on this commit."
+            echo "Expected within the Worker's 5-minute cache window; investigate if it persists."
+            diff served.sh scripts/install.sh || true
+          fi
+
+          # An unknown path must not answer 2xx: curl -fsSL has to abort rather than pipe a body
+          # into a shell.
+          status=$(curl -s -o /dev/null -w '%{http_code}' https://runta.haxzie.com/)
+          [ "$status" = "404" ] || {
+            echo "::error::Unknown path returned $status, expected 404"
+            exit 1
+          }

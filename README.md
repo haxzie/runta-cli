@@ -256,8 +256,47 @@ failure — including network failures — into a single `RuntaApiError`.
 
 ## Releasing
 
-1. Include a changeset with your PR (`pnpm changeset`).
-2. On merge to `main`, the release workflow opens a "Version Packages" PR.
-3. Merging that PR bumps versions and writes CHANGELOGs; the workflow then cross-compiles
-   all targets, creates the `v<version>` tag, and attaches the tarballs plus
-   `checksums.txt` to a GitHub Release. `install.sh` reads from exactly that.
+Changesets owns versioning; the release workflow turns a version bump into a GitHub Release with
+the compiled binaries attached. **Nothing is published to npm** — every package is private, and
+the CLI ships as a standalone binary.
+
+1. Include a changeset with your PR: `pnpm changeset`, pick the packages and a bump type, commit
+   the generated markdown.
+2. On merge to `main`, the release workflow opens or updates a **Version Packages** PR. Nothing
+   else happens yet.
+3. Merging that PR bumps every package to one version (`fixed: [["@runta/*"]]`, so
+   `runta --version` identifies the whole tree) and writes CHANGELOGs.
+4. That push to `main` leaves a version with no matching tag, which is the signal to release. The
+   workflow then cross-compiles all six targets, checks them, tags `v<version>`, and attaches the
+   tarballs plus `checksums.txt`.
+
+Three gates stand between a version bump and a published release, because a broken release is
+worse than a late one:
+
+- the `linux-x64` binary must run and report the version being released;
+- `scripts/install.sh` must install from the freshly built artifacts — the workflow serves `dist/`
+  over HTTP and runs the real installer against it, so a broken installer fails here rather than
+  in front of a user;
+- the changelog must actually contain a section for this version, so an empty release is an error
+  rather than a surprise.
+
+`@runta/tsconfig` and `@runta/install-worker` are excluded from versioning: shared config and
+deployment infrastructure are not things a user installs.
+
+### Deploying the install Worker
+
+`workers/install` deploys on its own, only when the Worker changes — the install script is read
+from the default branch at request time, so editing the script needs no deploy. The workflow
+typechecks and tests first, then verifies the live URL still serves a shell script and still
+answers 404 on unknown paths.
+
+It needs two repository secrets:
+
+| Secret | What |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | "Edit Cloudflare Workers" template, scoped to this account |
+| `CLOUDFLARE_ACCOUNT_ID` | the account the Worker lives in |
+
+The Worker also holds a `GITHUB_TOKEN` secret of its own (set with `wrangler secret put`), needed
+only while this repo is private — `raw.githubusercontent.com` answers 404 for a private repo, so
+the Worker reads through the contents API instead.
