@@ -1,5 +1,8 @@
 node_modules/
 dist/
+
+# Wrangler's local miniflare state: sqlite caches from `wrangler dev`.
+.wrangler/
 .turbo/
 *.tsbuildinfo
 coverage/
