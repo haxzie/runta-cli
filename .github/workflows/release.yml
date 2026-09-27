@@ -81,7 +81,7 @@ jobs:
             echo '## Install'
             echo
             echo '```sh'
-            echo "curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | sh"
+            echo "curl -fsSL https://runta.haxzie.com/install.sh | sh"
             echo '```'
           } >> release-notes.md
 

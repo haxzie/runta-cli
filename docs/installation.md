@@ -7,7 +7,7 @@ sidebar_position: 2
 # Installation
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/haxzie/runta-cli/main/scripts/install.sh | sh
+curl -fsSL https://runta.haxzie.com/install.sh | sh
 ```
 
 The script downloads a standalone binary for your platform from the latest GitHub Release,
@@ -40,6 +40,37 @@ Both are environment variables read by the install script:
 RUNTA_VERSION=v0.3.1 curl -fsSL …/install.sh | sh
 RUNTA_INSTALL_DIR=/usr/local/bin curl -fsSL …/install.sh | sh
 ```
+
+## Pinning the installer itself
+
+`RUNTA_VERSION` pins which *release* you install. To pin the *installer script* — to reproduce an
+old install, or to try a change before it reaches the default branch — pass `?ref=`:
+
+```sh
+curl -fsSL 'https://runta.haxzie.com/install.sh?ref=v0.1.0' | sh
+curl -fsSL 'https://runta.haxzie.com/install.sh?ref=my-branch' | sh
+```
+
+The response carries the resolved ref in an `x-runta-ref` header, so you can check what you got
+without running it:
+
+```console
+$ curl -sI https://runta.haxzie.com/install.sh | grep x-runta-ref
+x-runta-ref: main
+```
+
+## Read it before you run it
+
+Piping a remote script into a shell is worth doing deliberately. The script is small and has no
+dependencies beyond `curl` and `tar`:
+
+```sh
+curl -fsSL https://runta.haxzie.com/install.sh | less
+```
+
+It refuses to install anything whose SHA-256 does not match the `checksums.txt` published with the
+release, and the URL itself fails closed — an unreachable or unexpected response returns a non-2xx
+status, so `curl -fsSL` aborts rather than handing a body to `sh`.
 
 ## Supported platforms
 

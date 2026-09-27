@@ -23,7 +23,7 @@ It is a single standalone binary with no runtime dependency.
 
 ```sh
 # Install
-curl -fsSL https://raw.githubusercontent.com/haxzie/runta-cli/main/scripts/install.sh | sh
+curl -fsSL https://runta.haxzie.com/install.sh | sh
 
 # Sign in through the browser
 runta login

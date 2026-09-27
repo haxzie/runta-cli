@@ -5,7 +5,7 @@ The `runta` command line interface, and the packages it is built from.
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/haxzie/runta-cli/main/scripts/install.sh | sh
+curl -fsSL https://runta.haxzie.com/install.sh | sh
 ```
 
 This downloads a standalone binary for your platform from the latest GitHub Release,

@@ -1,7 +1,11 @@
 #!/bin/sh
 # Runta CLI installer.
 #
-#   curl -fsSL https://raw.githubusercontent.com/haxzie/runta-cli/main/scripts/install.sh | sh
+#   curl -fsSL https://runta.haxzie.com/install.sh | sh
+#
+# That URL is a Cloudflare Worker (workers/install) which serves this file from the
+# repository's default branch, so the installer can change without a redeploy. This
+# script is the source of truth; the Worker only relays it.
 #
 # Environment:
 #   RUNTA_VERSION       version to install (default: latest release)
