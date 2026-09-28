@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { fail, logger } from '@runta/utils';
@@ -77,4 +78,38 @@ async function readConfigFile(path: string): Promise<Record<string, unknown>> {
     });
   }
   return parsed as Record<string, unknown>;
+}
+
+/** Where the credential in use came from, or that there isn't one. */
+export type CredentialSource = 'env' | 'file' | 'none';
+
+/**
+ * Whether a credential exists, and which layer it came from — synchronously, and without ever
+ * failing.
+ *
+ * Both properties are requirements rather than preferences. `--help` is rendered by commander from
+ * a synchronous callback, so `loadConfig` is unavailable; and help has to render on a machine whose
+ * config file is missing, empty or corrupt, where `loadConfig` deliberately aborts the process.
+ * A file this cannot read is reported as `none`: the next real command loads it properly and
+ * reports the problem with a fix, which is the right place for that.
+ *
+ * Precedence matches `loadConfig` — the environment wins — because the distinction changes the
+ * advice. `login` writes to the config file, so telling someone with `RUNTA_TOKEN` set to run it
+ * would send them to a command whose result the environment then ignores.
+ *
+ * This reads the token's presence, never its validity. Saying "signed in" about a token the API
+ * would reject is the cost of not making a network call to render help; `whoami` is the check, and
+ * that is what the help text points at.
+ */
+export function credentialSource(env: NodeJS.ProcessEnv = process.env): CredentialSource {
+  if (env.RUNTA_TOKEN?.trim()) return 'env';
+
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(configPath(), 'utf8'));
+    if (typeof parsed !== 'object' || parsed === null) return 'none';
+    const { token } = parsed as { token?: unknown };
+    return typeof token === 'string' && token.trim() ? 'file' : 'none';
+  } catch {
+    return 'none';
+  }
 }

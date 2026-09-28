@@ -1,3 +1,4 @@
+import { type CredentialSource, credentialSource } from '@runta/core';
 import { colorEnabled } from '@runta/utils';
 import type { Command } from 'commander';
 
@@ -57,7 +58,44 @@ const EXAMPLES: [string, string?][] = [
 const bold = (text: string, colour: boolean): string => (colour ? `\x1b[1m${text}\x1b[0m` : text);
 const dim = (text: string, colour: boolean): string => (colour ? `\x1b[90m${text}\x1b[0m` : text);
 
-export function rootHelp(program: Command, colour = colorEnabled(process.stdout)): string {
+/**
+ * The opening line, which depends on whether there is a credential to start from.
+ *
+ * Telling someone who signed in an hour ago to "start with login" wastes the most valuable line of
+ * the help on advice they have already taken. What a signed-in user actually wants to know is who
+ * they are currently acting as, and how to change it.
+ *
+ * The two signed-in cases differ because the fix differs. With a token in the config file, `login`
+ * replaces it. With `RUNTA_TOKEN` set, the environment outranks the file, so `login` would appear
+ * to succeed and change nothing — the variable is what has to change.
+ *
+ * Presence is not validity: none of this makes an API call, so an expired token still reads as
+ * signed in. That is why every branch names `whoami`, which is the command that actually asks.
+ */
+function intro(name: string, colour: boolean, source: CredentialSource): string[] {
+  const cmd = (text: string): string => bold(`${name} ${text}`, colour);
+
+  if (source === 'env') {
+    return [
+      `Signed in using ${bold('RUNTA_TOKEN', colour)} from your environment.`,
+      `Run ${cmd('whoami')} to see which user and team that is. Because the environment takes`,
+      `precedence over ${cmd('login')}, change or unset the variable to switch.`,
+    ];
+  }
+  if (source === 'file') {
+    return [
+      `Signed in. Run ${cmd('whoami')} to see the current user and team, or ${cmd('login')}`,
+      'again to switch user or organisation.',
+    ];
+  }
+  return [`Not signed in yet? Start with ${cmd('login')}.`];
+}
+
+export function rootHelp(
+  program: Command,
+  colour = colorEnabled(process.stdout),
+  source: CredentialSource = credentialSource(),
+): string {
   const name = program.name();
   const described = new Map(program.commands.map((c) => [c.name(), c.description()]));
   // `help` is synthesised by commander and absent from `program.commands`.
@@ -68,7 +106,7 @@ export function rootHelp(program: Command, colour = colorEnabled(process.stdout)
   lines.push('');
   lines.push(program.description());
   lines.push('');
-  lines.push(`Not signed in yet? Start with ${bold(`${name} login`, colour)}.`);
+  lines.push(...intro(name, colour, source));
 
   const width = Math.max(
     ...Object.values(USAGE).map((u) => u.length),

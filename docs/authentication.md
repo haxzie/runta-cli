@@ -108,11 +108,28 @@ your threat model, use `RUNTA_TOKEN` from a secret manager instead and never run
 
 ## Which credential am I actually using?
 
-There is currently no command that answers this — `whoami` tells you the *identity* the API
-resolved, not which source the token came from. Until that exists, the quickest check is:
+`runta-next --help` says so on its second line, because the answer changes what you should do
+next:
+
+```console
+$ runta-next --help
+...
+Signed in using RUNTA_TOKEN from your environment.
+Run runta-next whoami to see which user and team that is. Because the environment takes
+precedence over runta-next login, change or unset the variable to switch.
+```
+
+With a stored login instead, it points at `whoami` to see the current user and team, and at
+`login` to switch. With no credential at all, it tells you to start with `login`.
+
+This is deliberately a check of *presence*, not validity — rendering help makes no API call, so an
+expired or revoked token still reads as signed in. `whoami` is the command that actually asks, which
+is why every variant of the line names it.
+
+For the underlying state:
 
 ```sh
-env | grep RUNTA_TOKEN                 # is an env var shadowing my login?
+env | grep RUNTA_TOKEN                      # is an env var shadowing my login?
 cat ~/.runta-next/config.json               # what did login store?
 runta-next --verbose whoami 2>&1 | head -1  # which endpoint is being called
 ```

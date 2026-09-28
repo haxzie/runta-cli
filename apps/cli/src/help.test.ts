@@ -1,9 +1,12 @@
+import type { CredentialSource } from '@runta/core';
 import { describe, expect, it } from 'vitest';
 import { __groups, rootHelp } from './help.js';
 import { buildProgram } from './program.js';
 
 const program = () => buildProgram();
-const plain = () => rootHelp(program(), false);
+// Always pass a credential state: the default probes the real filesystem, so tests that omitted it
+// would pass or fail depending on whether the machine running them happens to be logged in.
+const plain = (source: CredentialSource = 'none') => rootHelp(program(), false, source);
 
 describe('grouped root help', () => {
   /**
@@ -49,6 +52,51 @@ describe('grouped root help', () => {
     const text = plain();
     for (const option of program().options) {
       expect(text).toContain(option.flags);
+    }
+  });
+});
+
+describe('the introduction adapts to whether you are signed in', () => {
+  /**
+   * The opening line is the most valuable one in the help, and "start with login" spends it on
+   * advice a signed-in user has already taken. These assert the three states say something
+   * different and, in every case, something actionable.
+   */
+  it('tells a signed-in user how to see who they are, not how to log in', () => {
+    const text = plain('file');
+
+    expect(text).toContain('Signed in');
+    expect(text).toContain('runta-next whoami');
+    expect(text).not.toContain('Not signed in');
+  });
+
+  it('offers login as the way to switch user or organisation', () => {
+    expect(plain('file')).toMatch(/switch user or organisation/);
+  });
+
+  /**
+   * `login` writes the config file, which the environment outranks — so for an env-authenticated
+   * user it would appear to succeed and change nothing. The help has to say what actually works.
+   */
+  it('tells an env-authenticated user to change the variable, not to run login', () => {
+    const text = plain('env');
+
+    expect(text).toContain('RUNTA_TOKEN');
+    expect(text).toContain('precedence');
+    expect(text).toContain('runta-next whoami');
+  });
+
+  it('names whoami in every signed-in state, because presence is not validity', () => {
+    // No branch makes an API call, so an expired token still reads as signed in. `whoami` is the
+    // only thing that actually asks, so every path has to point at it.
+    for (const source of ['env', 'file'] as CredentialSource[]) {
+      expect(plain(source)).toContain('runta-next whoami');
+    }
+  });
+
+  it('still opens with the command groups, whatever the state', () => {
+    for (const source of ['env', 'file', 'none'] as CredentialSource[]) {
+      expect(plain(source)).toContain('Runtimes:');
     }
   });
 });

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { isCliError } from '@runta/utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { configPath } from './config.js';
-import { clearToken, saveToken } from './credentials.js';
+import { clearToken, credentialSource, saveToken } from './credentials.js';
 
 let home: string;
 const previous = process.env.RUNTA_CONFIG_HOME;
@@ -112,5 +112,58 @@ describe('clearToken', () => {
     await writeFile(configPath(), JSON.stringify({ apiUrl: 'https://self.hosted' }));
 
     await expect(clearToken()).resolves.toBe(false);
+  });
+});
+
+describe('credentialSource', () => {
+  it('reports none when there is no config file and no variable', () => {
+    expect(credentialSource({})).toBe('none');
+  });
+
+  it('reports file when the config file holds a token', async () => {
+    await saveToken('rt_abc');
+
+    expect(credentialSource({})).toBe('file');
+  });
+
+  /** Matches `loadConfig`: the environment wins. Help depends on this to give the right advice. */
+  it('prefers the environment over the config file', async () => {
+    await saveToken('rt_from_file');
+
+    expect(credentialSource({ RUNTA_TOKEN: 'rt_from_env' })).toBe('env');
+  });
+
+  it('treats a blank variable as no credential', () => {
+    // `RUNTA_TOKEN=` in a sourced env file is unset in every sense that matters to a user.
+    expect(credentialSource({ RUNTA_TOKEN: '' })).toBe('none');
+    expect(credentialSource({ RUNTA_TOKEN: '   ' })).toBe('none');
+  });
+
+  it('treats a config file without a token as no credential', async () => {
+    await mkdir(join(home, 'config', 'runta-next'), { recursive: true });
+    await writeFile(configPath(), '{"apiUrl":"https://example.test"}');
+
+    expect(credentialSource({})).toBe('none');
+  });
+
+  /**
+   * The async loaders abort the process on a malformed file, which is right for a command and wrong
+   * for `--help`: help has to render on a broken machine, and the next real command reports the
+   * problem properly with a fix.
+   */
+  it('reports none rather than throwing on a file it cannot read', async () => {
+    await mkdir(join(home, 'config', 'runta-next'), { recursive: true });
+
+    for (const content of ['not json', '[]', 'null', '', '{"token":123}', '{"token":"  "}']) {
+      await writeFile(configPath(), content);
+      expect(credentialSource({})).toBe('none');
+    }
+  });
+
+  it('reports none when the config path is a directory', async () => {
+    // An unreadable path is an EISDIR, not an ENOENT, and must not escape either.
+    await mkdir(configPath(), { recursive: true });
+
+    expect(credentialSource({})).toBe('none');
   });
 });
