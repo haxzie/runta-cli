@@ -303,6 +303,7 @@ the committed one, that an unknown path is not a 2xx, and that a path-traversal 
 That is also the thing that will catch the Worker's `GITHUB_TOKEN` expiring, which would otherwise
 be discovered by whoever next tried to install.
 
-The Worker holds one secret of its own, set with `wrangler secret put GITHUB_TOKEN`. It is needed
-only while this repo is private — `raw.githubusercontent.com` answers 404 for a private repo, so the
-Worker reads through the contents API instead. Make the repo public and the secret can be deleted.
+The Worker holds no secrets. It reads the script from `raw.githubusercontent.com`, which caches well
+and cannot leak a credential. It *can* authenticate through the GitHub contents API if a
+`GITHUB_TOKEN` secret is set — that path exists because the raw host answers 404 for a private repo —
+but with this repo public it is unused, and the secret was deleted.

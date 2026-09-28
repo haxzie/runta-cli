@@ -20,10 +20,10 @@ export interface Env {
   /**
    * Optional fine-grained token with read access to the repo's contents.
    *
-   * Only needed while the repo is private: `raw.githubusercontent.com` answers 404 for a private
-   * repo with no credential, so without this the Worker has nothing to serve. Set it with
-   * `wrangler secret put GITHUB_TOKEN`. When the repo is public, leave it unset and the Worker
-   * uses the unauthenticated raw URL, which caches better and cannot leak a credential.
+   * Unset in production: the repo is public, so the Worker uses the unauthenticated raw URL, which
+   * caches better and has no credential to leak or expire. The authenticated path exists because
+   * `raw.githubusercontent.com` answers 404 for a private repo — set it with
+   * `wrangler secret put GITHUB_TOKEN` if this repo ever goes private again.
    */
   GITHUB_TOKEN?: string;
 }
