@@ -35,64 +35,92 @@ Both are environment variables read by the install script:
 | --- | --- | --- |
 | `RUNTA_VERSION` | latest release | Install a specific version, e.g. `v0.3.1` |
 | `RUNTA_INSTALL_DIR` | `~/.runta/bin` | Where the binary lands |
+| `RUNTA_BIN_NAME` | `runta` | What to call the command, so it can sit beside the official CLI |
 
 ```sh
 RUNTA_VERSION=v0.3.1 curl -fsSL …/install.sh | sh
 RUNTA_INSTALL_DIR=/usr/local/bin curl -fsSL …/install.sh | sh
 ```
 
-## If you already have the npm-published CLI
+## Trying this alongside the official CLI
 
-Runta publishes a CLI to npm as `@runta/runta-cli`, and it installs a command called `runta` too.
-Both cannot own that name, and the installer warns you when it finds another one on your `PATH`.
+This CLI is an experiment. Runta publishes its own to npm as `@runta/runta-cli`, that one is the
+complete product, and nothing here is a reason to remove it.
 
-**Read this before uninstalling anything: this CLI does less than that one.** It covers the runtime
-lifecycle, `exec`, and authentication. It has no `cp`, `checkpoint`, `secret`, `egress`, `ports`,
-`ssh`, `vnc`, `image`, `github`, `tokens` or `model-provider` commands. If you rely on any of those,
-keep the npm CLI.
-
-Running both is fine as long as you are deliberate about which one you get:
+**Install this one under its own name.** Both provide a command called `runta` otherwise, whichever
+directory comes first on `PATH` wins silently, and their subcommand names differ — so the failure
+mode is `runta ps` erroring on a CLI that works fine, rather than anything that looks like a
+conflict:
 
 ```sh
-# whichever directory comes first on PATH wins
-export PATH="$HOME/.runta/bin:$PATH"      # prefer this CLI
-~/.runta/bin/runta list                    # or just be explicit
+RUNTA_BIN_NAME=runta-next curl -fsSL https://runta.haxzie.com/install.sh | sh
 
-runta --version    # 0.1.x is this CLI, 0.2.x is the npm one
+runta-next login
+runta-next create --name scratch --cpus 1 --memory 512
+runta          # still the official CLI, untouched
 ```
 
-To remove the npm one:
+Then which one you are running is never in doubt, and there are no `PATH` games.
+
+:::danger
+**`runta-next logout` revokes the credential server-side, not just locally.** If you are sharing a
+token with the official CLI or with CI — including anything in `RUNTA_TOKEN` — signing out here
+destroys it *everywhere*, and nothing else will tell you. Check before running it:
 
 ```sh
-npm uninstall -g @runta/runta-cli
+env | grep RUNTA_TOKEN
 ```
 
-### The command names are different on purpose
+To stop using this CLI without revoking anything, delete its config instead:
 
-There are no compatibility aliases, so muscle memory from the npm CLI will not work — by design,
-and for reasons written up in
+```sh
+rm -rf ~/.runta
+```
+:::
+
+### What works, and what is missing
+
+Implemented: [`login`](./commands/login.md), [`logout`](./commands/logout.md),
+[`whoami`](./commands/whoami.md), [`create`](./commands/create.md), [`list`](./commands/list.md),
+[`inspect`](./commands/inspect.md), [`delete`](./commands/delete.md) and
+[`exec`](./commands/exec.md).
+
+Not built: `cp`, `checkpoint`, `secret`, `egress`, `ports`, `ssh`, `vnc`, `image`, `github`,
+`tokens`, `model-provider`. Nine of the API's twelve operation groups are untouched — so keep the
+official CLI for anything real.
+
+### The shared names mean different things
+
+There are no compatibility aliases, on purpose — the reasoning is in
 [`Improvements.md`](https://github.com/haxzie/runta-cli/blob/main/Improvements.md):
 
-| npm CLI | This CLI | Why |
+| Official CLI | Here | Why |
 | --- | --- | --- |
-| `runta run` | [`runta create`](./commands/create.md) | `run` named the command that creates a runtime while `exec` was the one that runs things |
-| `runta ps` | [`runta list`](./commands/list.md) | `ps` is ambiguous about scope — your runtimes, or processes inside one? |
-| `runta rm` | [`runta delete`](./commands/delete.md) | consistency: the other three are whole words |
-| `runta inspect` | [`runta inspect`](./commands/inspect.md) | unchanged |
-| `runta exec` | [`runta exec`](./commands/exec.md) | unchanged |
+| `runta run` | `create` | `run` named the command that *creates* a runtime, while `exec` was the one that ran things |
+| `runta ps` | `list` | `ps` is ambiguous about scope — your runtimes, or processes inside one? |
+| `runta rm` | `delete` | consistency: the other three are whole words |
+| `runta inspect` | `inspect` | unchanged |
+| `runta exec` | `exec` | unchanged |
 
-### Credentials are not shared
-
-The two store configuration in different places, so signing into one does not sign you into the
-other:
+### Credentials are separate
 
 | | Location |
 | --- | --- |
-| npm CLI | `~/.config/runta/config.toml` |
+| Official CLI | `~/.config/runta/config.toml` |
 | This CLI | `~/.runta/config.json` |
 
-Run [`runta login`](./commands/login.md) again after switching, or set `RUNTA_TOKEN`, which both
-read.
+So `login` here does not sign you in there, or the reverse. `RUNTA_TOKEN` is read by both, which
+makes it the least surprising way to authenticate while testing — and the reason the `logout`
+warning above matters.
+
+### Testing without breaking anything
+
+- Work on a runtime you created for the purpose. `create --name scratch-…` and delete it after.
+- `delete --dry-run` first; it resolves names against the API and shows exactly what would go.
+- `--json` output shapes are settled; **error text is not** — branch on exit codes, not messages.
+- Found something wrong? The findings that produced this CLI live in
+  [`CLI_ISSUES.md`](https://github.com/haxzie/runta-cli/blob/main/CLI_ISSUES.md); new ones belong
+  there too.
 
 ## Pinning the installer itself
 

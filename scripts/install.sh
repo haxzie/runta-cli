@@ -10,11 +10,19 @@
 # Environment:
 #   RUNTA_VERSION       version to install (default: latest release)
 #   RUNTA_INSTALL_DIR   install location (default: $HOME/.runta/bin)
+#   RUNTA_BIN_NAME      command name to install as (default: runta)
 #   RUNTA_BASE_URL      override the release download base (for testing)
+#
+# Runta publishes its own CLI to npm, which also provides a `runta` command with different
+# subcommand names. If you want both, install this one under another name:
+#
+#   RUNTA_BIN_NAME=runta-next curl -fsSL https://runta.haxzie.com/install.sh | sh
 set -eu
 
 REPO="haxzie/runta-cli"
-BIN_NAME="runta"
+# Release artifacts are always named after the project; what you *call* it is up to you.
+ARTIFACT_PREFIX="runta"
+BIN_NAME="${RUNTA_BIN_NAME:-runta}"
 
 info() { printf '%s\n' "$*" >&2; }
 err() { printf 'error: %s\n' "$*" >&2; exit 1; }
@@ -47,7 +55,7 @@ detect_target() {
     fi
   fi
 
-  printf '%s-%s-%s%s' "$BIN_NAME" "$os" "$arch" "$libc"
+  printf '%s-%s-%s%s' "$ARTIFACT_PREFIX" "$os" "$arch" "$libc"
 }
 
 resolve_version() {
@@ -102,13 +110,14 @@ warn_about_other_runta() {
   info ""
   info "  $existing"
   info ""
-  info "That one will keep winning until $install_dir comes first. If it is the"
-  info "npm-published CLI, note that its command names differ from this one's, so"
-  info "muscle memory will fail in confusing ways. To remove it:"
+  info "That one will keep winning until $install_dir comes first, and its subcommand"
+  info "names differ from this one's, so muscle memory will fail in confusing ways."
   info ""
-  info "  npm uninstall -g @runta/runta-cli"
+  info "The simplest fix is to install this one under its own name instead:"
   info ""
-  info "Or run this one explicitly as $target_dir/$BIN_NAME while you compare them."
+  info "  RUNTA_BIN_NAME=runta-next curl -fsSL https://runta.haxzie.com/install.sh | sh"
+  info ""
+  info "Then both work, and which one you are running is never in doubt."
 }
 
 main() {
@@ -135,11 +144,11 @@ main() {
   verify_checksum "$tmp/$tarball" "$tmp/checksums.txt" "$tarball"
 
   tar -xzf "$tmp/$tarball" -C "$tmp"
-  [ -f "$tmp/$BIN_NAME" ] || err "Archive did not contain a \`$BIN_NAME\` binary."
+  [ -f "$tmp/$ARTIFACT_PREFIX" ] || err "Archive did not contain a \`$ARTIFACT_PREFIX\` binary."
 
   mkdir -p "$install_dir"
   # Write to a temp name then rename, so an in-use binary is replaced atomically.
-  mv "$tmp/$BIN_NAME" "$install_dir/$BIN_NAME.tmp"
+  mv "$tmp/$ARTIFACT_PREFIX" "$install_dir/$BIN_NAME.tmp"
   chmod +x "$install_dir/$BIN_NAME.tmp"
   mv "$install_dir/$BIN_NAME.tmp" "$install_dir/$BIN_NAME"
 

@@ -19,10 +19,16 @@ published to npm — there is no Node.js runtime requirement.
 
 Supported targets: macOS and Linux, on `x64` and `arm64` (glibc and musl).
 
-Runta also publishes a CLI to npm as `@runta/runta-cli`, which installs a `runta` command of its
-own. The installer warns when it finds another one on your `PATH`. Note this CLI covers fewer
-commands than that one and uses different names for the ones it shares — see
-[docs/installation.md](./docs/installation.md#if-you-already-have-the-npm-published-cli).
+This is an experimental CLI. Runta's own is published to npm as `@runta/runta-cli` and covers far
+more; this one implements eight commands and renames three of them deliberately. If you have both,
+install this one under its own name so they can coexist:
+
+```sh
+RUNTA_BIN_NAME=runta-next curl -fsSL https://runta.haxzie.com/install.sh | sh
+```
+
+See [docs/installation.md](./docs/installation.md#trying-this-alongside-the-official-cli) — including
+why `logout` here revokes a credential everywhere.
 
 ## Using the CLI
 
