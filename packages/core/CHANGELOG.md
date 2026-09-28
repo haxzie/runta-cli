@@ -1,5 +1,13 @@
 # @runta/core
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [[`c5647b2`](https://github.com/haxzie/runta-cli/commit/c5647b2c1eaf24c6c3639ee2464faefbeec1db8f)]:
+  - @runta/utils@0.3.0
+  - @runta/api@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
