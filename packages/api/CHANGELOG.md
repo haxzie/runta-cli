@@ -1,5 +1,15 @@
 # @runta/api
 
+## 0.4.0
+
+### Patch Changes
+
+- [`a359b60`](https://github.com/haxzie/runta-cli/commit/a359b606b742f45b8efc74a24bbea11f74a53ba3) Thanks [@haxzie](https://github.com/haxzie)! - Restore the `VncConnection.username` enum to `runta`.
+  
+  The runta → runta-next rename rewrote it to `runta-next`, but this is a value the *server* sends —
+  the in-runtime account name — so a rename of our command could not have changed it. The generated
+  SDK typed the field as `'runta-next'`, which no live response would ever satisfy.
+
 ## 0.3.0
 
 No changes in this release.
