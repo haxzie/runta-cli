@@ -6,7 +6,8 @@ sidebar_position: 14
 
 # `runta-next whoami`
 
-Shows the currently authenticated user.
+Shows which user and team the current credential belongs to. Reach for it when you are unsure
+which account a command is about to act as — after switching tokens, or on a shared machine.
 
 ```
 runta-next whoami [options]

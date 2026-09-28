@@ -6,6 +6,9 @@ sidebar_position: 9
 
 # `runta-next inspect`
 
+Shows everything the API knows about one runtime, as a detail view rather than a single table row.
+Reach for it when `list` says a runtime is unhappy and you need to know why.
+
 ```
 runta-next inspect <runtime> [options]
 runta-next runtime inspect <runtime> [options]

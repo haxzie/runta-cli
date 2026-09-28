@@ -6,6 +6,10 @@ sidebar_position: 10
 
 # `runta-next delete`
 
+Deletes one or more runtimes and waits until they are really gone, not merely accepted for deletion.
+It cannot be undone, so it confirms first where a human can answer and offers `--dry-run` where one
+cannot.
+
 ```
 runta-next delete <runtime...> [options]
 runta-next runtime delete <runtime...> [options]

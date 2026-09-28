@@ -1496,8 +1496,9 @@
           "username": {
             "type": "string",
             "enum": [
-              "runta-next"
-            ]
+              "runta"
+            ],
+            "description": "The in-runtime account, always `runta`. This is a value the server sends, not our command name \u2014 the runta \u2192 runta-next rename rewrote it here by mistake."
           },
           "security_type": {
             "type": "string",

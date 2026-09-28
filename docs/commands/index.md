@@ -6,6 +6,9 @@ sidebar_position: 6
 
 # Commands
 
+Every command the CLI has, what it does, and the conventions they all share. `--help` is always the
+authority on flags; this page explains the behaviour behind them.
+
 ```
 runta-next [global options] <command> [command options]
 ```

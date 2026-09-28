@@ -6,6 +6,9 @@ sidebar_position: 8
 
 # `runta-next list`
 
+Lists your runtimes as a table, or as JSON for a script. By default it shows only the runtimes that
+are running or suspended — the ones costing you money and able to accept work right now.
+
 ```
 runta-next list [options]
 runta-next runtime list [options]

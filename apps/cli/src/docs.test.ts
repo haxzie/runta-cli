@@ -108,6 +108,51 @@ const longFlagsOf = (command: Command): Set<string> =>
 const ROOT_FLAGS = (program: Command): Set<string> =>
   new Set([...longFlagsOf(program), '--help', '--version']);
 
+/**
+ * Every command page opens with prose saying what the command does, before any usage block.
+ *
+ * Four of the pages originally went straight from the heading into a fenced `runta-next …` line,
+ * which tells a reader the shape of the command and nothing about why they would run it. The
+ * frontmatter `description` does not fill the gap: VitePress puts it in the page metadata, so it is
+ * read by search engines and never by the person on the page.
+ */
+describe('every command page describes its command', () => {
+  const pages = (): { name: string; lead: string }[] => {
+    const dir = join(DOCS, 'commands');
+    return readdirSync(dir)
+      .filter((entry) => entry.endsWith('.md'))
+      .map((entry) => {
+        const lines = readFileSync(join(dir, entry), 'utf8').split('\n');
+        const heading = lines.findIndex((line) => line.startsWith('# '));
+        // The first non-blank line after the heading.
+        const lead = lines.slice(heading + 1).find((line) => line.trim().length > 0) ?? '';
+        return { name: entry, lead: lead.trim() };
+      });
+  };
+
+  it('finds every command page, so an empty sweep cannot pass', () => {
+    expect(pages().length).toBeGreaterThanOrEqual(9);
+  });
+
+  it('opens with prose rather than a usage block', () => {
+    const offenders = pages()
+      .filter(({ lead }) => lead.startsWith('```') || lead.startsWith('|') || lead.startsWith('#'))
+      .map(({ name }) => name);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('says enough to be worth reading', () => {
+    // A bare restatement of the command name is not a description. Nothing subtler than a length
+    // floor is worth enforcing here; the rest is review.
+    const thin = pages()
+      .filter(({ lead }) => lead.length < 40)
+      .map(({ name, lead }) => `${name}: ${lead}`);
+
+    expect(thin).toEqual([]);
+  });
+});
+
 describe('documented commands and flags exist', () => {
   it('every `runta-next …` in the docs names a real command', () => {
     const program = buildProgram();

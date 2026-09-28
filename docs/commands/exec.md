@@ -6,6 +6,9 @@ sidebar_position: 11
 
 # `runta-next exec`
 
+Runs a command inside a running runtime and exits with that command's own exit code, so it composes
+with `&&`, `set -e` and CI the way a local command would. Add `-it` for an interactive shell.
+
 ```
 runta-next exec <runtime> [options] -- <command> [args...]
 ```

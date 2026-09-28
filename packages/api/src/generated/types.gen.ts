@@ -249,7 +249,10 @@ export type RepositoryCheckout = {
 export type VncConnection = {
     hostname: string;
     port: number;
-    username: 'runta-next';
+    /**
+     * The in-runtime account, always `runta`. This is a value the server sends, not our command name — the runta → runta-next rename rewrote it here by mistake.
+     */
+    username: 'runta';
     security_type: 'X509Plain';
 };
 

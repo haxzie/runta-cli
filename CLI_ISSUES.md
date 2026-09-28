@@ -51,6 +51,7 @@ npm packages, the Homebrew tap, and the shipped binary (the source repo is priva
 | [C-33](#c-33---runtime-sign-in-reports-a-ready-runtime-whose-agent-cant-run) | `--runtime-sign-in` reports a ready runtime whose agent isn't logged in | high |
 | [C-34](#c-34-the-runtime-argument-is-a-flag-on-two-commands-and-positional-on-34) | Runtime arg is a flag on 2 commands, positional on 34 | medium |
 | [C-35](#c-35-no-published-openapi-document-so-every-client-is-hand-written) | No published OpenAPI document; API docs disagree with the live API in six places | high |
+| [C-36](#c-36--an-ambiguous-runtime-name-silently-resolves-to-the-first-match) | An ambiguous runtime name silently resolves to the first match | high |
 
 ---
 
@@ -1235,6 +1236,63 @@ Worth stating explicitly — these were verified live and are solid:
 - **`runta help --json` exposing the whole command tree** is genuinely rare and valuable — it just
   needs the arity bug in C-06 fixed.
 - **Tables are attractive and readable** at a real terminal width.
+
+### C-36 — An ambiguous runtime name silently resolves to the first match
+_Severity: high._
+
+Every runtime-taking command documents its positional as "Runtime name or ID", and the API accepts
+only a UUID (`runtime_id must be a UUID`), so the CLI resolves names itself by listing and matching.
+The resolution is sound in the ways that usually go wrong — it short-circuits a UUID without listing,
+and it does follow cursors past the first page — but it does not check whether the name it matched
+was unique.
+
+Probed by pointing `--endpoint` at a local server returning two runtimes that share a display name:
+
+```console
+$ runta --endpoint http://127.0.0.1:8801 inspect my-name
+  → GET /healthz
+  → GET /v2/runtimes?limit=100          # returns aaaaaaaa-… and bbbbbbbb-…, both "my-name"
+  → GET /v2/runtimes/aaaaaaaa-…         # picked the first, said nothing
+$ echo $?
+0
+```
+
+`rm` behaves the same way, which is where it stops being cosmetic:
+
+```console
+$ runta --endpoint http://127.0.0.1:8801 rm my-name
+{"action":"rm","ok":true,"results":[{"accepted":true,"error":null,"ok":true,
+  "runtime_name":"my-name","status":"delete_requested"}]}
+  → DELETE /v2/runtimes/aaaaaaaa-…?expected_revision=3
+```
+
+Two runtimes match, one is deleted, `ok` is `true`, and nothing in the output distinguishes this from
+an unambiguous delete. Note the result names `runtime_name` and never the id, so even reading the JSON
+afterwards does not tell you which of the two is gone — the only way to find out is to list again and
+see which survived. `rm` has no `--dry-run` and no confirmation prompt
+([C-09](#c-09-no---dry-run-and-no-confirmation-anywhere)), so there is no step at which a
+human could have noticed.
+
+Nothing in the API reference marks `name` as unique, and `create` assigns a random name only when
+omitted — so two runtimes sharing a name is a state a user can reach by passing `--name` twice, or by
+restoring a checkpoint alongside its original.
+
+→ Fail on an ambiguous name and list the candidate ids, rather than picking one. At minimum, echo the
+resolved id in the result so the action is auditable after the fact.
+
+**How ours differs.** `resolveRuntimeId` collects every match and routes them through a shared
+`pick()` helper, so an ambiguous name is an error naming the candidates, and the exit code says so:
+
+```console
+$ runta-next inspect my-name
+error Runtime name 'my-name' is ambiguous — 2 of them share it.
+Use an id instead: aaaaaaaa-0000-4000-8000-000000000001, bbbbbbbb-0000-4000-8000-000000000002
+$ echo $?
+1
+```
+
+Verified against the same local server in the same session: official exits `0` and acts, ours exits
+`1` and refuses.
 
 ## Not exercised
 
