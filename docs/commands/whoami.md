@@ -1,15 +1,15 @@
 ---
-title: runta whoami
+title: runta-next whoami
 description: Show the authenticated user, and why an organization API key is rejected here.
 sidebar_position: 14
 ---
 
-# `runta whoami`
+# `runta-next whoami`
 
 Shows the currently authenticated user.
 
 ```
-runta whoami [options]
+runta-next whoami [options]
 ```
 
 | Option | Does |
@@ -17,7 +17,7 @@ runta whoami [options]
 | `--json` | Print the result as JSON |
 
 ```console
-$ runta whoami
+$ runta-next whoami
 Logged in as Ada Lovelace <ada@example.com>
 Active team: b2d2ce6e-7f85-4178-bf2a-56547cf3e4b8
 ```
@@ -25,7 +25,7 @@ Active team: b2d2ce6e-7f85-4178-bf2a-56547cf3e4b8
 `display_name` is nullable in the API, so the email is used when there is no name:
 
 ```console
-$ runta whoami
+$ runta-next whoami
 Logged in as ada@example.com <ada@example.com>
 Active team: b2d2ce6e-7f85-4178-bf2a-56547cf3e4b8
 ```
@@ -41,7 +41,7 @@ model-providers call fails the team line is simply omitted rather than failing t
 command:
 
 ```console
-$ runta whoami
+$ runta-next whoami
 Logged in as Ada Lovelace <ada@example.com>
 ```
 
@@ -60,7 +60,7 @@ Flattens both calls into one object. The `data` envelope the API wraps `/v2/me` 
 unwrapped, and `organization_id` is merged in:
 
 ```console
-$ runta whoami --json
+$ runta-next whoami --json
 {
   "user_id": "800d9aa5-479a-4773-9a15-53d5a4193701",
   "email": "ada@example.com",
@@ -70,8 +70,8 @@ $ runta whoami --json
 ```
 
 ```sh
-runta whoami --json | jq -r .email
-runta whoami --json | jq -r '.organization_id // "unknown"'
+runta-next whoami --json | jq -r .email
+runta-next whoami --json | jq -r '.organization_id // "unknown"'
 ```
 
 `organization_id` is **absent** when it could not be resolved, so use `//` rather than
@@ -83,9 +83,9 @@ assuming it is there.
 An organization API key (`rt_…`) authenticates successfully but is rejected by this endpoint:
 
 ```console
-$ runta whoami
+$ runta-next whoami
 error principal's role does not allow this organization action
-This looks like an organization API key. `whoami` needs a user credential — run `runta login`.
+This looks like an organization API key. `whoami` needs a user credential — run `runta-next login`.
 exit 2
 ```
 
@@ -115,14 +115,14 @@ For the last one, see
 | `2` | No credential, a rejected credential, or an org key on a user-only endpoint |
 
 ```console
-$ runta whoami                                     # nothing set
+$ runta-next whoami                                     # nothing set
 error 403 Forbidden
-No credential was sent. Run `runta login` or set RUNTA_TOKEN.
+No credential was sent. Run `runta-next login` or set RUNTA_TOKEN.
 exit 2
 
-$ RUNTA_TOKEN=rt_bogus runta whoami                # rejected
+$ RUNTA_TOKEN=rt_bogus runta-next whoami                # rejected
 error invalid bearer credential
-The token was rejected. Run `runta login` to get a new one.
+The token was rejected. Run `runta-next login` to get a new one.
 exit 2
 ```
 

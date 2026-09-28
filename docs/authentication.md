@@ -8,24 +8,24 @@ sidebar_position: 3
 
 Every command except `hello` needs a credential. There are two ways to supply one.
 
-## Interactive: `runta login`
+## Interactive: `runta-next login`
 
 ```console
-$ runta login
+$ runta-next login
 Your code is ABCD-1234
 Opened your browser to approve it.
 Waiting for authorization…
-Authorized. Token saved to /Users/you/.runta/config.json
+Authorized. Token saved to /Users/you/.runta-next/config.json
 ```
 
 This is the [RFC 8628 device flow](https://datatracker.ietf.org/doc/html/rfc8628): the CLI
 asks the API for a short code, opens your browser at a URL with that code pre-filled, and
 polls until you approve. The resulting token is written to
-[`~/.runta/config.json`](#where-credentials-live).
+[`~/.runta-next/config.json`](#where-credentials-live).
 
 The browser is opened for you. If that is wrong for your situation — a remote shell, a
 container, no desktop — the CLI detects it and prints the URL instead, and you can force
-that with `--no-browser`. See [`runta login`](./commands/login.md) for
+that with `--no-browser`. See [`runta-next login`](./commands/login.md) for
 all flags.
 
 ### It tolerates a flaky API
@@ -44,7 +44,7 @@ to disk:
 
 ```sh
 export RUNTA_TOKEN=rt_…
-runta whoami
+runta-next whoami
 ```
 
 This is the right approach for CI, containers, and anything scripted:
@@ -58,10 +58,10 @@ env:
 [precedence](./configuration.md#precedence) — and the warning below, because this is the one
 part of the system that will surprise you.
 
-## Signing out: `runta logout`
+## Signing out: `runta-next logout`
 
 ```console
-$ runta logout
+$ runta-next logout
 Logged out.
 ```
 
@@ -82,7 +82,7 @@ out.
 
 ## Where credentials live
 
-`~/.runta/config.json`, as plain JSON:
+`~/.runta-next/config.json`, as plain JSON:
 
 ```json
 {
@@ -92,13 +92,13 @@ out.
 
 | Property | Value |
 | --- | --- |
-| File | `~/.runta/config.json` |
+| File | `~/.runta-next/config.json` |
 | File mode | `0600` (owner read/write only) |
 | Directory mode | `0700` |
 | Override | `RUNTA_CONFIG_HOME` sets the directory |
 
 The directory is created on demand, so `login` works on a machine that has never run
-`runta`. Other keys in the file — `apiUrl`, for instance — are preserved when the token is
+`runta-next`. Other keys in the file — `apiUrl`, for instance — are preserved when the token is
 written or cleared; the token is one field in a shared config file, not the whole document.
 
 The token is stored **in plaintext**. `0600` keeps it away from other users on the machine,
@@ -113,19 +113,19 @@ resolved, not which source the token came from. Until that exists, the quickest 
 
 ```sh
 env | grep RUNTA_TOKEN                 # is an env var shadowing my login?
-cat ~/.runta/config.json               # what did login store?
-runta --verbose whoami 2>&1 | head -1  # which endpoint is being called
+cat ~/.runta-next/config.json               # what did login store?
+runta-next --verbose whoami 2>&1 | head -1  # which endpoint is being called
 ```
 
 ## Token scope matters for `whoami`
 
-`runta whoami` calls `GET /v2/me`, which only accepts a **user** credential from the device
+`runta-next whoami` calls `GET /v2/me`, which only accepts a **user** credential from the device
 flow. An organization API key authenticates fine but is rejected here:
 
 ```console
-$ runta whoami
+$ runta-next whoami
 error principal's role does not allow this organization action
-This looks like an organization API key. `whoami` needs a user credential — run `runta login`.
+This looks like an organization API key. `whoami` needs a user credential — run `runta-next login`.
 ```
 
 That is expected, not a bug — see [`whoami`](./commands/whoami.md#organization-api-keys).

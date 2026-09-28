@@ -1,16 +1,16 @@
 ---
-title: runta hello
+title: runta-next hello
 description: A no-op greeting used to smoke-test the CLI and the development loop.
 sidebar_position: 15
 ---
 
-# `runta hello`
+# `runta-next hello`
 
 Prints a greeting. It exists to smoke-test the binary and the dev loop — it makes no network
 call and needs no credential.
 
 ```
-runta hello [name]
+runta-next hello [name]
 ```
 
 | Argument | Default | Does |
@@ -18,10 +18,10 @@ runta hello [name]
 | `name` | `world` | Who to greet |
 
 ```console
-$ runta hello
+$ runta-next hello
 Hello, world!
 
-$ runta hello Ada
+$ runta-next hello Ada
 Hello, Ada!
 ```
 
@@ -29,6 +29,6 @@ Useful as the first thing to run after installing, and as the CI check that a
 cross-compiled binary actually executes on its target platform:
 
 ```sh
-runta --version
-runta hello ci
+runta-next --version
+runta-next hello ci
 ```

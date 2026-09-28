@@ -1,42 +1,42 @@
 ---
 title: Commands
-description: Every runta command, the global options, and what the API supports that the CLI does not yet.
+description: Every runta-next command, the global options, and what the API supports that the CLI does not yet.
 sidebar_position: 6
 ---
 
 # Commands
 
 ```
-runta [global options] <command> [command options]
+runta-next [global options] <command> [command options]
 ```
 
 ## Available commands
 
 | Command | Does |
 | --- | --- |
-| [`runta create`](./create.md) | Create a runtime and wait until it can accept commands |
-| [`runta list`](./list.md) | List runtimes |
-| [`runta inspect`](./inspect.md) | Show everything about one runtime |
-| [`runta delete`](./delete.md) | Delete one or more runtimes |
-| [`runta exec`](./exec.md) | Run a command inside a runtime |
-| [`runta login`](./login.md) | Sign in through a browser using a one-time device code |
-| [`runta logout`](./logout.md) | Revoke the stored credential and remove it locally |
-| [`runta whoami`](./whoami.md) | Show the authenticated user and active team |
-| [`runta hello`](./hello.md) | Print a greeting — a smoke test for the dev loop |
+| [`runta-next create`](./create.md) | Create a runtime and wait until it can accept commands |
+| [`runta-next list`](./list.md) | List runtimes |
+| [`runta-next inspect`](./inspect.md) | Show everything about one runtime |
+| [`runta-next delete`](./delete.md) | Delete one or more runtimes |
+| [`runta-next exec`](./exec.md) | Run a command inside a runtime |
+| [`runta-next login`](./login.md) | Sign in through a browser using a one-time device code |
+| [`runta-next logout`](./logout.md) | Revoke the stored credential and remove it locally |
+| [`runta-next whoami`](./whoami.md) | Show the authenticated user and active team |
+| [`runta-next hello`](./hello.md) | Print a greeting — a smoke test for the dev loop |
 
 ## Two forms for runtime commands
 
 Every runtime verb is reachable two ways, and they are the same command:
 
 ```sh
-runta runtime create      runta create
-runta runtime list        runta list
-runta runtime inspect     runta inspect
-runta runtime delete      runta delete
+runta-next runtime create      runta-next create
+runta-next runtime list        runta-next list
+runta-next runtime inspect     runta-next inspect
+runta-next runtime delete      runta-next delete
 ```
 
 The noun-first form is canonical, so every resource reads the same way and you can predict
-`runta checkpoint list` from having seen `runta runtime list`. The top-level form exists because
+`runta-next checkpoint list` from having seen `runta-next runtime list`. The top-level form exists because
 runtimes are the noun you work with all day and naming them twice gets old. Runtimes are the only
 resource with that shortcut.
 
@@ -49,8 +49,8 @@ Every command that targets a runtime takes it as a **positional** argument and a
 name or a UUID:
 
 ```sh
-runta inspect demo
-runta inspect 01a0dcc4-2ba7-7353-acb2-7fa79602b0a0
+runta-next inspect demo
+runta-next inspect 01a0dcc4-2ba7-7353-acb2-7fa79602b0a0
 ```
 
 Names are resolved by the CLI, because the API's path parameter only accepts a UUID. Two
@@ -58,7 +58,7 @@ consequences: resolving a name costs one extra request, and because names are no
 unique, an ambiguous name is an error rather than a guess —
 
 ```console
-$ runta inspect demo
+$ runta-next inspect demo
 error Runtime name 'demo' is ambiguous — 2 of them share it.
 Use an id instead: 01a0dcc4-…, 01a0dd12-…
 ```
@@ -88,8 +88,8 @@ ambiguous name rather than picking one.
 go before the command:
 
 ```sh
-runta --verbose whoami      # works
-runta whoami --verbose      # unknown option
+runta-next --verbose whoami      # works
+runta-next whoami --verbose      # unknown option
 ```
 
 ## Help is authoritative
@@ -98,16 +98,16 @@ runta whoami --verbose      # unknown option
 accepts:
 
 ```sh
-runta --help
-runta login --help
-runta whoami --help
+runta-next --help
+runta-next login --help
+runta-next whoami --help
 ```
 
 If this documentation and `--help` disagree, `--help` is right.
 
 ## Not yet implemented
 
-The [Runta REST API](https://runta.com/docs/reference/api/) exposes 85 operations. The CLI
+The [Runta REST API](https://runta-next.com/docs/reference/api/) exposes 85 operations. The CLI
 currently covers four. Nothing below exists yet as a command:
 
 | Area | API operations | Status |

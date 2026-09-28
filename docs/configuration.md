@@ -15,7 +15,7 @@ the environment or from a config file.
 | --- | --- | --- |
 | `RUNTA_TOKEN` | — | Bearer credential. Skips `login` entirely |
 | `RUNTA_API_URL` | `https://api.runta.com` | API base URL |
-| `RUNTA_CONFIG_HOME` | `~/.runta` | Directory holding `config.json` |
+| `RUNTA_CONFIG_HOME` | `~/.runta-next` | Directory holding `config.json` |
 | `RUNTA_LOG_LEVEL` | `info` | `silent`, `error`, `warn`, `info` or `debug` |
 | `NO_COLOR` | — | Any value disables colour in diagnostics |
 
@@ -23,7 +23,7 @@ the environment or from a config file.
 
 ## Config file
 
-`~/.runta/config.json`, created by `runta login`. Both keys are optional:
+`~/.runta-next/config.json`, created by `runta-next login`. Both keys are optional:
 
 ```json
 {
@@ -35,8 +35,8 @@ the environment or from a config file.
 Set `RUNTA_CONFIG_HOME` to move the directory — useful for keeping profiles apart:
 
 ```sh
-RUNTA_CONFIG_HOME=~/.runta-staging runta login
-RUNTA_CONFIG_HOME=~/.runta-staging runta whoami
+RUNTA_CONFIG_HOME=~/.runta-next-staging runta-next login
+RUNTA_CONFIG_HOME=~/.runta-next-staging runta-next whoami
 ```
 
 Note this is a **directory**, not a file path; the CLI always appends `config.json`.
@@ -57,8 +57,8 @@ endpoint: RUNTA_API_URL   >  config.json "apiUrl"   >  https://api.runta.com
 Confirm what actually resolved with `--verbose`:
 
 ```console
-$ runta --verbose whoami
-debug loaded config from /Users/you/.runta/config.json
+$ runta-next --verbose whoami
+debug loaded config from /Users/you/.runta-next/config.json
 debug calling https://api.runta.com/v2/me
 ```
 

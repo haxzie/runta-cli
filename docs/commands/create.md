@@ -1,16 +1,16 @@
 ---
-title: runta create
+title: runta-next create
 description: Create a runtime and wait until it can accept commands, including sizing, published ports, idle policy, and restoring from a checkpoint.
 sidebar_position: 7
 ---
 
-# `runta create`
+# `runta-next create`
 
 Creates a runtime and, by default, waits until it is running.
 
 ```
-runta create [options]
-runta runtime create [options]
+runta-next create [options]
+runta-next runtime create [options]
 ```
 
 Both forms are the same command. See [Commands](./index.md#two-forms-for-runtime-commands).
@@ -33,11 +33,11 @@ Both forms are the same command. See [Commands](./index.md#two-forms-for-runtime
 | `--json` | Print the runtime as JSON |
 
 ```console
-$ runta create --name demo --image clean --cpus 1 --memory 512 -p 8080/https
+$ runta-next create --name demo --image clean --cpus 1 --memory 512 -p 8080/https
 Creating runtime 'demo'…
 Runtime 'demo' is running.
 Published: 8080/https
-Run a command:  runta exec demo -- <command>
+Run a command:  runta-next exec demo -- <command>
 ```
 
 ## It waits by default
@@ -47,7 +47,7 @@ waiting the command would hand you a runtime you cannot use yet. Waiting is the 
 that is almost never what anyone wanted; `--detach` opts out.
 
 ```console
-$ runta create --detach --json
+$ runta-next create --detach --json
 { "id": "01a0ddcf-…", "status": "creating", … }
 ```
 
@@ -59,9 +59,9 @@ the wait — that is a different problem from a failed create.
 On timeout the command tells you what it was stuck on, and the runtime still exists:
 
 ```console
-$ runta create --timeout 5
+$ runta-next create --timeout 5
 error Runtime 'demo' was still creating after 5s.
-It may still be starting — check with `runta inspect`, or pass --detach to skip waiting.
+It may still be starting — check with `runta-next inspect`, or pass --detach to skip waiting.
 ```
 
 ## Sizing
@@ -71,7 +71,7 @@ The API has no top-level `cpus`/`memory`/`disk`; they live under `resources.requ
 mapping, so:
 
 ```sh
-runta create --cpus 2 --memory 2048 --memory-max 8192 --disk 32
+runta-next create --cpus 2 --memory 2048 --memory-max 8192 --disk 32
 ```
 
 becomes
@@ -90,13 +90,13 @@ without a protocol. The CLI infers it when the image binds exactly one — so `-
 no extra flag:
 
 ```sh
-runta create --image claude     # anthropic_messages inferred
+runta-next create --image claude     # anthropic_messages inferred
 ```
 
 When an image binds several, it asks, before making any request:
 
 ```console
-$ runta create --image kimi
+$ runta-next create --image kimi
 error Image 'kimi' supports several model-provider protocols.
 Pick one with --model-provider-protocol: anthropic_messages, openai_chat, openai_responses.
 ```
@@ -108,7 +108,7 @@ configured and no secret in the request, the API refuses the create — it does 
 runtime whose agent cannot authenticate:
 
 ```console
-$ runta create --image claude --cpus 2 --memory 2048
+$ runta-next create --image claude --cpus 2 --memory 2048
 error invalid argument: the selected runtime image reads its model-provider credential from ANTHROPIC_API_KEY, which no secret in this request populates
 This image needs a model provider. Connect one at https://dashboard.runta.com, then create the runtime again.
 ```
@@ -121,14 +121,14 @@ Images carry both — `clean` and `Clean runtime` — and the API accepts only t
 resolves the name:
 
 ```sh
-runta create --image clean            # slug
-runta create --image 'Clean runtime'  # display name, resolved to `clean`
+runta-next create --image clean            # slug
+runta-next create --image 'Clean runtime'  # display name, resolved to `clean`
 ```
 
-An unknown name lists what exists, because there is no `runta image list` yet:
+An unknown name lists what exists, because there is no `runta-next image list` yet:
 
 ```console
-$ runta create --image 'Nope'
+$ runta-next create --image 'Nope'
 error Image 'Nope' was not found.
 Available images: claude, clean, cloud_agent, codex, cursor, deepseek_harness, exo, flue, hermes, kimi, openclaw, opencode, pi.
 ```
@@ -136,19 +136,19 @@ Available images: claude, clean, cloud_agent, codex, cursor, deepseek_harness, e
 ## Restoring from a checkpoint
 
 ```sh
-runta create --from-checkpoint 01a0dcc4-… --name restored
-runta create --from-checkpoint nightly --name restored   # by name
+runta-next create --from-checkpoint 01a0dcc4-… --name restored
+runta-next create --from-checkpoint nightly --name restored   # by name
 ```
 
 `checkpoint_id` must be a UUID, so a name is resolved the same way a runtime name is. There is no
-`runta checkpoint list` yet, so an unknown name says so rather than naming a command that would
+`runta-next checkpoint list` yet, so an unknown name says so rather than naming a command that would
 not help.
 
 A checkpoint fixes the runtime's size and image identity, so `--cpus`, `--memory` and `--image`
 are **rejected** rather than silently ignored:
 
 ```console
-$ runta create --from-checkpoint ck_abc --cpus 4
+$ runta-next create --from-checkpoint ck_abc --cpus 4
 error --cpus cannot be combined with --from-checkpoint
 A checkpoint fixes the runtime size and image; omit the flag.
 ```
@@ -157,7 +157,7 @@ A checkpoint fixes the runtime size and image; omit the flag.
 
 `--publish 8080/https` opens the port. The resulting URL is **not** printed yet — it is not on
 the runtime object, and the endpoint that returns it is not part of the public REST API. Until
-that is available, `runta inspect` shows the published ports and the URL has to come from the
+that is available, `runta-next inspect` shows the published ports and the URL has to come from the
 dashboard.
 
 ## Exit codes

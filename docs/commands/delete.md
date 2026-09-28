@@ -1,14 +1,14 @@
 ---
-title: runta delete
+title: runta-next delete
 description: Delete runtimes, with --dry-run, confirmation, optimistic concurrency and waiting until they are gone.
 sidebar_position: 10
 ---
 
-# `runta delete`
+# `runta-next delete`
 
 ```
-runta delete <runtime...> [options]
-runta runtime delete <runtime...> [options]
+runta-next delete <runtime...> [options]
+runta-next runtime delete <runtime...> [options]
 ```
 
 Takes one or more names or ids.
@@ -22,7 +22,7 @@ Takes one or more names or ids.
 | `--json` | Print the result as JSON |
 
 ```console
-$ runta delete demo
+$ runta-next delete demo
 Delete 1 runtime(s): demo? This cannot be undone. [y/N] y
 Deleting 'demo'…
 Deleted 'demo'.
@@ -34,14 +34,14 @@ The plan is built from the API, not from what you typed — so it shows the runt
 actually be deleted, with their current status:
 
 ```console
-$ runta delete demo staging --dry-run
+$ runta-next delete demo staging --dry-run
 Would delete 2 runtime(s):
   demo (01a0dcc4-…) — currently running
   staging (01a0dd12-…) — currently paused
 ```
 
 ```console
-$ runta delete demo --dry-run --json
+$ runta-next delete demo --dry-run --json
 {
   "action": "delete",
   "dry_run": true,
@@ -61,9 +61,9 @@ CI there is no prompt — a prompt nobody can see is a hang, not a safeguard. `-
 explicitly.
 
 ```sh
-runta delete demo -y            # no prompt
-runta delete demo --json        # no prompt
-echo n | runta delete demo      # declined → "Aborted.", nothing deleted
+runta-next delete demo -y            # no prompt
+runta-next delete demo --json        # no prompt
+echo n | runta-next delete demo      # declined → "Aborted.", nothing deleted
 ```
 
 ## Why deletion reads before it writes
@@ -83,7 +83,7 @@ By default the command polls until the runtime 404s, so when it returns the runt
 deleted. `--detach` returns as soon as the API accepts the request.
 
 ```console
-$ runta delete demo -y --json
+$ runta-next delete demo -y --json
 { "action": "delete", "runtimes": [ { "name": "demo", "id": "01a0dcc4-…", "deleted": true } ] }
 ```
 

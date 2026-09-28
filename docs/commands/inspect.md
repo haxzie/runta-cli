@@ -1,14 +1,14 @@
 ---
-title: runta inspect
+title: runta-next inspect
 description: Show everything about one runtime, including the effective egress posture and the fields the list table omits.
 sidebar_position: 9
 ---
 
-# `runta inspect`
+# `runta-next inspect`
 
 ```
-runta inspect <runtime> [options]
-runta runtime inspect <runtime> [options]
+runta-next inspect <runtime> [options]
+runta-next runtime inspect <runtime> [options]
 ```
 
 `<runtime>` is a name or an id. See [Commands](./index.md#runtimes-are-named-or-identified).
@@ -18,7 +18,7 @@ runta runtime inspect <runtime> [options]
 | `--json` | Print the runtime as JSON |
 
 ```console
-$ runta inspect demo
+$ runta-next inspect demo
 Name         demo
 ID           01a0dcc4-2ba7-7353-acb2-7fa79602b0a0
 Status       running
@@ -65,6 +65,6 @@ a steady state has neither, so their presence is itself information.
 The runtime object exactly as the API returned it, unwrapped from its `data` envelope:
 
 ```sh
-runta inspect demo --json | jq -r .resources.requests.vcpus
-runta inspect demo --json | jq -r .revision      # what `delete` needs
+runta-next inspect demo --json | jq -r .resources.requests.vcpus
+runta-next inspect demo --json | jq -r .revision      # what `delete` needs
 ```

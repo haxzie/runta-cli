@@ -251,10 +251,10 @@ export async function list(
     );
     // An empty list is the one place a new user is definitely stuck, so it is worth a pointer.
     printNextSteps([
-      { command: 'runta create --name demo', why: 'create your first runtime' },
+      { command: 'runta-next create --name demo', why: 'create your first runtime' },
       ...(options.all
         ? []
-        : [{ command: 'runta list --all', why: 'include stopped and failed runtimes' }]),
+        : [{ command: 'runta-next list --all', why: 'include stopped and failed runtimes' }]),
     ]);
     return;
   }
@@ -337,14 +337,14 @@ function inspectNextSteps(runtime: Runtime): NextStep[] {
 
   if (runtime.status === 'error' || runtime.status === 'crashed') {
     return [
-      { command: `runta delete ${name}`, why: 'remove it — this runtime cannot be recovered' },
-      { command: 'runta create --name ' + name, why: 'create a replacement' },
+      { command: `runta-next delete ${name}`, why: 'remove it — this runtime cannot be recovered' },
+      { command: 'runta-next create --name ' + name, why: 'create a replacement' },
     ];
   }
   if (runtime.degraded) {
     return [
       {
-        command: `runta inspect ${name}`,
+        command: `runta-next inspect ${name}`,
         why: 'check again — degraded means no heartbeat for 60s+',
       },
     ];
@@ -356,7 +356,7 @@ function inspectNextSteps(runtime: Runtime): NextStep[] {
     // Easy to do by accident and invisible from the runtime's status.
     return [
       {
-        command: `runta inspect ${name} --json`,
+        command: `runta-next inspect ${name} --json`,
         why: 'egress is fully blocked — nothing in this runtime can reach the network',
       },
     ];
@@ -517,13 +517,13 @@ export async function remove(
     logger.info(r.deleted ? `Deleted '${r.name}'.` : `Deletion of '${r.name}' requested.`);
   }
 
-  // Suggesting `runta list` here would be noise — you know what you just deleted. Reaching zero is
+  // Suggesting `runta-next list` here would be noise — you know what you just deleted. Reaching zero is
   // different: that is a state worth naming, and the only case where there is a next step.
   if (!options.detach) {
     const remaining = await run(() => collect(client, { status: ACTIVE.join(',') }, 1));
     if (remaining.length === 0) {
       printNextSteps([
-        { command: 'runta create --name demo', why: 'no runtimes left — create another' },
+        { command: 'runta-next create --name demo', why: 'no runtimes left — create another' },
       ]);
     }
   }
@@ -552,7 +552,7 @@ async function waitFor<T>(operation: () => Promise<T>): Promise<T> {
         exitCode: 1,
         hint:
           error.reason === 'timeout'
-            ? 'It may still be starting — check with `runta inspect`, or pass --detach to skip waiting.'
+            ? 'It may still be starting — check with `runta-next inspect`, or pass --detach to skip waiting.'
             : undefined,
         cause: error,
       });
@@ -568,10 +568,11 @@ const exitCodeFor = (error: RuntaApiError): number =>
   error.status === 401 || error.status === 403 ? 2 : 1;
 
 function hintFor(error: RuntaApiError): string | undefined {
-  if (error.status === 401) return 'The token was rejected. Run `runta login` to get a new one.';
+  if (error.status === 401)
+    return 'The token was rejected. Run `runta-next login` to get a new one.';
   if (error.status === 403)
-    return 'No credential was sent, or it lacks permission. Run `runta login`.';
-  if (error.status === 404) return 'Check the name or id with `runta list --all`.';
+    return 'No credential was sent, or it lacks permission. Run `runta-next login`.';
+  if (error.status === 404) return 'Check the name or id with `runta-next list --all`.';
   if (error.status === 409)
     return 'Something else changed the runtime at the same time. Try again.';
   // 5xx bodies are often not JSON, so the message degrades to bare status text like
@@ -617,20 +618,20 @@ function createNextSteps(runtime: Runtime, waited: boolean): NextStep[] {
 
   if (!waited) {
     // Without waiting the runtime is not usable yet, so watching it is the only sensible step.
-    steps.push({ command: `runta inspect ${name}`, why: 'check whether it is running yet' });
+    steps.push({ command: `runta-next inspect ${name}`, why: 'check whether it is running yet' });
   } else {
-    steps.push({ command: `runta exec ${name} -- uname -a`, why: 'run a command inside it' });
-    steps.push({ command: `runta inspect ${name}`, why: 'see its full state' });
+    steps.push({ command: `runta-next exec ${name} -- uname -a`, why: 'run a command inside it' });
+    steps.push({ command: `runta-next inspect ${name}`, why: 'see its full state' });
   }
 
   if (runtime.ingress_specs.length > 0) {
     steps.push({
-      command: `runta inspect ${name} --json`,
+      command: `runta-next inspect ${name} --json`,
       why: 'read ingress_specs — the public URL is not yet available from the CLI',
     });
   }
 
-  steps.push({ command: `runta delete ${name}`, why: 'remove it when you are done' });
+  steps.push({ command: `runta-next delete ${name}`, why: 'remove it when you are done' });
   return steps;
 }
 
@@ -639,8 +640,8 @@ function createNextSteps(runtime: Runtime, waited: boolean): NextStep[] {
 /**
  * Adds the four verbs to whichever command is passed.
  *
- * Called twice: once on `runta runtime` (the canonical noun-first form, so every resource reads
- * the same way and an agent can predict `runta checkpoint list` from one example) and once on the
+ * Called twice: once on `runta-next runtime` (the canonical noun-first form, so every resource reads
+ * the same way and an agent can predict `runta-next checkpoint list` from one example) and once on the
  * root, because runtimes are the noun you type all day. See Improvements.md I-2.
  */
 function addRuntimeVerbs(parent: Command): void {

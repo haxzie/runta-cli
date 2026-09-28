@@ -10,7 +10,7 @@ describe('printNextSteps', () => {
     const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-    printNextSteps([{ command: 'runta list', why: 'see what exists' }]);
+    printNextSteps([{ command: 'runta-next list', why: 'see what exists' }]);
 
     expect(stderr).toHaveBeenCalled();
     expect(stdout).not.toHaveBeenCalled();
@@ -31,12 +31,12 @@ describe('printNextSteps', () => {
     });
 
     printNextSteps([
-      { command: 'runta list', why: 'REASON_A' },
-      { command: 'runta inspect a-much-longer-name', why: 'REASON_B' },
+      { command: 'runta-next list', why: 'REASON_A' },
+      { command: 'runta-next inspect a-much-longer-name', why: 'REASON_B' },
     ]);
 
     // Distinct sentinels: a reason like 'long' would also match inside the command text.
-    const [first, second] = lines.filter((l) => l.startsWith('  runta'));
+    const [first, second] = lines.filter((l) => l.startsWith('  runta-next'));
     expect(first?.indexOf('REASON_A')).toBe(second?.indexOf('REASON_B'));
   });
 });
@@ -59,7 +59,7 @@ function suggestedCommands(): { file: string; text: string; path: string[] }[] {
     const source = readFileSync(file, 'utf8');
     // Strip block comments: they discuss commands that deliberately do not exist yet.
     const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-    for (const match of code.matchAll(/runta ((?:[a-z][a-z-]*)(?: [a-z][a-z-]*)*)/g)) {
+    for (const match of code.matchAll(/runta-next ((?:[a-z][a-z-]*)(?: [a-z][a-z-]*)*)/g)) {
       const words = (match[1] ?? '').split(' ');
       // Stop at the first word that is not a literal subcommand — a flag, a placeholder or prose.
       const path: string[] = [];
@@ -87,14 +87,14 @@ const resolve = (program: Command, path: readonly string[]): boolean => {
 
 describe('suggested commands exist', () => {
   /**
-   * Runta's own agent skill documents a `runta agents ls` command and `--agent`/`--no-shell` flags
+   * Runta's own agent skill documents a `runta-next agents ls` command and `--agent`/`--no-shell` flags
    * that do not exist, and its `resume` points callers at `resume` (CLI_ISSUES.md C-30, C-11).
    * Both are the same underlying mistake: text that names commands nothing verifies. This test is
    * the verification.
    *
-   * It caught a real one — `create` suggested `runta exec` before `exec` was implemented.
+   * It caught a real one — `create` suggested `runta-next exec` before `exec` was implemented.
    */
-  it('every `runta …` in a suggestion or hint resolves against the real program', () => {
+  it('every `runta-next …` in a suggestion or hint resolves against the real program', () => {
     const program = buildProgram();
     const missing = suggestedCommands()
       .filter(({ path }) => !resolve(program, path))

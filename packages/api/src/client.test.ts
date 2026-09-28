@@ -49,13 +49,13 @@ describe('createRuntaClient', () => {
     const fetch = stubFetch(ok);
     const client = createRuntaClient({
       baseUrl: 'https://api.test',
-      userAgent: 'runta/1.2.3',
+      userAgent: 'runta-next/1.2.3',
       fetch,
     });
 
     await getMe({ client, throwOnError: true });
 
-    expect(fetch.mock.calls[0]?.[0].headers.get('user-agent')).toBe('runta/1.2.3');
+    expect(fetch.mock.calls[0]?.[0].headers.get('user-agent')).toBe('runta-next/1.2.3');
   });
 
   it('throws RuntaApiError on a non-2xx response even without an explicit throwOnError', async () => {

@@ -1,13 +1,13 @@
 ---
-title: runta exec
+title: runta-next exec
 description: Run a command inside a runtime, including interactive pty sessions, streaming output, NDJSON frames, and why an unknown outcome is not a failure.
 sidebar_position: 11
 ---
 
-# `runta exec`
+# `runta-next exec`
 
 ```
-runta exec <runtime> [options] -- <command> [args...]
+runta-next exec <runtime> [options] -- <command> [args...]
 ```
 
 `<runtime>` is a name or an id.
@@ -20,17 +20,17 @@ runta exec <runtime> [options] -- <command> [args...]
 | `--json` | Stream NDJSON frames instead of raw output |
 
 ```console
-$ runta exec demo -- uname -a
+$ runta-next exec demo -- uname -a
 Linux runta 6.12.8+ #1 SMP … x86_64 GNU/Linux
 ```
 
 The `--` matters: everything after it belongs to the remote command, so its own flags are not
-mistaken for `runta`'s.
+mistaken for `runta-next`'s.
 
 ## The exit code is the command's exit code
 
 ```console
-$ runta exec demo -- sh -c 'exit 42'; echo $?
+$ runta-next exec demo -- sh -c 'exit 42'; echo $?
 42
 ```
 
@@ -51,7 +51,7 @@ ran. The protocol is explicit that such a command must not be retried automatica
 refuses to call it a failure:
 
 ```console
-$ runta exec demo -- ./deploy.sh
+$ runta-next exec demo -- ./deploy.sh
 error The connection closed before the command reported an exit status.
 The command may have run. Check before retrying — this is not a reported failure.
 ```
@@ -64,7 +64,7 @@ duplicate work. `126` means it might have.
 `-i` forwards stdin. `-t` allocates a pty. Together they give a real terminal:
 
 ```console
-$ runta exec demo -it -- sh
+$ runta-next exec demo -it -- sh
 # tty
 /dev/pts/0
 # echo $TERM
@@ -83,15 +83,15 @@ Without a pty, `-i` still forwards stdin and Ctrl-C is translated into an explic
 remote process:
 
 ```sh
-echo 'print("hi")' | runta exec demo -i -- python3
-cat local.sql | runta exec demo -i -- psql
+echo 'print("hi")' | runta-next exec demo -i -- python3
+cat local.sql | runta-next exec demo -i -- psql
 ```
 
 `-t` is refused when stdout is not a terminal, because a pty with nowhere to render is not a session
 anyone wants:
 
 ```console
-$ runta exec demo -t -- sh > out.txt
+$ runta-next exec demo -t -- sh > out.txt
 error --tty needs a terminal on stdout.
 Drop -t when piping or redirecting output.
 ```
@@ -102,8 +102,8 @@ Output is written as it arrives, not buffered to the end — so a long build sho
 `stdout` and `stderr` stay on their own streams:
 
 ```sh
-runta exec demo -- make 2>build.log    # errors to a file, progress on screen
-runta exec demo -- ls | grep foo       # pipes work normally
+runta-next exec demo -- make 2>build.log    # errors to a file, progress on screen
+runta-next exec demo -- ls | grep foo       # pipes work normally
 ```
 
 ## `--json`
@@ -112,7 +112,7 @@ Emits [NDJSON](https://ndjson.org) frames that mirror the wire protocol, so anyt
 `packages/api/asyncapi.yaml` already knows the shape:
 
 ```console
-$ runta exec demo --json -- sh -lc 'echo hi; echo oops >&2; exit 3'
+$ runta-next exec demo --json -- sh -lc 'echo hi; echo oops >&2; exit 3'
 {"type":"stdout","data_base64":"aGkK"}
 {"type":"stderr","data_base64":"b29wcwo="}
 {"type":"exit","code":3}
@@ -126,7 +126,7 @@ character or invalid UTF-8 would otherwise be corrupted. An unknown outcome appe
 ```
 
 ```sh
-runta exec demo --json -- ls | jq -r 'select(.type=="stdout") | .data_base64' | base64 -d
+runta-next exec demo --json -- ls | jq -r 'select(.type=="stdout") | .data_base64' | base64 -d
 ```
 
 ## A cold runtime is slow, not stuck
@@ -135,14 +135,14 @@ The API holds the connection for up to 300 seconds while a runtime becomes ready
 appear to hang, the CLI says so:
 
 ```console
-$ runta exec demo -- ls
+$ runta-next exec demo -- ls
 Waiting for the runtime to become ready…
 ```
 
 ## Environment
 
 ```sh
-runta exec demo --env GREETING=hei --env LANG=C -- sh -lc 'echo $GREETING'
+runta-next exec demo --env GREETING=hei --env LANG=C -- sh -lc 'echo $GREETING'
 ```
 
 Names must be POSIX-shaped, and the `RUNTA_` prefix is reserved by the platform. A malformed pair is

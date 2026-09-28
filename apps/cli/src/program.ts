@@ -8,8 +8,8 @@ import { registerWhoami } from './commands/whoami.js';
 import { version } from './version.js';
 
 export function buildProgram(): Command {
-  const program = new Command('runta')
-    .description('Runta command line interface')
+  const program = new Command('runta-next')
+    .description('An experimental command line interface for Runta')
     .version(version, '-v, --version')
     .option('--verbose', 'print debug output')
     .option('--quiet', 'only print errors')

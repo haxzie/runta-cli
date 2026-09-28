@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install the runta binary, pin a version, choose an install directory, and uninstall.
+description: Install the runta-next binary, pin a version, choose an install directory, and uninstall.
 sidebar_position: 2
 ---
 
@@ -12,7 +12,7 @@ curl -fsSL https://runta.haxzie.com/install.sh | sh
 
 The script downloads a standalone binary for your platform from the latest GitHub Release,
 verifies its SHA-256 checksum against the release's `checksums.txt`, and installs it to
-`~/.runta/bin/runta`.
+`~/.runta-next/bin/runta-next`.
 
 There is **no Node.js requirement** and nothing is published to npm — the binary is
 self-contained.
@@ -34,33 +34,32 @@ Both are environment variables read by the install script:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `RUNTA_VERSION` | latest release | Install a specific version, e.g. `v0.3.1` |
-| `RUNTA_INSTALL_DIR` | `~/.runta/bin` | Where the binary lands |
-| `RUNTA_BIN_NAME` | `runta` | What to call the command, so it can sit beside the official CLI |
+| `RUNTA_INSTALL_DIR` | `~/.runta-next/bin` | Where the binary lands |
+| `RUNTA_BIN_NAME` | `runta-next` | What to call the command, so it can sit beside the official CLI |
 
 ```sh
 RUNTA_VERSION=v0.3.1 curl -fsSL …/install.sh | sh
 RUNTA_INSTALL_DIR=/usr/local/bin curl -fsSL …/install.sh | sh
 ```
 
-## Trying this alongside the official CLI
+## It sits beside the official CLI
 
-This CLI is an experiment. Runta publishes its own to npm as `@runta/runta-cli`, that one is the
+This CLI is an experiment. Runta's own is published to npm as `@runta/runta-cli`, that one is the
 complete product, and nothing here is a reason to remove it.
 
-**Install this one under its own name.** Both provide a command called `runta` otherwise, whichever
-directory comes first on `PATH` wins silently, and their subcommand names differ — so the failure
-mode is `runta ps` erroring on a CLI that works fine, rather than anything that looks like a
-conflict:
+The command here is **`runta-next`**, so the two never collide:
 
 ```sh
-RUNTA_BIN_NAME=runta-next curl -fsSL https://runta.haxzie.com/install.sh | sh
+curl -fsSL https://runta.haxzie.com/install.sh | sh
 
 runta-next login
 runta-next create --name scratch --cpus 1 --memory 512
-runta          # still the official CLI, untouched
+runta                # still the official CLI, untouched
 ```
 
-Then which one you are running is never in doubt, and there are no `PATH` games.
+Nothing to uninstall, no `PATH` ordering to get right, and which one you are running is never in
+doubt. `RUNTA_BIN_NAME` overrides the name if you want something shorter — the installer warns if
+the name you pick is already taken.
 
 :::danger
 **`runta-next logout` revokes the credential server-side, not just locally.** If you are sharing a
@@ -74,7 +73,7 @@ env | grep RUNTA_TOKEN
 To stop using this CLI without revoking anything, delete its config instead:
 
 ```sh
-rm -rf ~/.runta
+rm -rf ~/.runta-next
 ```
 :::
 
@@ -107,7 +106,7 @@ There are no compatibility aliases, on purpose — the reasoning is in
 | | Location |
 | --- | --- |
 | Official CLI | `~/.config/runta/config.toml` |
-| This CLI | `~/.runta/config.json` |
+| This CLI | `~/.runta-next/config.json` |
 
 So `login` here does not sign you in there, or the reverse. `RUNTA_TOKEN` is read by both, which
 makes it the least surprising way to authenticate while testing — and the reason the `logout`
@@ -132,12 +131,12 @@ curl -fsSL 'https://runta.haxzie.com/install.sh?ref=v0.1.0' | sh
 curl -fsSL 'https://runta.haxzie.com/install.sh?ref=my-branch' | sh
 ```
 
-The response carries the resolved ref in an `x-runta-ref` header, so you can check what you got
+The response carries the resolved ref in an `x-runta-next-ref` header, so you can check what you got
 without running it:
 
 ```console
-$ curl -sI https://runta.haxzie.com/install.sh | grep x-runta-ref
-x-runta-ref: main
+$ curl -sI https://runta.haxzie.com/install.sh | grep x-runta-next-ref
+x-runta-next-ref: main
 ```
 
 ## Read it before you run it
@@ -166,14 +165,14 @@ The default install directory is not on `PATH` on a fresh machine. Add it to you
 profile:
 
 ```sh
-export PATH="$HOME/.runta/bin:$PATH"
+export PATH="$HOME/.runta-next/bin:$PATH"
 ```
 
 ## Verify
 
 ```sh
-runta --version
-runta hello
+runta-next --version
+runta-next hello
 ```
 
 ## Uninstall
@@ -181,9 +180,9 @@ runta hello
 The CLI keeps everything under one directory, so removing it is a single step:
 
 ```sh
-rm -rf ~/.runta
+rm -rf ~/.runta-next
 ```
 
 That removes the binary **and** your stored credential
 (see [Authentication → where credentials live](./authentication.md#where-credentials-live)).
-To remove only the credential, use `runta logout`.
+To remove only the credential, use `runta-next logout`.

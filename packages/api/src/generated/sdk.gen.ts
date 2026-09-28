@@ -49,7 +49,7 @@ export const exchangeDeviceToken = <ThrowOnError extends boolean = false>(option
 /**
  * Revoke the current bearer credential
  *
- * Revokes the credential used to make this request. Takes no body — the token in the `Authorization` header is the subject. This is what `runta logout` calls.
+ * Revokes the credential used to make this request. Takes no body — the token in the `Authorization` header is the subject. This is what `runta-next logout` calls.
  */
 export const revokeCurrentToken = <ThrowOnError extends boolean = false>(options?: Options<RevokeCurrentTokenData, ThrowOnError>): RequestResult<RevokeCurrentTokenResponses, RevokeCurrentTokenErrors, ThrowOnError> => (options?.client ?? client).delete<RevokeCurrentTokenResponses, RevokeCurrentTokenErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -75,7 +75,7 @@ export const getMe = <ThrowOnError extends boolean = false>(options?: Options<Ge
 /**
  * List managed model providers
  *
- * Lists the organization-managed model providers. Incidentally the only operation that returns the calling credential's `organization_id`, which is why `runta whoami` calls it.
+ * Lists the organization-managed model providers. Incidentally the only operation that returns the calling credential's `organization_id`, which is why `runta-next whoami` calls it.
  */
 export const listManagedModelProviders = <ThrowOnError extends boolean = false>(options?: Options<ListManagedModelProvidersData, ThrowOnError>): RequestResult<ListManagedModelProvidersResponses, ListManagedModelProvidersErrors, ThrowOnError> => (options?.client ?? client).get<ListManagedModelProvidersResponses, ListManagedModelProvidersErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

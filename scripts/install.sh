@@ -9,20 +9,18 @@
 #
 # Environment:
 #   RUNTA_VERSION       version to install (default: latest release)
-#   RUNTA_INSTALL_DIR   install location (default: $HOME/.runta/bin)
-#   RUNTA_BIN_NAME      command name to install as (default: runta)
+#   RUNTA_INSTALL_DIR   install location (default: $HOME/.runta-next/bin)
+#   RUNTA_BIN_NAME      command name to install as (default: runta-next)
 #   RUNTA_BASE_URL      override the release download base (for testing)
 #
-# Runta publishes its own CLI to npm, which also provides a `runta` command with different
-# subcommand names. If you want both, install this one under another name:
-#
-#   RUNTA_BIN_NAME=runta-next curl -fsSL https://runta.haxzie.com/install.sh | sh
+# The command installs as `runta-next`, not `runta`, so it sits beside Runta's own npm-published
+# CLI without shadowing it. Override with RUNTA_BIN_NAME to call it something else.
 set -eu
 
 REPO="haxzie/runta-cli"
 # Release artifacts are always named after the project; what you *call* it is up to you.
-ARTIFACT_PREFIX="runta"
-BIN_NAME="${RUNTA_BIN_NAME:-runta}"
+ARTIFACT_PREFIX="runta-next"
+BIN_NAME="${RUNTA_BIN_NAME:-runta-next}"
 
 info() { printf '%s\n' "$*" >&2; }
 err() { printf 'error: %s\n' "$*" >&2; exit 1; }
@@ -90,10 +88,10 @@ verify_checksum() {
   [ "$actual" = "$expected" ] || err "Checksum mismatch for $3 (expected $expected, got $actual)."
 }
 
-# The npm-published Runta CLI provides a `runta` command too, and its command names differ from
-# this one's — `ps` there is `list` here, `run` is `create`, `rm` is `delete`. Whichever comes first
-# on PATH wins silently, so a user with both installed gets confusing failures rather than a clear
-# conflict. Say something.
+# Only reachable when RUNTA_BIN_NAME names something already installed — most likely `runta`, which
+# Runta's own npm-published CLI owns. Those two have different subcommand names (`ps` there is
+# `list` here, `run` is `create`, `rm` is `delete`), so whichever wins on PATH produces confusing
+# failures rather than a clear conflict. Say something.
 warn_about_other_runta() {
   install_dir=$1
   existing=$(command -v "$BIN_NAME" 2>/dev/null) || return 0
@@ -110,14 +108,13 @@ warn_about_other_runta() {
   info ""
   info "  $existing"
   info ""
-  info "That one will keep winning until $install_dir comes first, and its subcommand"
-  info "names differ from this one's, so muscle memory will fail in confusing ways."
+  info "That one will keep winning until $install_dir comes first, and if it is Runta's"
+  info "own CLI its subcommand names differ from this one's, so muscle memory will fail"
+  info "in confusing ways."
   info ""
-  info "The simplest fix is to install this one under its own name instead:"
+  info "The default name avoids this entirely:"
   info ""
-  info "  RUNTA_BIN_NAME=runta-next curl -fsSL https://runta.haxzie.com/install.sh | sh"
-  info ""
-  info "Then both work, and which one you are running is never in doubt."
+  info "  curl -fsSL https://runta.haxzie.com/install.sh | sh    # installs as runta-next"
 }
 
 main() {
@@ -126,7 +123,7 @@ main() {
 
   target=$(detect_target)
   version=$(resolve_version)
-  install_dir=${RUNTA_INSTALL_DIR:-$HOME/.runta/bin}
+  install_dir=${RUNTA_INSTALL_DIR:-$HOME/.runta-next/bin}
   base_url=${RUNTA_BASE_URL:-https://github.com/$REPO/releases/download/$version}
   tarball="$target.tar.gz"
 

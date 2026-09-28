@@ -60,6 +60,6 @@ jobs:
       - run: pnpm build:binaries
       - name: Smoke-test the linux-x64 binary
         run: |
-          tar -xzf dist/runta-linux-x64.tar.gz -C dist
-          ./dist/runta --version
-          ./dist/runta hello ci
+          tar -xzf dist/runta-next-linux-x64.tar.gz -C dist
+          ./dist/runta-next --version
+          ./dist/runta-next hello ci

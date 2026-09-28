@@ -1,5 +1,34 @@
 # @runta/cli
 
+## 0.2.0
+
+### Minor Changes
+
+- Rename the command to `runta-next`.
+  
+  This is an experimental CLI and Runta publishes its own as `@runta/runta-cli`, which owns the `runta`
+  command. Competing for that name was a self-inflicted problem: both would install a `runta`, whichever
+  came first on `PATH` would win silently, and because the subcommand names deliberately differ the
+  failure mode was `runta ps` erroring on a CLI that works fine.
+  
+  So the binary, the help output, every hint and suggestion, the release artifacts and the default paths
+  all say `runta-next` now. Configuration moved from `~/.runta/` to `~/.runta-next/`, and the installer
+  defaults to `~/.runta-next/bin/runta-next`. The two CLIs no longer interact at all.
+  
+  `RUNTA_TOKEN`, `RUNTA_API_URL` and the other environment variables keep their names: they identify the
+  platform rather than the binary, so a token you already have works here without being set twice.
+  
+  **If you installed 0.1.0**, that version's release artifacts were named `runta-*` and this installer
+  looks for `runta-next-*`. Re-run the installer to get the renamed command, then remove the old one:
+  `rm -rf ~/.runta`.
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @runta/core@0.2.0
+  - @runta/api@0.2.0
+  - @runta/utils@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes

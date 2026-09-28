@@ -66,7 +66,7 @@ export async function isolateEnv(overrides: Record<string, string | undefined> =
   const keys = ['RUNTA_CONFIG_HOME', 'RUNTA_API_URL', 'RUNTA_TOKEN', ...Object.keys(overrides)];
   const saved = new Map(keys.map((key) => [key, process.env[key]]));
 
-  process.env.RUNTA_CONFIG_HOME = join(home, 'runta');
+  process.env.RUNTA_CONFIG_HOME = join(home, 'runta-next');
   process.env.RUNTA_API_URL = API;
   delete process.env.RUNTA_TOKEN;
   for (const [key, value] of Object.entries(overrides)) {

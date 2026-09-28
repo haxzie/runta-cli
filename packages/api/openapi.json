@@ -3,7 +3,7 @@
   "info": {
     "title": "Runta API",
     "version": "0.1.0",
-    "description": "Hand-written from https://runta.com/docs/reference/api/ and verified against live https://api.runta.com. Runta does not publish an openapi.json (all candidate URLs 404), so this file is source rather than a generated snapshot \u2014 it is maintained by hand, operation group by operation group, and codegen reads it directly with no network access. Where the published docs and the live API disagree, this spec follows the live API; see NOTES.md for the list of divergences.\n\nCoverage: auth, identity, runtime CRUD, the image and checkpoint lists (for name resolution), and the model-providers list (for its organization_id). 74 of the 85 documented operations are not yet described."
+    "description": "Hand-written from https://runta-next.com/docs/reference/api/ and verified against live https://api.runta.com. Runta does not publish an openapi.json (all candidate URLs 404), so this file is source rather than a generated snapshot \u2014 it is maintained by hand, operation group by operation group, and codegen reads it directly with no network access. Where the published docs and the live API disagree, this spec follows the live API; see NOTES.md for the list of divergences.\n\nCoverage: auth, identity, runtime CRUD, the image and checkpoint lists (for name resolution), and the model-providers list (for its organization_id). 74 of the 85 documented operations are not yet described."
   },
   "servers": [
     {
@@ -218,7 +218,7 @@
       "delete": {
         "operationId": "revokeCurrentToken",
         "summary": "Revoke the current bearer credential",
-        "description": "Revokes the credential used to make this request. Takes no body \u2014 the token in the `Authorization` header is the subject. This is what `runta logout` calls.",
+        "description": "Revokes the credential used to make this request. Takes no body \u2014 the token in the `Authorization` header is the subject. This is what `runta-next logout` calls.",
         "tags": [
           "auth"
         ],
@@ -334,7 +334,7 @@
       "get": {
         "operationId": "listManagedModelProviders",
         "summary": "List managed model providers",
-        "description": "Lists the organization-managed model providers. Incidentally the only operation that returns the calling credential's `organization_id`, which is why `runta whoami` calls it.",
+        "description": "Lists the organization-managed model providers. Incidentally the only operation that returns the calling credential's `organization_id`, which is why `runta-next whoami` calls it.",
         "tags": [
           "model-providers"
         ],
@@ -1496,7 +1496,7 @@
           "username": {
             "type": "string",
             "enum": [
-              "runta"
+              "runta-next"
             ]
           },
           "security_type": {

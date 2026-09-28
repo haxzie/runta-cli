@@ -39,7 +39,7 @@ const runtime = (overrides: Partial<Runtime> = {}): Runtime =>
     vnc_connection: {
       hostname: 'vnc.runta.com',
       port: 5900,
-      username: 'runta',
+      username: 'runta-next',
       security_type: 'X509Plain',
     },
     owner_user_id: 'u_1',
@@ -381,7 +381,7 @@ describe('resolveImage', () => {
   });
 
   it('lists the available ids when the name is unknown', async () => {
-    // There is no `runta image list` yet, and we are already holding the answer.
+    // There is no `runta-next image list` yet, and we are already holding the answer.
     const { client: c } = await makeClient([imagesRoute(images)]);
 
     const error = await resolveImage(c, 'Nope').catch((e: unknown) => e);

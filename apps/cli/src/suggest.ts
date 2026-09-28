@@ -15,10 +15,10 @@ export interface NextStep {
  * can read stderr, and one that doesn't gets clean data.
  *
  * Two rules worth keeping. First, never suggest the command that just ran: the production CLI's
- * `resume` returns `required_action: runta resume <name>`, which makes an agent following the
+ * `resume` returns `required_action: runta-next resume <name>`, which makes an agent following the
  * field loop (CLI_ISSUES.md C-11). Second, only ever name commands that exist — suggesting a
  * command the binary does not have is the same defect as its agent skill documenting
- * `runta agents ls` (C-30). `suggest.test.ts` asserts the second one against the real program.
+ * `runta-next agents ls` (C-30). `suggest.test.ts` asserts the second one against the real program.
  */
 export function printNextSteps(steps: readonly NextStep[]): void {
   if (steps.length === 0) return;

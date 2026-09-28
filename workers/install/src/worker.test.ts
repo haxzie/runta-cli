@@ -182,7 +182,7 @@ describe('pinning a ref', () => {
     );
 
     expect(urls[0]).toContain('/haxzie/runta-cli/v0.1.0/scripts/install.sh');
-    expect(response.headers.get('x-runta-ref')).toBe('v0.1.0');
+    expect(response.headers.get('x-runta-next-ref')).toBe('v0.1.0');
   });
 
   it('allows a slash, so release branches work', async () => {

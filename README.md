@@ -1,6 +1,6 @@
-# runta
+# runta-next
 
-The `runta` command line interface, and the packages it is built from.
+The `runta-next` command line interface, and the packages it is built from.
 
 ## Install
 
@@ -9,44 +9,40 @@ curl -fsSL https://runta.haxzie.com/install.sh | sh
 ```
 
 This downloads a standalone binary for your platform from the latest GitHub Release,
-verifies its SHA-256 checksum, and installs it to `~/.runta/bin/runta`. Nothing is
+verifies its SHA-256 checksum, and installs it to `~/.runta-next/bin/runta-next`. Nothing is
 published to npm — there is no Node.js runtime requirement.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `RUNTA_VERSION` | latest release | Install a specific version |
-| `RUNTA_INSTALL_DIR` | `~/.runta/bin` | Where the binary lands |
+| `RUNTA_INSTALL_DIR` | `~/.runta-next/bin` | Where the binary lands |
 
 Supported targets: macOS and Linux, on `x64` and `arm64` (glibc and musl).
 
 This is an experimental CLI. Runta's own is published to npm as `@runta/runta-cli` and covers far
-more; this one implements eight commands and renames three of them deliberately. If you have both,
-install this one under its own name so they can coexist:
+more; this one implements eight commands and renames three of them deliberately. The command here is
+`runta-next`, so installing it never shadows `runta`.
 
-```sh
-RUNTA_BIN_NAME=runta-next curl -fsSL https://runta.haxzie.com/install.sh | sh
-```
-
-See [docs/installation.md](./docs/installation.md#trying-this-alongside-the-official-cli) — including
-why `logout` here revokes a credential everywhere.
+See [docs/installation.md](./docs/installation.md#it-sits-beside-the-official-cli) — including why
+`logout` here revokes a credential everywhere.
 
 ## Using the CLI
 
 ```
-runta [global options] <command> [command options]
+runta-next [global options] <command> [command options]
 ```
 
 | Command | Does |
 | --- | --- |
-| `runta create` | Create a runtime and wait until it can accept commands |
-| `runta list` | List runtimes |
-| `runta inspect <runtime>` | Show everything about one runtime |
-| `runta delete <runtime>...` | Delete runtimes, with `--dry-run` and confirmation |
-| `runta exec <runtime> -- <cmd>` | Run a command inside a runtime; `-it` for an interactive pty |
-| `runta login` | Sign in through a browser using a one-time device code |
-| `runta logout` | Revoke the stored credential and remove it locally |
-| `runta whoami` | Show the authenticated user and active team |
-| `runta hello [name]` | Print a greeting — smoke test, no network, no credential |
+| `runta-next create` | Create a runtime and wait until it can accept commands |
+| `runta-next list` | List runtimes |
+| `runta-next inspect <runtime>` | Show everything about one runtime |
+| `runta-next delete <runtime>...` | Delete runtimes, with `--dry-run` and confirmation |
+| `runta-next exec <runtime> -- <cmd>` | Run a command inside a runtime; `-it` for an interactive pty |
+| `runta-next login` | Sign in through a browser using a one-time device code |
+| `runta-next logout` | Revoke the stored credential and remove it locally |
+| `runta-next whoami` | Show the authenticated user and active team |
+| `runta-next hello [name]` | Print a greeting — smoke test, no network, no credential |
 
 | Global option | Does |
 | --- | --- |
@@ -56,7 +52,7 @@ runta [global options] <command> [command options]
 | `--quiet` | Errors only |
 
 `--verbose` and `--quiet` are program-level, so they go *before* the command:
-`runta --verbose whoami`, not `runta whoami --verbose`.
+`runta-next --verbose whoami`, not `runta-next whoami --verbose`.
 
 `--help` is generated from the program itself and can never drift from what the binary
 accepts. If it disagrees with the docs, believe `--help`.
@@ -70,11 +66,11 @@ file transfer and agents are not implemented yet — see
 Interactively, via the device flow:
 
 ```console
-$ runta login
+$ runta-next login
 Your code is ABCD-1234
 Opened your browser to approve it.
 Waiting for authorization…
-Authorized. Token saved to /Users/you/.runta/config.json
+Authorized. Token saved to /Users/you/.runta-next/config.json
 ```
 
 The browser is opened for you, and skipped automatically when stdout is not a TTY or an SSH
@@ -86,7 +82,7 @@ Non-interactively, skip the login entirely:
 
 ```sh
 export RUNTA_TOKEN=rt_…
-runta whoami
+runta-next whoami
 ```
 
 ### Configuration
@@ -95,7 +91,7 @@ runta whoami
 | --- | --- | --- |
 | `RUNTA_TOKEN` | — | Bearer credential; skips `login` |
 | `RUNTA_API_URL` | `https://api.runta.com` | API base URL |
-| `RUNTA_CONFIG_HOME` | `~/.runta` | Directory holding `config.json` |
+| `RUNTA_CONFIG_HOME` | `~/.runta-next` | Directory holding `config.json` |
 | `RUNTA_LOG_LEVEL` | `info` | `silent`, `error`, `warn`, `info`, `debug` |
 | `NO_COLOR` | — | Any value disables colour |
 
@@ -106,9 +102,9 @@ token:    RUNTA_TOKEN    >  config.json "token"   >  (none)
 endpoint: RUNTA_API_URL  >  config.json "apiUrl"  >  https://api.runta.com
 ```
 
-Credentials live in `~/.runta/config.json` — plaintext JSON, file `0600`, directory `0700`,
+Credentials live in `~/.runta-next/config.json` — plaintext JSON, file `0600`, directory `0700`,
 created on demand. Other keys in the file are preserved when the token is written or cleared.
-`rm -rf ~/.runta` removes the binary and the credential together.
+`rm -rf ~/.runta-next` removes the binary and the credential together.
 
 ### Output and exit codes
 
@@ -119,9 +115,9 @@ stdout is data; progress, hints and errors go to stderr, so pipes stay clean. Ou
 it emits NDJSON — one compact object per line, the code arriving before polling starts:
 
 ```console
-$ runta login --json --no-browser
+$ runta-next login --json --no-browser
 {"status":"authorization_pending","user_code":"ABCD-1234","verification_uri_complete":"…?code=ABCD-1234","expires_at":"2026-09-26T09:50:41Z"}
-{"status":"authorized","config_path":"/Users/you/.runta/config.json"}
+{"status":"authorized","config_path":"/Users/you/.runta-next/config.json"}
 ```
 
 | Code | Meaning |
@@ -224,7 +220,7 @@ their TypeScript source under the `bun` export condition, so an edit anywhere in
 ## Layout
 
 ```
-apps/cli          @runta/cli       Commander program; compiles to the `runta` binary
+apps/cli          @runta/cli       Commander program; compiles to the `runta-next` binary
 packages/api      @runta/api       Generated OpenAPI SDK + hand-written client shell
 packages/core     @runta/core      Config loading and command context
 packages/utils    @runta/utils     Logger and error types
@@ -233,7 +229,7 @@ workers/install   @runta/install-worker  Cloudflare Worker serving install.sh
 ```
 
 Every package is private. Changesets versions them as one fixed group, so
-`runta --version` identifies the whole tree.
+`runta-next --version` identifies the whole tree.
 
 ## The API SDK
 
@@ -244,7 +240,7 @@ generated from `packages/api/openapi.json`.
 **`openapi.json` is hand-maintained.** Runta publishes no OpenAPI document — every
 plausible URL 404s — so there is nothing to sync from and codegen never touches the
 network. The spec is written from
-[the API reference](https://runta.com/docs/reference/api/) and verified against live
+[the API reference](https://runta-next.com/docs/reference/api/) and verified against live
 `api.runta.com`, one operation group at a time. `packages/api/NOTES.md` records the
 coverage so far and the places where the live API disagrees with the published docs.
 
@@ -258,7 +254,7 @@ Consequences worth knowing:
 - If Runta ever publishes a spec, this becomes a generated artifact again and the
   hand-written file can go away. Until then, treat `openapi.json` as source.
 
-`runta exec` is not REST. It is a WebSocket described by a separate AsyncAPI document,
+`runta-next exec` is not REST. It is a WebSocket described by a separate AsyncAPI document,
 `packages/api/asyncapi.yaml`. No generator reads it — `openapi-ts` is OpenAPI-only — so the exec
 client will be hand-written against that file, which is source of truth in the same way.
 
@@ -277,7 +273,7 @@ the CLI ships as a standalone binary.
 2. On merge to `main`, the release workflow opens or updates a **Version Packages** PR. Nothing
    else happens yet.
 3. Merging that PR bumps every package to one version (`fixed: [["@runta/*"]]`, so
-   `runta --version` identifies the whole tree) and writes CHANGELOGs.
+   `runta-next --version` identifies the whole tree) and writes CHANGELOGs.
 4. That push to `main` leaves a version with no matching tag, which is the signal to release. The
    workflow then cross-compiles all six targets, checks them, tags `v<version>`, and attaches the
    tarballs plus `checksums.txt`.

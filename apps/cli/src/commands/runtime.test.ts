@@ -31,7 +31,7 @@ const runtime = (overrides: Partial<Runtime> = {}): Runtime =>
     vnc_connection: {
       hostname: 'vnc.runta.com',
       port: 5900,
-      username: 'runta',
+      username: 'runta-next',
       security_type: 'X509Plain',
     },
     owner_user_id: 'u_1',
@@ -501,7 +501,7 @@ describe('delete', () => {
   });
 
   it('points at create only when nothing is left', async () => {
-    // `runta list` after a delete would be noise — you know what you deleted. Reaching zero is the
+    // `runta-next list` after a delete would be noise — you know what you deleted. Reaching zero is the
     // one state worth naming.
     // isolateEnv silences the logger so test output stays readable; this test is about what the
     // logger says, so turn it back up for the duration.

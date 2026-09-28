@@ -249,7 +249,7 @@ export type RepositoryCheckout = {
 export type VncConnection = {
     hostname: string;
     port: number;
-    username: 'runta';
+    username: 'runta-next';
     security_type: 'X509Plain';
 };
 

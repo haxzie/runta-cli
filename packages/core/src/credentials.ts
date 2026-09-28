@@ -7,7 +7,7 @@ import { configPath } from './config.js';
  * Persists the token into the config file, creating the directory if it does not exist.
  *
  * That `mkdir` is not incidental: the production Rust CLI writes its login state without
- * creating `~/.config/runta` first, so `runta login` fails with `os error 2` on every clean
+ * creating `~/.config/runta` first, so `runta-next login` fails with `os error 2` on every clean
  * machine (CLI_ISSUES.md C-02). Creating the directory is the whole fix.
  *
  * Other keys in the file are preserved — the token is one field in a shared config, not the

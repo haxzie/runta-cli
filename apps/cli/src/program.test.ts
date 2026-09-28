@@ -16,7 +16,7 @@ const optionsOf = (name: string): string[] => {
 
 describe('command surface', () => {
   it('exposes login and logout at the top level', () => {
-    // Deliberately not `runta auth login`: this mirrors Runta's own CLI, and is the shape
+    // Deliberately not `runta-next auth login`: this mirrors Runta's own CLI, and is the shape
     // the docs and every hint string promise.
     expect(names()).toContain('login');
     expect(names()).toContain('logout');
@@ -44,7 +44,7 @@ describe('command surface', () => {
 
   it('exposes the runtime verbs both under the noun and at the top level', () => {
     // Noun-first is canonical so every resource reads the same way and an agent can predict
-    // `runta checkpoint list` from one example; the top-level forms exist because runtimes are
+    // `runta-next checkpoint list` from one example; the top-level forms exist because runtimes are
     // what you type all day. See Improvements.md I-2.
     const group = program().commands.find((c) => c.name() === 'runtime');
     const verbs = group?.commands.map((c) => c.name()).sort();

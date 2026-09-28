@@ -10,10 +10,10 @@ let home: string;
 const previous = process.env.RUNTA_CONFIG_HOME;
 
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), 'runta-creds-'));
+  home = await mkdtemp(join(tmpdir(), 'runta-next-creds-'));
   // Point at a directory *inside* the temp dir that does not exist yet, so every test
   // starts from the clean-machine state that breaks the production CLI.
-  process.env.RUNTA_CONFIG_HOME = join(home, 'config', 'runta');
+  process.env.RUNTA_CONFIG_HOME = join(home, 'config', 'runta-next');
 });
 
 afterEach(() => {

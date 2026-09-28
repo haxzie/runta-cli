@@ -61,7 +61,10 @@ export async function exec(
 ): Promise<number> {
   const [program, ...args] = command;
   if (!program) {
-    fail('No command given.', { exitCode: 2, hint: 'Try `runta exec <runtime> -- <command>`.' });
+    fail('No command given.', {
+      exitCode: 2,
+      hint: 'Try `runta-next exec <runtime> -- <command>`.',
+    });
   }
 
   // A pty has to be attached to something. Asking for one without a terminal would produce a

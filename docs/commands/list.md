@@ -1,14 +1,14 @@
 ---
-title: runta list
+title: runta-next list
 description: List runtimes, with the default active filter, --all, --status, --limit, pagination and JSON output.
 sidebar_position: 8
 ---
 
-# `runta list`
+# `runta-next list`
 
 ```
-runta list [options]
-runta runtime list [options]
+runta-next list [options]
+runta-next runtime list [options]
 ```
 
 | Option | Does |
@@ -19,7 +19,7 @@ runta runtime list [options]
 | `--json` | Print the runtimes as JSON |
 
 ```console
-$ runta list
+$ runta-next list
 NAME            STATUS   VCPUS    MEMORY  IMAGE   CREATED
 jesting_kalong  running      1  1024 MiB  clean   2026-09-26T08:10:39Z
 prequel-dev     paused       2  2048 MiB  claude  2026-09-26T07:58:48Z
@@ -35,9 +35,9 @@ transitional.
 `--all` drops the filter entirely. `--status` overrides both:
 
 ```sh
-runta list --all                 # everything, including deleting and error
-runta list --status error        # just the failures
-runta list --status running,error
+runta-next list --all                 # everything, including deleting and error
+runta-next list --status error        # just the failures
+runta-next list --status running,error
 ```
 
 An unknown status is rejected by the API with a 422 rather than silently returning nothing.
@@ -53,11 +53,11 @@ without any flag. `--limit` caps the **results** and stops fetching once it has 
 With no matches, nothing goes to stdout — the explanation goes to stderr:
 
 ```console
-$ runta list
+$ runta-next list
 No active runtimes. Use --all to include stopped ones.
 ```
 
-So `runta list | wc -l` is 0 when there is nothing, and a pipe never has to parse a sentence.
+So `runta-next list | wc -l` is 0 when there is nothing, and a pipe never has to parse a sentence.
 
 ## Degraded runtimes
 
@@ -77,8 +77,8 @@ matters in CI and under `script`, where the terminal reports a width of zero.
 ## `--json`
 
 Prints the array of runtime objects verbatim, so `jq` paths match the
-[API reference](https://runta.com/docs/reference/api/operations/listruntimes/):
+[API reference](https://runta-next.com/docs/reference/api/operations/listruntimes/):
 
 ```sh
-runta list --json | jq -r '.[] | select(.status == "running") | .display_name'
+runta-next list --json | jq -r '.[] | select(.status == "running") | .display_name'
 ```

@@ -52,7 +52,7 @@ export async function resolveRuntimeId(client: RuntaClient, reference: string): 
     after = data.pagination.next_cursor;
   }
 
-  return pick('Runtime', reference, matches, 'List what exists with `runta list --all`.');
+  return pick('Runtime', reference, matches, 'List what exists with `runta-next list --all`.');
 }
 
 /**
@@ -73,7 +73,7 @@ export async function resolveImage(client: RuntaClient, reference: string): Prom
     .filter((image) => image.name === reference)
     .map((image) => ({ id: image.id, display_name: image.name }));
 
-  // Naming the valid ids beats naming a command: there is no `runta image list` yet, and we are
+  // Naming the valid ids beats naming a command: there is no `runta-next image list` yet, and we are
   // already holding the full list that would answer the question.
   const id = pick(
     'Image',
@@ -143,7 +143,7 @@ export async function resolveCheckpointId(client: RuntaClient, reference: string
     'Checkpoint',
     reference,
     matches,
-    'Pass the checkpoint UUID instead — `runta checkpoint list` does not exist yet.',
+    'Pass the checkpoint UUID instead — `runta-next checkpoint list` does not exist yet.',
   );
 }
 

@@ -1,16 +1,16 @@
 ---
-title: runta login
+title: runta-next login
 description: Sign in through the browser with a one-time device code, including flags, NDJSON output, and how the poller tolerates a flaky API.
 sidebar_position: 12
 ---
 
-# `runta login`
+# `runta-next login`
 
 Signs in through a browser using a one-time device code, then stores the resulting token in
-[`~/.runta/config.json`](../authentication.md#where-credentials-live).
+[`~/.runta-next/config.json`](../authentication.md#where-credentials-live).
 
 ```
-runta login [options]
+runta-next login [options]
 ```
 
 | Option | Does |
@@ -20,11 +20,11 @@ runta login [options]
 ## Interactive
 
 ```console
-$ runta login
+$ runta-next login
 Your code is ABCD-1234
 Opened your browser to approve it.
 Waiting for authorization…
-Authorized. Token saved to /Users/you/.runta/config.json
+Authorized. Token saved to /Users/you/.runta-next/config.json
 ```
 
 Approve the code in the browser and the command returns. Progress goes to stderr, so it stays
@@ -36,7 +36,7 @@ The CLI skips opening a browser when stdout is not a TTY, or when it detects an 
 (`SSH_CONNECTION` / `SSH_TTY`). Force that with `--no-browser`:
 
 ```console
-$ runta login --no-browser
+$ runta-next login --no-browser
 Your code is ABCD-1234
 Open https://dashboard.runta.com/device?code=ABCD-1234 to approve it.
 Waiting for authorization…
@@ -49,9 +49,9 @@ The URL has the code pre-filled, so it can be opened on any device.
 Emits one compact JSON object per line as each stage completes:
 
 ```console
-$ runta login --json --no-browser
+$ runta-next login --json --no-browser
 {"status":"authorization_pending","user_code":"ABCD-1234","verification_uri_complete":"https://dashboard.runta.com/device?code=ABCD-1234","expires_at":"2026-09-26T09:50:41Z"}
-{"status":"authorized","config_path":"/Users/you/.runta/config.json"}
+{"status":"authorized","config_path":"/Users/you/.runta-next/config.json"}
 ```
 
 | `status` | When | Fields |

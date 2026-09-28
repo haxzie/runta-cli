@@ -1,39 +1,39 @@
 ---
-title: runta logout
+title: runta-next logout
 description: Revoke the current credential and remove it locally, including why revoking an environment token is permanent.
 sidebar_position: 13
 ---
 
-# `runta logout`
+# `runta-next logout`
 
 Revokes the current credential server-side, then removes it from the local config file.
 
 ```
-runta logout [options]
+runta-next logout [options]
 ```
 
 | Option | Does |
 | --- | --- |
 | `--json` | Print the result as JSON |
 ```console
-$ runta logout
+$ runta-next logout
 Logged out.
 ```
 
 ```console
-$ runta logout --json
+$ runta-next logout --json
 {"status":"logged_out","revoked":true,"cleared":true}
 ```
 
 | Field | Meaning |
 | --- | --- |
 | `revoked` | The API confirmed the credential is now invalid |
-| `cleared` | A token was removed from `~/.runta/config.json` |
+| `cleared` | A token was removed from `~/.runta-next/config.json` |
 
 Both can be `false` — that is what "nothing to do" looks like:
 
 ```console
-$ runta logout --json     # never logged in
+$ runta-next logout --json     # never logged in
 {"status":"logged_out","revoked":false,"cleared":false}
 ```
 

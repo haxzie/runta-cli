@@ -15,14 +15,14 @@ export const defaultConfig: RuntaConfig = {
   token: undefined,
 };
 
-/** `$RUNTA_CONFIG_HOME/config.json`, defaulting to `~/.runta/config.json`. */
+/** `$RUNTA_CONFIG_HOME/config.json`, defaulting to `~/.runta-next/config.json`. */
 export function configPath(): string {
-  const home = process.env.RUNTA_CONFIG_HOME ?? join(homedir(), '.runta');
+  const home = process.env.RUNTA_CONFIG_HOME ?? join(homedir(), '.runta-next');
   return join(home, 'config.json');
 }
 
 /**
- * Layers config: built-in defaults < `~/.runta/config.json` < environment.
+ * Layers config: built-in defaults < `~/.runta-next/config.json` < environment.
  * A missing config file is normal (unauthenticated user); a malformed one is not.
  */
 export async function loadConfig(): Promise<RuntaConfig> {

@@ -107,7 +107,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
       'content-length': String(new TextEncoder().encode(script).byteLength),
       // The script is meant to be read before it is run.
       'content-disposition': 'inline; filename="install.sh"',
-      'x-runta-ref': ref,
+      'x-runta-next-ref': ref,
       'x-content-type-options': 'nosniff',
     },
   });

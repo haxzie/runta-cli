@@ -19,12 +19,12 @@ interface Target {
 }
 
 const TARGETS: Target[] = [
-  { bun: 'bun-darwin-arm64', artifact: 'runta-darwin-arm64' },
-  { bun: 'bun-darwin-x64', artifact: 'runta-darwin-x64' },
-  { bun: 'bun-linux-arm64', artifact: 'runta-linux-arm64' },
-  { bun: 'bun-linux-x64', artifact: 'runta-linux-x64' },
-  { bun: 'bun-linux-x64-musl', artifact: 'runta-linux-x64-musl' },
-  { bun: 'bun-linux-arm64-musl', artifact: 'runta-linux-arm64-musl' },
+  { bun: 'bun-darwin-arm64', artifact: 'runta-next-darwin-arm64' },
+  { bun: 'bun-darwin-x64', artifact: 'runta-next-darwin-x64' },
+  { bun: 'bun-linux-arm64', artifact: 'runta-next-linux-arm64' },
+  { bun: 'bun-linux-x64', artifact: 'runta-next-linux-x64' },
+  { bun: 'bun-linux-x64-musl', artifact: 'runta-next-linux-x64-musl' },
+  { bun: 'bun-linux-arm64-musl', artifact: 'runta-next-linux-arm64-musl' },
 ];
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -73,11 +73,11 @@ async function main(): Promise<void> {
       --define RUNTA_VERSION=${JSON.stringify(version)} \
       --outfile ${binary}`.cwd(repoRoot);
 
-    // Archive as `runta` so the tarball extracts to the final command name.
+    // Archive as `runta-next` so the tarball extracts to the final command name.
     const tarball = `${target.artifact}.tar.gz`;
-    await $`cp ${binary} ${join(outDir, 'runta')}`;
-    await $`tar -czf ${tarball} runta`.cwd(outDir);
-    await $`rm -f ${join(outDir, 'runta')}`;
+    await $`cp ${binary} ${join(outDir, 'runta-next')}`;
+    await $`tar -czf ${tarball} runta-next`.cwd(outDir);
+    await $`rm -f ${join(outDir, 'runta-next')}`;
 
     checksums.push(`${await sha256(join(outDir, tarball))}  ${tarball}`);
   }

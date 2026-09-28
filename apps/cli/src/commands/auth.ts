@@ -92,8 +92,8 @@ export async function login(
   }
   logger.info(`Authorized. Token saved to ${path}`);
   printNextSteps([
-    { command: 'runta whoami', why: 'confirm which account and team you are on' },
-    { command: 'runta create --name demo', why: 'create your first runtime' },
+    { command: 'runta-next whoami', why: 'confirm which account and team you are on' },
+    { command: 'runta-next create --name demo', why: 'create your first runtime' },
   ]);
 }
 
@@ -133,7 +133,7 @@ async function prompt(
 }
 
 const hintForDeviceAuth = (error: DeviceAuthError): string | undefined => {
-  if (error.reason === 'expired') return 'Run `runta login` again to get a fresh code.';
+  if (error.reason === 'expired') return 'Run `runta-next login` again to get a fresh code.';
   if (error.reason === 'unreachable') return 'Check your connection, then try again.';
   return undefined;
 };
@@ -185,14 +185,14 @@ export async function logout(
     logger.warn('RUNTA_TOKEN is still set in your environment and now refers to a revoked token.');
     printNextSteps([
       { command: 'unset RUNTA_TOKEN', why: 'stop sending the revoked credential' },
-      { command: 'runta login', why: 'sign in again' },
+      { command: 'runta-next login', why: 'sign in again' },
     ]);
   }
 }
 
 /**
  * `login` and `logout` sit at the top level rather than under an `auth` group, matching
- * Runta's own CLI — `runta login` is what muscle memory reaches for, and two commands do not
+ * Runta's own CLI — `runta-next login` is what muscle memory reaches for, and two commands do not
  * earn a namespace.
  */
 export function registerAuthCommands(program: Command): void {
