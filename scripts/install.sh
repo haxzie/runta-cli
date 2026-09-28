@@ -82,6 +82,35 @@ verify_checksum() {
   [ "$actual" = "$expected" ] || err "Checksum mismatch for $3 (expected $expected, got $actual)."
 }
 
+# The npm-published Runta CLI provides a `runta` command too, and its command names differ from
+# this one's — `ps` there is `list` here, `run` is `create`, `rm` is `delete`. Whichever comes first
+# on PATH wins silently, so a user with both installed gets confusing failures rather than a clear
+# conflict. Say something.
+warn_about_other_runta() {
+  install_dir=$1
+  existing=$(command -v "$BIN_NAME" 2>/dev/null) || return 0
+  [ -n "$existing" ] || return 0
+
+  # Resolve both sides before comparing: a symlink or a relative PATH entry would otherwise look
+  # like a different install.
+  existing_dir=$(CDPATH='' cd -- "$(dirname -- "$existing")" && pwd -P) || return 0
+  target_dir=$(CDPATH='' cd -- "$install_dir" && pwd -P) || return 0
+  [ "$existing_dir" != "$target_dir" ] || return 0
+
+  info ""
+  info "warning: another \`$BIN_NAME\` is already on your PATH:"
+  info ""
+  info "  $existing"
+  info ""
+  info "That one will keep winning until $install_dir comes first. If it is the"
+  info "npm-published CLI, note that its command names differ from this one's, so"
+  info "muscle memory will fail in confusing ways. To remove it:"
+  info ""
+  info "  npm uninstall -g @runta/runta-cli"
+  info ""
+  info "Or run this one explicitly as $target_dir/$BIN_NAME while you compare them."
+}
+
 main() {
   need curl
   need tar
@@ -116,6 +145,8 @@ main() {
 
   info ""
   info "Installed $install_dir/$BIN_NAME"
+
+  warn_about_other_runta "$install_dir"
 
   case ":$PATH:" in
     *":$install_dir:"*) ;;

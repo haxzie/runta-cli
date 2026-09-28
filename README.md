@@ -19,6 +19,11 @@ published to npm — there is no Node.js runtime requirement.
 
 Supported targets: macOS and Linux, on `x64` and `arm64` (glibc and musl).
 
+Runta also publishes a CLI to npm as `@runta/runta-cli`, which installs a `runta` command of its
+own. The installer warns when it finds another one on your `PATH`. Note this CLI covers fewer
+commands than that one and uses different names for the ones it shares — see
+[docs/installation.md](./docs/installation.md#if-you-already-have-the-npm-published-cli).
+
 ## Using the CLI
 
 ```

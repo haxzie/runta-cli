@@ -41,6 +41,59 @@ RUNTA_VERSION=v0.3.1 curl -fsSL …/install.sh | sh
 RUNTA_INSTALL_DIR=/usr/local/bin curl -fsSL …/install.sh | sh
 ```
 
+## If you already have the npm-published CLI
+
+Runta publishes a CLI to npm as `@runta/runta-cli`, and it installs a command called `runta` too.
+Both cannot own that name, and the installer warns you when it finds another one on your `PATH`.
+
+**Read this before uninstalling anything: this CLI does less than that one.** It covers the runtime
+lifecycle, `exec`, and authentication. It has no `cp`, `checkpoint`, `secret`, `egress`, `ports`,
+`ssh`, `vnc`, `image`, `github`, `tokens` or `model-provider` commands. If you rely on any of those,
+keep the npm CLI.
+
+Running both is fine as long as you are deliberate about which one you get:
+
+```sh
+# whichever directory comes first on PATH wins
+export PATH="$HOME/.runta/bin:$PATH"      # prefer this CLI
+~/.runta/bin/runta list                    # or just be explicit
+
+runta --version    # 0.1.x is this CLI, 0.2.x is the npm one
+```
+
+To remove the npm one:
+
+```sh
+npm uninstall -g @runta/runta-cli
+```
+
+### The command names are different on purpose
+
+There are no compatibility aliases, so muscle memory from the npm CLI will not work — by design,
+and for reasons written up in
+[`Improvements.md`](https://github.com/haxzie/runta-cli/blob/main/Improvements.md):
+
+| npm CLI | This CLI | Why |
+| --- | --- | --- |
+| `runta run` | [`runta create`](./commands/create.md) | `run` named the command that creates a runtime while `exec` was the one that runs things |
+| `runta ps` | [`runta list`](./commands/list.md) | `ps` is ambiguous about scope — your runtimes, or processes inside one? |
+| `runta rm` | [`runta delete`](./commands/delete.md) | consistency: the other three are whole words |
+| `runta inspect` | [`runta inspect`](./commands/inspect.md) | unchanged |
+| `runta exec` | [`runta exec`](./commands/exec.md) | unchanged |
+
+### Credentials are not shared
+
+The two store configuration in different places, so signing into one does not sign you into the
+other:
+
+| | Location |
+| --- | --- |
+| npm CLI | `~/.config/runta/config.toml` |
+| This CLI | `~/.runta/config.json` |
+
+Run [`runta login`](./commands/login.md) again after switching, or set `RUNTA_TOKEN`, which both
+read.
+
 ## Pinning the installer itself
 
 `RUNTA_VERSION` pins which *release* you install. To pin the *installer script* — to reproduce an
