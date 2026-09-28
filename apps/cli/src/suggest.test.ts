@@ -73,16 +73,28 @@ function suggestedCommands(): { file: string; text: string; path: string[] }[] {
   return found;
 }
 
+/**
+ * Walks as far down the command tree as the words go, stopping at the first that is not a
+ * subcommand — because that word is a positional argument, not a typo.
+ *
+ * `runta-next exec demo` has to pass (`demo` is a runtime name) while `runta-next agents ls` has to
+ * fail (`agents` does not exist). The distinguishing question is only ever about the *first* word,
+ * so that is what the caller checks.
+ */
 const resolve = (program: Command, path: readonly string[]): boolean => {
   let current: Command = program;
+  let depth = 0;
+
   for (const word of path) {
     const next: Command | undefined = current.commands.find(
       (c) => c.name() === word || c.aliases().includes(word),
     );
-    if (!next) return false;
+    if (!next) break;
     current = next;
+    depth += 1;
   }
-  return true;
+
+  return depth > 0;
 };
 
 describe('suggested commands exist', () => {
@@ -109,11 +121,15 @@ describe('suggested commands exist', () => {
   });
 
   it('fails when a suggestion names a command that does not exist', () => {
-    // Guards the guard: proves resolve() actually rejects. `checkpoint` is the next resource we
-    // expect to build, which makes it a good stand-in for "documented but not shipped".
+    // Guards the guard: proves resolve() rejects an unknown first word while tolerating a
+    // positional after a known one. `checkpoint` is the next resource we expect to build, which
+    // makes it a good stand-in for "documented but not shipped".
     expect(resolve(buildProgram(), ['checkpoint'])).toBe(false);
-    expect(resolve(buildProgram(), ['runtime', 'nope'])).toBe(false);
+    expect(resolve(buildProgram(), ['agents', 'ls'])).toBe(false);
     expect(resolve(buildProgram(), ['exec'])).toBe(true);
     expect(resolve(buildProgram(), ['runtime', 'list'])).toBe(true);
+    // `demo` is a runtime name, not a subcommand, and must not be mistaken for one.
+    expect(resolve(buildProgram(), ['exec', 'demo'])).toBe(true);
+    expect(resolve(buildProgram(), ['inspect', 'demo'])).toBe(true);
   });
 });

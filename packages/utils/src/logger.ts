@@ -1,3 +1,5 @@
+import { colorEnabled } from './color.js';
+
 const LEVELS = ['silent', 'error', 'warn', 'info', 'debug'] as const;
 
 export type LogLevel = (typeof LEVELS)[number];
@@ -11,12 +13,8 @@ export interface Logger {
 
 const rank = (level: LogLevel): number => LEVELS.indexOf(level);
 
-/** Honours NO_COLOR and non-TTY stderr, so piped output stays clean. */
-const colorEnabled = (): boolean =>
-  !process.env.NO_COLOR && Boolean(process.stderr.isTTY) && process.env.TERM !== 'dumb';
-
 const paint = (code: string, text: string): string =>
-  colorEnabled() ? `\x1b[${code}m${text}\x1b[0m` : text;
+  colorEnabled(process.stderr) ? `\x1b[${code}m${text}\x1b[0m` : text;
 
 export interface LevelledLogger extends Logger {
   setLevel(level: LogLevel): void;

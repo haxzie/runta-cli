@@ -75,6 +75,16 @@ which flag wants which form:
 Each resolves to the canonical form before any request that needs it, and each refuses an
 ambiguous name rather than picking one.
 
+## The help output is grouped
+
+`runta-next --help` groups commands by what you are working on rather than listing them
+alphabetically, opens with how to sign in, and ends with a short note for agents and a set of
+examples. Headings are bold only on a terminal — piped help carries no escape sequences, and
+`NO_COLOR` is honoured.
+
+The groups are checked against the registered commands by a test, so a command cannot exist without
+appearing in the help.
+
 ## Global options
 
 | Option | Does |

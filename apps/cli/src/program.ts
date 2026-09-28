@@ -5,14 +5,15 @@ import { registerExec } from './commands/exec.js';
 import { registerHello } from './commands/hello.js';
 import { registerRuntime } from './commands/runtime.js';
 import { registerWhoami } from './commands/whoami.js';
+import { useGroupedHelp } from './help.js';
 import { version } from './version.js';
 
 export function buildProgram(): Command {
   const program = new Command('runta-next')
     .description('An experimental command line interface for Runta')
-    .version(version, '-v, --version')
-    .option('--verbose', 'print debug output')
-    .option('--quiet', 'only print errors')
+    .version(version, '-v, --version', 'Show the version')
+    .option('--verbose', 'Print debug output')
+    .option('--quiet', 'Only print errors')
     .showHelpAfterError();
 
   // Resolve the log level once, before any subcommand action runs.
@@ -27,6 +28,8 @@ export function buildProgram(): Command {
   registerHello(program);
   registerRuntime(program);
   registerWhoami(program);
+
+  useGroupedHelp(program);
 
   return program;
 }

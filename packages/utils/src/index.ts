@@ -1,3 +1,4 @@
+export { type ColorStream, colorEnabled } from './color.js';
 export { CliError, fail, isCliError } from './errors.js';
 export {
   createLogger,
