@@ -30,7 +30,7 @@ const LLMS_URL = `${DOCS_URL}/llms-full.txt`;
 const GROUPS: Group[] = [
   { title: 'Runtimes', commands: ['create', 'list', 'inspect', 'delete', 'exec'] },
   { title: 'Account', commands: ['login', 'logout', 'whoami'] },
-  { title: 'More', commands: ['runtime', 'help'] },
+  { title: 'More', commands: ['runtime', 'upgrade', 'help'] },
 ];
 
 /** Commands whose usage is worth showing in the list, because the bare name is not enough. */
@@ -48,6 +48,7 @@ const EXAMPLES: [string, string?][] = [
   ['runta-next exec demo -it -- sh', 'interactive shell'],
   ['runta-next list --json', 'machine-readable'],
   ['runta-next delete demo --dry-run', 'show what would go, change nothing'],
+  ['runta-next upgrade --check', 'is there a newer version?'],
 ];
 
 /**

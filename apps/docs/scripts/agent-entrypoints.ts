@@ -38,6 +38,7 @@ const ORDER = [
   'commands/login.md',
   'commands/logout.md',
   'commands/whoami.md',
+  'commands/upgrade.md',
 ];
 
 interface Page {

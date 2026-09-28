@@ -25,6 +25,7 @@ runta-next [global options] <command> [command options]
 | [`runta-next login`](./login.md) | Sign in through a browser using a one-time device code |
 | [`runta-next logout`](./logout.md) | Revoke the stored credential and remove it locally |
 | [`runta-next whoami`](./whoami.md) | Show the authenticated user and active team |
+| [`runta-next upgrade`](./upgrade.md) | Upgrade this CLI to the latest release |
 
 ## Two forms for runtime commands
 

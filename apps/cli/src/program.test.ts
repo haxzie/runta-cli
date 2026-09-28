@@ -37,6 +37,7 @@ describe('command surface', () => {
       'login',
       'logout',
       'runtime',
+      'upgrade',
       'whoami',
     ]);
   });

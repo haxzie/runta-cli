@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { registerAuthCommands } from './commands/auth.js';
 import { registerExec } from './commands/exec.js';
 import { registerRuntime } from './commands/runtime.js';
+import { registerUpgrade } from './commands/upgrade.js';
 import { registerWhoami } from './commands/whoami.js';
 import { useGroupedHelp } from './help.js';
 import { version } from './version.js';
@@ -26,6 +27,7 @@ export function buildProgram(): Command {
   registerExec(program);
   registerRuntime(program);
   registerWhoami(program);
+  registerUpgrade(program);
 
   useGroupedHelp(program);
 

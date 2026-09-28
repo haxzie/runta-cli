@@ -57,6 +57,7 @@ export default defineConfig({
           { text: 'login', link: '/commands/login' },
           { text: 'logout', link: '/commands/logout' },
           { text: 'whoami', link: '/commands/whoami' },
+          { text: 'upgrade', link: '/commands/upgrade' },
         ],
       },
     ],

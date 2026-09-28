@@ -42,6 +42,7 @@ runta-next [global options] <command> [command options]
 | `runta-next login` | Sign in through a browser using a one-time device code |
 | `runta-next logout` | Revoke the stored credential and remove it locally |
 | `runta-next whoami` | Show the authenticated user and active team |
+| `runta-next upgrade` | Replace the installed binary with a newer release |
 
 | Global option | Does |
 | --- | --- |
