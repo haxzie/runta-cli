@@ -62,4 +62,4 @@ jobs:
         run: |
           tar -xzf dist/runta-next-linux-x64.tar.gz -C dist
           ./dist/runta-next --version
-          ./dist/runta-next hello ci
+          ./dist/runta-next --help >/dev/null   # exercises the whole program graph

@@ -1,0 +1,23 @@
+{
+  "name": "@runta/docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Documentation site for runta-next, served at runta-cli.haxzie.com/docs",
+  "scripts": {
+    "sync": "bun run scripts/sync-content.ts",
+    "dev": "pnpm run sync && vitepress dev",
+    "build": "pnpm run sync && vitepress build && bun run scripts/agent-entrypoints.ts",
+    "preview": "vitepress preview",
+    "deploy": "pnpm run build && wrangler deploy",
+    "clean": "rm -rf content .vitepress/dist .vitepress/cache .turbo",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4",
+    "wrangler": "^4.141.0",
+    "vue": "^3.5.0",
+    "@cloudflare/workers-types": "^5.20260927.1",
+    "@runta/tsconfig": "workspace:*"
+  }
+}

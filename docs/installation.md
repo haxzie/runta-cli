@@ -172,7 +172,6 @@ export PATH="$HOME/.runta-next/bin:$PATH"
 
 ```sh
 runta-next --version
-runta-next hello
 ```
 
 ## Uninstall

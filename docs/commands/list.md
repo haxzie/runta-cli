@@ -77,7 +77,7 @@ matters in CI and under `script`, where the terminal reports a width of zero.
 ## `--json`
 
 Prints the array of runtime objects verbatim, so `jq` paths match the
-[API reference](https://runta-next.com/docs/reference/api/operations/listruntimes/):
+[API reference](https://runta.com/docs/reference/api/operations/listruntimes/):
 
 ```sh
 runta-next list --json | jq -r '.[] | select(.status == "running") | .display_name'

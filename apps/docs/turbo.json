@@ -1,0 +1,14 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // The content lives in the repo's `docs/` directory and is copied in at build time, so it sits
+    // outside this package and turbo cannot list it as an input. Caching on `src/**` alone would
+    // serve a stale site every time a docs page changed. The build takes ~2s; don't cache it.
+    "build": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "outputs": [".vitepress/dist/**"]
+    }
+  }
+}

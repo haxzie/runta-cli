@@ -338,7 +338,7 @@ function inspectNextSteps(runtime: Runtime): NextStep[] {
   if (runtime.status === 'error' || runtime.status === 'crashed') {
     return [
       { command: `runta-next delete ${name}`, why: 'remove it — this runtime cannot be recovered' },
-      { command: 'runta-next create --name ' + name, why: 'create a replacement' },
+      { command: `runta-next create --name ${name}`, why: 'create a replacement' },
     ];
   }
   if (runtime.degraded) {

@@ -71,7 +71,7 @@ jobs:
           VERSION: ${{ steps.check.outputs.version }}
         run: |
           tar -xzf dist/runta-next-linux-x64.tar.gz -C dist
-          ./dist/runta-next hello release
+          ./dist/runta-next --help >/dev/null   # exercises the whole program graph
           actual=$(./dist/runta-next --version)
           if [ "$actual" != "$VERSION" ]; then
             echo "::error::Binary reports $actual but the release is $VERSION"

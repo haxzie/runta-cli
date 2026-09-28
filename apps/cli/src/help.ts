@@ -18,10 +18,18 @@ interface Group {
   commands: string[];
 }
 
+/**
+ * The human docs, and the same content as one plain-text document for agents. Naming the second
+ * one in `--help` is the point: an agent that reads help can fetch the whole manual in one request
+ * instead of scraping rendered HTML page by page.
+ */
+const DOCS_URL = 'https://runta-cli.haxzie.com/docs';
+const LLMS_URL = `${DOCS_URL}/llms-full.txt`;
+
 const GROUPS: Group[] = [
   { title: 'Runtimes', commands: ['create', 'list', 'inspect', 'delete', 'exec'] },
   { title: 'Account', commands: ['login', 'logout', 'whoami'] },
-  { title: 'More', commands: ['runtime', 'hello', 'help'] },
+  { title: 'More', commands: ['runtime', 'help'] },
 ];
 
 /** Commands whose usage is worth showing in the list, because the bare name is not enough. */
@@ -29,7 +37,6 @@ const USAGE: Record<string, string> = {
   inspect: 'inspect <runtime>',
   delete: 'delete <runtime>...',
   exec: 'exec <runtime> -- <command>',
-  hello: 'hello [name]',
   help: 'help [command]',
 };
 
@@ -91,6 +98,7 @@ export function rootHelp(program: Command, colour = colorEnabled(process.stdout)
   lines.push('  whether stdout is a terminal, so behaviour is identical interactively and in a');
   lines.push('  pipe. Branch on exit codes rather than message text — codes are stable, wording');
   lines.push(`  is not. Set RUNTA_TOKEN to skip ${name} login entirely.`);
+  lines.push(`  Every page of the docs is also served as plain text: ${LLMS_URL}`);
 
   lines.push('');
   lines.push(bold('Examples:', colour));
@@ -100,7 +108,7 @@ export function rootHelp(program: Command, colour = colorEnabled(process.stdout)
   }
 
   lines.push('');
-  lines.push(`Docs: ${dim('https://github.com/haxzie/runta-cli/tree/main/docs', colour)}`);
+  lines.push(`Docs: ${dim(DOCS_URL, colour)}`);
   lines.push('');
   return lines.join('\n');
 }

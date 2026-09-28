@@ -86,6 +86,22 @@ describe('the agent section', () => {
   });
 });
 
+describe('the docs pointer', () => {
+  it('names the docs site, so a reader can go deeper than --help', () => {
+    expect(plain()).toContain('https://runta-cli.haxzie.com/docs');
+  });
+
+  /**
+   * The whole point of naming this one: an agent that has read `--help` can fetch the entire
+   * manual in a single request instead of crawling rendered HTML page by page.
+   */
+  it('points agents at the plain-text rendering of the whole site', () => {
+    const text = plain();
+    expect(text).toContain('https://runta-cli.haxzie.com/docs/llms-full.txt');
+    expect(text.indexOf('llms-full.txt')).toBeGreaterThan(text.indexOf('For agents:'));
+  });
+});
+
 describe('colour', () => {
   it('emits no escape sequences when told not to colour', () => {
     // `skills --help` emits bold even when piped; that is the C-25 mistake, and piped help has to

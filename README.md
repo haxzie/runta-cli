@@ -42,7 +42,6 @@ runta-next [global options] <command> [command options]
 | `runta-next login` | Sign in through a browser using a one-time device code |
 | `runta-next logout` | Revoke the stored credential and remove it locally |
 | `runta-next whoami` | Show the authenticated user and active team |
-| `runta-next hello [name]` | Print a greeting — smoke test, no network, no credential |
 
 | Global option | Does |
 | --- | --- |
@@ -148,19 +147,32 @@ $ runta-next login --json --no-browser
 
 ## Documentation
 
-Long-form docs live in [`docs/`](./docs) as plain markdown with frontmatter, ready for the
-docs web app:
+**<https://runta-cli.haxzie.com/docs>**
+
+The source is [`docs/`](./docs) — plain markdown with frontmatter, the single copy. `apps/docs`
+builds the site from it, so there is nothing to keep in sync between the repo and the web:
 
 | Page | Covers |
 | --- | --- |
 | [Overview](./docs/index.md) | Quick start and current scope |
+| [A tour of runta-next](./docs/tour.md) | One end-to-end session, start to teardown |
 | [Installation](./docs/installation.md) | Install, pin a version, uninstall |
 | [Authentication](./docs/authentication.md) | Device flow, CI tokens, credential storage |
 | [Configuration](./docs/configuration.md) | Every variable, the config file, precedence |
 | [Output and scripting](./docs/output-and-scripting.md) | `--json`, NDJSON, exit codes, agents |
 | [Commands](./docs/commands/index.md) | Per-command reference |
 
-Keep them in step with the code: a flag added without a docs change is a bug.
+For agents, every page is also served as plain text — [`/docs/llms.txt`][llms] indexes the site,
+[`/docs/llms-full.txt`][full] is all of it in one request, and `/docs/raw/<page>.md` is any single
+page. `runta-next --help` names the second one, so an agent that reads help can fetch the whole
+manual without crawling HTML.
+
+[llms]: https://runta-cli.haxzie.com/docs/llms.txt
+[full]: https://runta-cli.haxzie.com/docs/llms-full.txt
+
+Keep the docs in step with the code: a flag added without a docs change is a bug, and
+`apps/cli/src/docs.test.ts` enforces it by resolving every `runta-next …` example in `docs/`
+against the real command tree. It rejects both unknown commands and unknown flags.
 
 ### Design rules
 
@@ -192,7 +204,7 @@ Requires [Bun](https://bun.sh) 1.3+, Node 22 (see `.nvmrc`) and pnpm 10.
 ```sh
 pnpm install
 cp .env.example .env      # optional; every value has a working default
-pnpm dev hello world      # run the CLI from source, with watch — no build step
+pnpm dev list             # run the CLI from source, with watch — no build step
 pnpm cli whoami           # same, single run, no watch
 ```
 
@@ -215,12 +227,15 @@ their TypeScript source under the `bun` export condition, so an edit anywhere in
 | `pnpm api:generate` | Regenerate the SDK from `packages/api/openapi.json` |
 | `pnpm build:binaries` | Cross-compile release binaries into `dist/` |
 | `pnpm --filter @runta/install-worker deploy` | Deploy the install-script Worker |
+| `pnpm --filter @runta/docs dev` | Serve the docs site locally |
+| `pnpm --filter @runta/docs deploy` | Build and deploy the docs site |
 | `pnpm changeset` | Record a change for the next release |
 
 ## Layout
 
 ```
 apps/cli          @runta/cli       Commander program; compiles to the `runta-next` binary
+apps/docs         @runta/docs      VitePress site + Worker, built from `docs/`
 packages/api      @runta/api       Generated OpenAPI SDK + hand-written client shell
 packages/core     @runta/core      Config loading and command context
 packages/utils    @runta/utils     Logger and error types
@@ -240,7 +255,7 @@ generated from `packages/api/openapi.json`.
 **`openapi.json` is hand-maintained.** Runta publishes no OpenAPI document — every
 plausible URL 404s — so there is nothing to sync from and codegen never touches the
 network. The spec is written from
-[the API reference](https://runta-next.com/docs/reference/api/) and verified against live
+[the API reference](https://runta.com/docs/reference/api/) and verified against live
 `api.runta.com`, one operation group at a time. `packages/api/NOTES.md` records the
 coverage so far and the places where the live API disagrees with the published docs.
 

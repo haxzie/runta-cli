@@ -8,6 +8,7 @@ onlyBuiltDependencies:
   - esbuild
 
 catalog:
+  vitepress: ^1.6.4
   '@biomejs/biome': ^2.5.14
   '@changesets/cli': ^3.0.3
   '@hey-api/openapi-ts': ^0.99.0

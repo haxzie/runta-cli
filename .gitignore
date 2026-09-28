@@ -3,6 +3,9 @@ dist/
 
 # Wrangler's local miniflare state: sqlite caches from `wrangler dev`.
 .wrangler/
+
+# Generated copy of docs/ for the VitePress build.
+apps/docs/content/
 .turbo/
 *.tsbuildinfo
 coverage/
@@ -12,3 +15,6 @@ coverage/
 .env.local
 
 .context/
+
+# VitePress dev-server cache.
+apps/docs/.vitepress/cache/

@@ -1,12 +1,12 @@
 ---
-title: Runta CLI
+title: runta-next
 description: Manage Runta from the terminal — authentication, identity, and the commands built on the public REST API.
 sidebar_position: 1
 ---
 
-# Runta CLI
+# runta-next
 
-`runta-next` is a command line interface for the [Runta REST API](https://runta-next.com/docs/reference/api/).
+`runta-next` is a command line interface for the [Runta REST API](https://runta.com/docs/reference/api/).
 It is a single standalone binary with no runtime dependency.
 
 ## Start here
@@ -51,7 +51,6 @@ The CLI is early. Today it covers the runtime lifecycle, authentication and iden
   [`runta-next exec`](./commands/exec.md)
 - [`runta-next login`](./commands/login.md) · [`runta-next logout`](./commands/logout.md) ·
   [`runta-next whoami`](./commands/whoami.md)
-- [`runta-next hello`](./commands/hello.md) — a development smoke test
 
 Checkpoints, secrets, file transfer, images and agents are not implemented yet. See
 [Commands → not yet implemented](./commands/index.md#not-yet-implemented) for what the API

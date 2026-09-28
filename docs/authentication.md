@@ -6,7 +6,7 @@ sidebar_position: 3
 
 # Authentication
 
-Every command except `hello` needs a credential. There are two ways to supply one.
+Every command needs a credential. There are two ways to supply one.
 
 ## Interactive: `runta-next login`
 

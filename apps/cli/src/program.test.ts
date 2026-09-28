@@ -32,7 +32,6 @@ describe('command surface', () => {
       'create',
       'delete',
       'exec',
-      'hello',
       'inspect',
       'list',
       'login',

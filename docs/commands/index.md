@@ -22,7 +22,6 @@ runta-next [global options] <command> [command options]
 | [`runta-next login`](./login.md) | Sign in through a browser using a one-time device code |
 | [`runta-next logout`](./logout.md) | Revoke the stored credential and remove it locally |
 | [`runta-next whoami`](./whoami.md) | Show the authenticated user and active team |
-| [`runta-next hello`](./hello.md) | Print a greeting — a smoke test for the dev loop |
 
 ## Two forms for runtime commands
 
@@ -117,7 +116,7 @@ If this documentation and `--help` disagree, `--help` is right.
 
 ## Not yet implemented
 
-The [Runta REST API](https://runta-next.com/docs/reference/api/) exposes 85 operations. The CLI
+The [Runta REST API](https://runta.com/docs/reference/api/) exposes 85 operations. The CLI
 currently covers four. Nothing below exists yet as a command:
 
 | Area | API operations | Status |
