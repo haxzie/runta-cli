@@ -47,17 +47,40 @@ jobs:
       # Once that PR merges, main carries a bumped version with no matching tag. That
       # gap — not the action's output — is the signal to cut a release, which keeps this
       # correct even if the version bump lands by some other route.
+      #
+      # Read the version from the commit, NOT the working tree. The step above runs
+      # `pnpm run version`, which bumps every package.json in place so it can commit the result
+      # to the version PR — so after it, the runner's tree carries the *next* version while main
+      # still carries the current one. Reading the file meant publishing that next version early,
+      # from the pre-merge commit: v0.4.0 was cut from a tree whose own version was 0.3.0 and
+      # which lacked five later commits, and when the real 0.4.0 merged the tag already existed,
+      # so it was skipped. `git show HEAD:` is the committed state and cannot be mutated by a
+      # previous step.
       - name: Is there a version to release?
         id: check
         run: |
-          version=$(node -p "require('./apps/cli/package.json').version")
+          git show HEAD:apps/cli/package.json > /tmp/committed-package.json
+          version=$(node -p "require('/tmp/committed-package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          # Guard the guard: if the tree and the commit disagree, the bump has not landed yet and
+          # this push is not a release. Say so rather than letting a future edit reintroduce the bug.
+          tree_version=$(node -p "require('./apps/cli/package.json').version")
+          if [ "$tree_version" != "$version" ]; then
+            echo "Working tree says $tree_version, commit says $version — the version PR has not merged yet."
+          fi
+
           if git rev-parse "v$version" >/dev/null 2>&1; then
             echo "Tag v$version already exists, nothing to release."
             echo "release=false" >> "$GITHUB_OUTPUT"
           else
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # The binaries must come from the released commit, not from a tree a previous step edited.
+      - name: Restore the committed tree before building
+        if: steps.check.outputs.release == 'true'
+        run: git checkout -- .
 
       - name: Build binaries
         if: steps.check.outputs.release == 'true'
