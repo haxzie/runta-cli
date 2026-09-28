@@ -134,22 +134,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.check.outputs.version }}
         run: |
-          # Only this version's changelog section, not the whole file. The "Patch Changes"
-          # block is dropped: every package is private and pinned to one version, so
-          # "Updated dependencies: @runta/core@X" is noise to anyone reading a release.
-          awk -v ver="## $VERSION" '
-            $0 == ver { inside = 1; next }
-            inside && /^## / { exit }
-            inside && /^### Patch Changes/ { inside = 0; exit }
-            inside { print }
-          ' apps/cli/CHANGELOG.md > release-notes.md
-
-          # A release with empty notes means the changelog heading did not match the version,
-          # which would otherwise ship a silently empty release.
-          if ! grep -q '[^[:space:]]' release-notes.md; then
-            echo "::error::No changelog section found for $VERSION in apps/cli/CHANGELOG.md"
-            exit 1
-          fi
+          # Only this version's section, with the "Updated dependencies" bullet filtered out.
+          # It exits non-zero on empty notes, so a heading that does not match the version fails
+          # the release rather than shipping a blank one.
+          python3 scripts/release-notes.py "$VERSION" apps/cli/CHANGELOG.md > release-notes.md
 
           {
             echo
