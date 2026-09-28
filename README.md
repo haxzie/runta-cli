@@ -226,9 +226,9 @@ their TypeScript source under the `bun` export condition, so an edit anywhere in
 | `pnpm lint` / `pnpm lint:fix` | Biome check / autofix |
 | `pnpm api:generate` | Regenerate the SDK from `packages/api/openapi.json` |
 | `pnpm build:binaries` | Cross-compile release binaries into `dist/` |
-| `pnpm --filter @runta/install-worker deploy` | Deploy the install-script Worker |
+| `pnpm --filter @runta/install-worker run deploy` | Deploy the install-script Worker |
 | `pnpm --filter @runta/docs dev` | Serve the docs site locally |
-| `pnpm --filter @runta/docs deploy` | Build and deploy the docs site |
+| `pnpm --filter @runta/docs run deploy` | Build and deploy the docs site |
 | `pnpm changeset` | Record a change for the next release |
 
 ## Layout
@@ -306,13 +306,19 @@ worse than a late one:
 `@runta/tsconfig` and `@runta/install-worker` are excluded from versioning: shared config and
 deployment infrastructure are not things a user installs.
 
-### Deploying the install Worker
+### Deploying the Workers
 
-The Worker is deployed by hand, from a machine with `wrangler login`:
+Both Workers are deployed by hand, from a machine with `wrangler login`:
 
 ```sh
-pnpm --filter @runta/install-worker deploy
+pnpm --filter @runta/install-worker run deploy   # runta.haxzie.com/install.sh
+pnpm --filter @runta/docs run deploy             # runta-cli.haxzie.com/docs
 ```
+
+`run` is not optional. `pnpm deploy` is a reserved pnpm command that packages a workspace into a
+directory, so `pnpm --filter … deploy` fails with `ERR_PNPM_INVALID_DEPLOY_TARGET` instead of
+running the script. The docs script builds first — deploying with bare `wrangler deploy` uploads
+whatever is already in `dist/`, which is how you ship a site without your last edit in it.
 
 There is no CI deploy and no Cloudflare credential in this repository, on purpose. The Worker reads
 `scripts/install.sh` from the default branch **at request time**, so editing the install script
