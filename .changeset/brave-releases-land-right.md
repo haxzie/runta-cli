@@ -4,14 +4,17 @@
 
 Cut releases from the commit being released.
 
-The release workflow read the version from `apps/cli/package.json` in the runner's working tree,
-immediately after `changesets/action` had run `pnpm run version` and bumped every `package.json` in
-place. So it published the *next* version from the *current* commit: `v0.4.0` was tagged at a tree
-whose own version was 0.3.0 and which lacked five later commits, and when the real 0.4.0 merged the
-tag already existed, so publishing was skipped.
+The release workflow decided which version to publish by reading `apps/cli/package.json` from the
+runner, immediately after `changesets/action` had run `pnpm run version` — which bumps every
+`package.json` in place, commits the result to `changeset-release/main`, and leaves the checkout on
+that branch. Both the working tree and `HEAD` therefore carried the *next* version, so the workflow
+published it from the *current* commit: `v0.4.0` was tagged at a tree whose own version was 0.3.0 and
+which lacked five later commits, and when the genuine 0.4.0 merged the tag already existed, so it was
+skipped and never shipped. The stranded `v0.1.0` has the same cause.
 
-It now reads `git show HEAD:apps/cli/package.json`, which a previous step cannot mutate, restores the
-committed tree before compiling, and logs loudly when the tree and the commit disagree.
+It now reads the version from `$GITHUB_SHA`, which is fixed when the run starts and cannot be moved by
+a later step, and checks that commit out before compiling. That also makes the binary smoke test
+meaningful: comparing the binary's `--version` against the release only proves something if the binary
+was built from the released commit.
 
-This release is the first to contain the credential-aware `--help` in a published binary; v0.4.0's
-artifacts predate it.
+This is the first release whose binaries contain the credential-aware `--help`; v0.4.0's predate it.

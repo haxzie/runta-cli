@@ -48,26 +48,27 @@ jobs:
       # gap — not the action's output — is the signal to cut a release, which keeps this
       # correct even if the version bump lands by some other route.
       #
-      # Read the version from the commit, NOT the working tree. The step above runs
-      # `pnpm run version`, which bumps every package.json in place so it can commit the result
-      # to the version PR — so after it, the runner's tree carries the *next* version while main
-      # still carries the current one. Reading the file meant publishing that next version early,
-      # from the pre-merge commit: v0.4.0 was cut from a tree whose own version was 0.3.0 and
-      # which lacked five later commits, and when the real 0.4.0 merged the tag already existed,
-      # so it was skipped. `git show HEAD:` is the committed state and cannot be mutated by a
-      # previous step.
+      # Read the version from the commit that triggered this run, and nothing else.
+      #
+      # Neither the working tree nor `HEAD` can be trusted here, because the step above rewrites
+      # both: `pnpm run version` bumps every package.json in place, then the action commits that to
+      # `changeset-release/main` and leaves the checkout sitting on it. Reading either one meant
+      # publishing the *next* version from the *current* commit — v0.4.0 was tagged at a tree whose
+      # own version was 0.3.0 and which lacked five later commits, and when the genuine 0.4.0 merged
+      # the tag already existed, so it was skipped and never shipped.
+      #
+      # `$GITHUB_SHA` is fixed when the run starts, so no later step can move it.
       - name: Is there a version to release?
         id: check
         run: |
-          git show HEAD:apps/cli/package.json > /tmp/committed-package.json
-          version=$(node -p "require('/tmp/committed-package.json').version")
+          git show "$GITHUB_SHA:apps/cli/package.json" > /tmp/released-package.json
+          version=$(node -p "require('/tmp/released-package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Releasing from $GITHUB_SHA, whose version is $version."
 
-          # Guard the guard: if the tree and the commit disagree, the bump has not landed yet and
-          # this push is not a release. Say so rather than letting a future edit reintroduce the bug.
           tree_version=$(node -p "require('./apps/cli/package.json').version")
           if [ "$tree_version" != "$version" ]; then
-            echo "Working tree says $tree_version, commit says $version — the version PR has not merged yet."
+            echo "Working tree says $tree_version — a previous step bumped it; ignoring."
           fi
 
           if git rev-parse "v$version" >/dev/null 2>&1; then
@@ -77,10 +78,14 @@ jobs:
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # The binaries must come from the released commit, not from a tree a previous step edited.
-      - name: Restore the committed tree before building
+      # Build from the released commit, not from whatever the version step left behind. This also
+      # makes the binary smoke test meaningful: it compares the binary's version against the
+      # released one, which only proves something if the binary was compiled from that commit.
+      - name: Check out the released commit before building
         if: steps.check.outputs.release == 'true'
-        run: git checkout -- .
+        run: |
+          git checkout --force "$GITHUB_SHA"
+          git status --short
 
       - name: Build binaries
         if: steps.check.outputs.release == 'true'
