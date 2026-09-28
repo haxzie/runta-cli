@@ -139,19 +139,6 @@ $ curl -sI https://runta.haxzie.com/install.sh | grep x-runta-next-ref
 x-runta-next-ref: main
 ```
 
-## Read it before you run it
-
-Piping a remote script into a shell is worth doing deliberately. The script is small and has no
-dependencies beyond `curl` and `tar`:
-
-```sh
-curl -fsSL https://runta.haxzie.com/install.sh | less
-```
-
-It refuses to install anything whose SHA-256 does not match the `checksums.txt` published with the
-release, and the URL itself fails closed — an unreachable or unexpected response returns a non-2xx
-status, so `curl -fsSL` aborts rather than handing a body to `sh`.
-
 ## Supported platforms
 
 macOS and Linux, on `x64` and `arm64`. Linux builds cover both glibc and musl, selected by

@@ -39,7 +39,7 @@ Practically: a transient blip mid-login does not lose your approval.
 
 ## Non-interactive: `RUNTA_TOKEN`
 
-Set an API key in the environment and no login is needed. Nothing is read from or written
+Set an API key in the environment and no login is needed. You can get the API key from the Runta Dashboard > Settings > API Keys. Nothing is read from or written
 to disk:
 
 ```sh
