@@ -122,6 +122,40 @@ So accepting names is a client responsibility — `resolveRuntimeId` in `@runta/
 matches. This is consistent with the exec WebSocket spec, which says the CLI resolves names to ids
 first, and inconsistent with these two REST pages.
 
+### 6b. The transition endpoints are undocumented, and the reference renames two of them
+
+The published reference does not describe the state-transition endpoints at all. They were recovered
+by pointing the production CLI's `--endpoint` at a local HTTP server and logging what it sent:
+
+```
+runta shutdown demo  ->  POST /v2/runtimes/{id}/stop?expected_revision=7    {}
+runta boot demo      ->  POST /v2/runtimes/{id}/start?expected_revision=7   {}
+runta pause demo     ->  POST /v2/runtimes/{id}/pause?expected_revision=7   {}
+runta resume demo    ->  POST /v2/runtimes/{id}/resume?expected_revision=7  {}
+runta resize demo …  ->  PATCH /v2/runtimes/{id}?expected_revision=7
+                         {"resources":{"requests":{"memory_mib":2048}}}
+```
+
+Three things worth keeping:
+
+- **The API's verbs are `start` and `stop`.** The CLI's `boot` and `shutdown` are its own renaming;
+  our commands use the API's vocabulary (`Improvements.md` I-9).
+- **`/start` and `/resume` are separate endpoints** and neither covers the other, so waking a runtime
+  needs the current status to pick. There is no `/suspend`: the `suspended` status is reachable only
+  through `idle_policy`.
+- **`resize` is not its own endpoint** — it is a `PATCH` on the runtime, so the same operation backs
+  any future `update` command.
+
+All of them take `expected_revision` as a query parameter and an empty JSON object as the body, and
+answer with the runtime — carrying its **pre-transition** status, since the control plane has only
+accepted the request at that point. Anything reading `status` from that response is reading a stale
+value (`CLI_ISSUES.md` C-14).
+
+These are described in `openapi.json` as `startRuntime`, `stopRuntime`, `pauseRuntime` and
+`resumeRuntime`. Unlike the rest of the spec they were verified against the production CLI's traffic
+rather than against the live API, because this session had no token; the request shape is certain, the
+response shape follows the documented `RuntimeResponse` envelope and should be re-checked live.
+
 ### 7. `checkpoint_id` is UUID-only too, and images have two identifiers
 
 Same pattern as `{runtime_id}`: a checkpoint name is rejected —
@@ -233,7 +267,7 @@ Done: **auth** (3) + **identity** (1) + **runtimes** (4 of 21) + **images** (1 o
 | Health | 2 | todo |
 | Events / token analysis | 5 | todo |
 | GitHub | 9 | todo |
-| Runtimes | 21 | 4 of 21 (create, list, get, delete) |
+| Runtimes | 21 | 8 of 21 (create, list, get, delete, start, stop, pause, resume) |
 | Images | 5 | 1 of 5 (`listRuntimeImages`, for name resolution) |
 | Files | 2 | todo |
 | SSH keys | 7 | todo |

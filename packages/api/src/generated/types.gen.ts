@@ -693,6 +693,147 @@ export type RevokeCurrentTokenResponses = {
 
 export type RevokeCurrentTokenResponse = RevokeCurrentTokenResponses[keyof RevokeCurrentTokenResponses];
 
+export type ListCheckpointsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        limit?: number;
+        after?: string;
+    };
+    url: '/v2/checkpoints';
+};
+
+export type ListCheckpointsErrors = {
+    /**
+     * Malformed or invalid request body.
+     */
+    400: ErrorResponse;
+    /**
+     * The bearer token was present but rejected.
+     */
+    401: ErrorResponse;
+    /**
+     * No bearer token was supplied, or the token's role does not allow this action.
+     */
+    403: ErrorResponse;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * The request conflicts with current resource state.
+     */
+    409: ErrorResponse;
+    /**
+     * Validation or application error.
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded.
+     */
+    429: ErrorResponse;
+    /**
+     * Internal error.
+     */
+    500: ErrorResponse;
+    /**
+     * Operation is not implemented.
+     */
+    501: ErrorResponse;
+    /**
+     * Upstream service is unavailable.
+     */
+    503: ErrorResponse;
+    /**
+     * Upstream request timed out.
+     */
+    504: ErrorResponse;
+    /**
+     * Error response.
+     */
+    default: ErrorResponse;
+};
+
+export type ListCheckpointsError = ListCheckpointsErrors[keyof ListCheckpointsErrors];
+
+export type ListCheckpointsResponses = {
+    /**
+     * A page of checkpoints.
+     */
+    200: CheckpointListResponse;
+};
+
+export type ListCheckpointsResponse = ListCheckpointsResponses[keyof ListCheckpointsResponses];
+
+export type ListRuntimeImagesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/v2/images';
+};
+
+export type ListRuntimeImagesErrors = {
+    /**
+     * Malformed or invalid request body.
+     */
+    400: ErrorResponse;
+    /**
+     * The bearer token was present but rejected.
+     */
+    401: ErrorResponse;
+    /**
+     * No bearer token was supplied, or the token's role does not allow this action.
+     */
+    403: ErrorResponse;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * The request conflicts with current resource state.
+     */
+    409: ErrorResponse;
+    /**
+     * Validation or application error.
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded.
+     */
+    429: ErrorResponse;
+    /**
+     * Internal error.
+     */
+    500: ErrorResponse;
+    /**
+     * Operation is not implemented.
+     */
+    501: ErrorResponse;
+    /**
+     * Upstream service is unavailable.
+     */
+    503: ErrorResponse;
+    /**
+     * Upstream request timed out.
+     */
+    504: ErrorResponse;
+    /**
+     * Error response.
+     */
+    default: ErrorResponse;
+};
+
+export type ListRuntimeImagesError = ListRuntimeImagesErrors[keyof ListRuntimeImagesErrors];
+
+export type ListRuntimeImagesResponses = {
+    /**
+     * Available runtime images.
+     */
+    200: RuntimeImageListResponse;
+};
+
+export type ListRuntimeImagesResponse = ListRuntimeImagesResponses[keyof ListRuntimeImagesResponses];
+
 export type GetMeData = {
     body?: never;
     path?: never;
@@ -1141,86 +1282,29 @@ export type GetRuntimeResponses = {
 
 export type GetRuntimeResponse = GetRuntimeResponses[keyof GetRuntimeResponses];
 
-export type ListRuntimeImagesData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/v2/images';
-};
-
-export type ListRuntimeImagesErrors = {
+export type PauseRuntimeData = {
     /**
-     * Malformed or invalid request body.
+     * The production CLI sends `{}`; no fields are documented.
      */
-    400: ErrorResponse;
-    /**
-     * The bearer token was present but rejected.
-     */
-    401: ErrorResponse;
-    /**
-     * No bearer token was supplied, or the token's role does not allow this action.
-     */
-    403: ErrorResponse;
-    /**
-     * The requested resource was not found.
-     */
-    404: ErrorResponse;
-    /**
-     * The request conflicts with current resource state.
-     */
-    409: ErrorResponse;
-    /**
-     * Validation or application error.
-     */
-    422: ErrorResponse;
-    /**
-     * Rate limit exceeded.
-     */
-    429: ErrorResponse;
-    /**
-     * Internal error.
-     */
-    500: ErrorResponse;
-    /**
-     * Operation is not implemented.
-     */
-    501: ErrorResponse;
-    /**
-     * Upstream service is unavailable.
-     */
-    503: ErrorResponse;
-    /**
-     * Upstream request timed out.
-     */
-    504: ErrorResponse;
-    /**
-     * Error response.
-     */
-    default: ErrorResponse;
-};
-
-export type ListRuntimeImagesError = ListRuntimeImagesErrors[keyof ListRuntimeImagesErrors];
-
-export type ListRuntimeImagesResponses = {
-    /**
-     * Available runtime images.
-     */
-    200: RuntimeImageListResponse;
-};
-
-export type ListRuntimeImagesResponse = ListRuntimeImagesResponses[keyof ListRuntimeImagesResponses];
-
-export type ListCheckpointsData = {
-    body?: never;
-    path?: never;
-    query?: {
-        limit?: number;
-        after?: string;
+    body?: {
+        [key: string]: never;
     };
-    url: '/v2/checkpoints';
+    path: {
+        /**
+         * Runtime UUID. A display name is rejected; see NOTES.md.
+         */
+        runtime_id: string;
+    };
+    query: {
+        /**
+         * The runtime's current `revision`.
+         */
+        expected_revision: number;
+    };
+    url: '/v2/runtimes/{runtime_id}/pause';
 };
 
-export type ListCheckpointsErrors = {
+export type PauseRuntimeErrors = {
     /**
      * Malformed or invalid request body.
      */
@@ -1271,13 +1355,281 @@ export type ListCheckpointsErrors = {
     default: ErrorResponse;
 };
 
-export type ListCheckpointsError = ListCheckpointsErrors[keyof ListCheckpointsErrors];
+export type PauseRuntimeError = PauseRuntimeErrors[keyof PauseRuntimeErrors];
 
-export type ListCheckpointsResponses = {
+export type PauseRuntimeResponses = {
     /**
-     * A page of checkpoints.
+     * The transition was accepted. The runtime reaches the new state asynchronously, so `status` in this body is usually still the old one.
      */
-    200: CheckpointListResponse;
+    200: RuntimeResponse;
+    /**
+     * Accepted, pending.
+     */
+    202: RuntimeResponse;
 };
 
-export type ListCheckpointsResponse = ListCheckpointsResponses[keyof ListCheckpointsResponses];
+export type PauseRuntimeResponse = PauseRuntimeResponses[keyof PauseRuntimeResponses];
+
+export type ResumeRuntimeData = {
+    /**
+     * The production CLI sends `{}`; no fields are documented.
+     */
+    body?: {
+        [key: string]: never;
+    };
+    path: {
+        /**
+         * Runtime UUID. A display name is rejected; see NOTES.md.
+         */
+        runtime_id: string;
+    };
+    query: {
+        /**
+         * The runtime's current `revision`.
+         */
+        expected_revision: number;
+    };
+    url: '/v2/runtimes/{runtime_id}/resume';
+};
+
+export type ResumeRuntimeErrors = {
+    /**
+     * Malformed or invalid request body.
+     */
+    400: ErrorResponse;
+    /**
+     * The bearer token was present but rejected.
+     */
+    401: ErrorResponse;
+    /**
+     * No bearer token was supplied, or the token's role does not allow this action.
+     */
+    403: ErrorResponse;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * The request conflicts with current resource state.
+     */
+    409: ErrorResponse;
+    /**
+     * Validation or application error.
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded.
+     */
+    429: ErrorResponse;
+    /**
+     * Internal error.
+     */
+    500: ErrorResponse;
+    /**
+     * Operation is not implemented.
+     */
+    501: ErrorResponse;
+    /**
+     * Upstream service is unavailable.
+     */
+    503: ErrorResponse;
+    /**
+     * Upstream request timed out.
+     */
+    504: ErrorResponse;
+    /**
+     * Error response.
+     */
+    default: ErrorResponse;
+};
+
+export type ResumeRuntimeError = ResumeRuntimeErrors[keyof ResumeRuntimeErrors];
+
+export type ResumeRuntimeResponses = {
+    /**
+     * The transition was accepted. The runtime reaches the new state asynchronously, so `status` in this body is usually still the old one.
+     */
+    200: RuntimeResponse;
+    /**
+     * Accepted, pending.
+     */
+    202: RuntimeResponse;
+};
+
+export type ResumeRuntimeResponse = ResumeRuntimeResponses[keyof ResumeRuntimeResponses];
+
+export type StartRuntimeData = {
+    /**
+     * The production CLI sends `{}`; no fields are documented.
+     */
+    body?: {
+        [key: string]: never;
+    };
+    path: {
+        /**
+         * Runtime UUID. A display name is rejected; see NOTES.md.
+         */
+        runtime_id: string;
+    };
+    query: {
+        /**
+         * The runtime's current `revision`.
+         */
+        expected_revision: number;
+    };
+    url: '/v2/runtimes/{runtime_id}/start';
+};
+
+export type StartRuntimeErrors = {
+    /**
+     * Malformed or invalid request body.
+     */
+    400: ErrorResponse;
+    /**
+     * The bearer token was present but rejected.
+     */
+    401: ErrorResponse;
+    /**
+     * No bearer token was supplied, or the token's role does not allow this action.
+     */
+    403: ErrorResponse;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * The request conflicts with current resource state.
+     */
+    409: ErrorResponse;
+    /**
+     * Validation or application error.
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded.
+     */
+    429: ErrorResponse;
+    /**
+     * Internal error.
+     */
+    500: ErrorResponse;
+    /**
+     * Operation is not implemented.
+     */
+    501: ErrorResponse;
+    /**
+     * Upstream service is unavailable.
+     */
+    503: ErrorResponse;
+    /**
+     * Upstream request timed out.
+     */
+    504: ErrorResponse;
+    /**
+     * Error response.
+     */
+    default: ErrorResponse;
+};
+
+export type StartRuntimeError = StartRuntimeErrors[keyof StartRuntimeErrors];
+
+export type StartRuntimeResponses = {
+    /**
+     * The transition was accepted. The runtime reaches the new state asynchronously, so `status` in this body is usually still the old one.
+     */
+    200: RuntimeResponse;
+    /**
+     * Accepted, pending.
+     */
+    202: RuntimeResponse;
+};
+
+export type StartRuntimeResponse = StartRuntimeResponses[keyof StartRuntimeResponses];
+
+export type StopRuntimeData = {
+    /**
+     * The production CLI sends `{}`; no fields are documented.
+     */
+    body?: {
+        [key: string]: never;
+    };
+    path: {
+        /**
+         * Runtime UUID. A display name is rejected; see NOTES.md.
+         */
+        runtime_id: string;
+    };
+    query: {
+        /**
+         * The runtime's current `revision`.
+         */
+        expected_revision: number;
+    };
+    url: '/v2/runtimes/{runtime_id}/stop';
+};
+
+export type StopRuntimeErrors = {
+    /**
+     * Malformed or invalid request body.
+     */
+    400: ErrorResponse;
+    /**
+     * The bearer token was present but rejected.
+     */
+    401: ErrorResponse;
+    /**
+     * No bearer token was supplied, or the token's role does not allow this action.
+     */
+    403: ErrorResponse;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * The request conflicts with current resource state.
+     */
+    409: ErrorResponse;
+    /**
+     * Validation or application error.
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded.
+     */
+    429: ErrorResponse;
+    /**
+     * Internal error.
+     */
+    500: ErrorResponse;
+    /**
+     * Operation is not implemented.
+     */
+    501: ErrorResponse;
+    /**
+     * Upstream service is unavailable.
+     */
+    503: ErrorResponse;
+    /**
+     * Upstream request timed out.
+     */
+    504: ErrorResponse;
+    /**
+     * Error response.
+     */
+    default: ErrorResponse;
+};
+
+export type StopRuntimeError = StopRuntimeErrors[keyof StopRuntimeErrors];
+
+export type StopRuntimeResponses = {
+    /**
+     * The transition was accepted. The runtime reaches the new state asynchronously, so `status` in this body is usually still the old one.
+     */
+    200: RuntimeResponse;
+    /**
+     * Accepted, pending.
+     */
+    202: RuntimeResponse;
+};
+
+export type StopRuntimeResponse = StopRuntimeResponses[keyof StopRuntimeResponses];

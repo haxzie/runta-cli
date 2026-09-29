@@ -36,7 +36,10 @@ describe('command surface', () => {
       'list',
       'login',
       'logout',
+      'pause',
       'runtime',
+      'start',
+      'stop',
       'upgrade',
       'whoami',
     ]);
@@ -49,14 +52,14 @@ describe('command surface', () => {
     const group = program().commands.find((c) => c.name() === 'runtime');
     const verbs = group?.commands.map((c) => c.name()).sort();
 
-    expect(verbs).toEqual(['create', 'delete', 'inspect', 'list']);
+    expect(verbs).toEqual(['create', 'delete', 'inspect', 'list', 'pause', 'start', 'stop']);
     for (const verb of verbs ?? []) expect(names()).toContain(verb);
   });
 
   it('keeps the two forms of each verb in step', () => {
     // Registered from one function, so a flag added to one form cannot go missing from the other.
     const group = program().commands.find((c) => c.name() === 'runtime');
-    for (const verb of ['create', 'delete', 'inspect', 'list']) {
+    for (const verb of ['create', 'delete', 'inspect', 'list', 'pause', 'start', 'stop']) {
       const flat = optionsOf(verb);
       const nested = (group?.commands.find((c) => c.name() === verb)?.options ?? [])
         .map((o) => o.long ?? o.short ?? '')

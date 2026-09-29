@@ -2,7 +2,15 @@ import type { Runtime } from '@runta/api';
 import { isCliError, setLogLevel } from '@runta/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { captureStdout, isolateEnv, type Route, stubFetch } from '../test/harness.js';
-import { type CommandDeps, create, inspect, list, remove } from './runtime.js';
+import {
+  type CommandDeps,
+  create,
+  inspect,
+  lifecycle,
+  list,
+  remove,
+  resolveAction,
+} from './runtime.js';
 
 const ID = '01a0dcc4-2ba7-7353-acb2-7fa79602b0a0';
 
@@ -31,7 +39,7 @@ const runtime = (overrides: Partial<Runtime> = {}): Runtime =>
     vnc_connection: {
       hostname: 'vnc.runta.com',
       port: 5900,
-      username: 'runta-next',
+      username: 'runta',
       security_type: 'X509Plain',
     },
     owner_user_id: 'u_1',
@@ -592,5 +600,240 @@ describe('delete', () => {
       action: 'delete',
       runtimes: [{ name: 'demo', id: ID, deleted: true }],
     });
+  });
+});
+
+// ---------------------------------------------------------------- lifecycle
+
+/** `POST /v2/runtimes/{id}/<verb>` */
+const ACT = (verb: string, body?: unknown, status = 200): Route => ({
+  method: 'POST',
+  path: `/v2/runtimes/${ID}/${verb}`,
+  status,
+  body: body ?? { data: runtime() },
+});
+
+describe('resolveAction', () => {
+  /**
+   * The table that fixes the original CLI's worst lifecycle wart: it ships `boot` for a shut-down
+   * runtime and `resume` for a paused one, so the user has to know the state before they can name
+   * the verb, and naming the wrong one is an API error rather than a no-op.
+   */
+  it('sends start to /start and resume to /resume, from one command', () => {
+    expect(resolveAction('start', runtime({ status: 'shutdown' }))).toBe('start');
+    expect(resolveAction('start', runtime({ status: 'paused' }))).toBe('resume');
+    // Only the idle policy produces `suspended`, and it is memory-suspended, so it resumes.
+    expect(resolveAction('start', runtime({ status: 'suspended' }))).toBe('resume');
+  });
+
+  it('treats a request for the state you are already in as nothing to do', () => {
+    expect(resolveAction('start', runtime({ status: 'running' }))).toBeNull();
+    expect(resolveAction('stop', runtime({ status: 'shutdown' }))).toBeNull();
+    expect(resolveAction('pause', runtime({ status: 'paused' }))).toBeNull();
+    // Already on its way to running.
+    expect(resolveAction('start', runtime({ status: 'creating' }))).toBeNull();
+  });
+
+  it('can stop a parked runtime, but cannot pause one', () => {
+    expect(resolveAction('stop', runtime({ status: 'paused' }))).toBe('stop');
+    expect(resolveAction('stop', runtime({ status: 'suspended' }))).toBe('stop');
+    expect(resolveAction('pause', runtime({ status: 'suspended' }))).toBeUndefined();
+    expect(resolveAction('pause', runtime({ status: 'shutdown' }))).toBeUndefined();
+  });
+
+  it('refuses every verb on a runtime no verb can fix', () => {
+    for (const status of ['error', 'crashed'] as const) {
+      for (const action of ['start', 'stop', 'pause'] as const) {
+        expect(resolveAction(action, runtime({ status }))).toBeUndefined();
+      }
+    }
+  });
+});
+
+describe('lifecycle', () => {
+  it('stops a runtime and waits until it is really shut down', async () => {
+    const { stub, out, deps } = harness([
+      LIST(page([runtime()])),
+      GET({ data: runtime() }), // resolve + read revision
+      GET({ data: runtime() }), // transitionAtCurrentRevision re-reads
+      ACT('stop'),
+      GET({ data: runtime({ status: 'shutdown', desired_status: 'shutdown' }) }),
+    ]);
+
+    await lifecycle('stop', 'demo', { json: true }, deps);
+
+    expect(JSON.parse(out.text)).toMatchObject({
+      action: 'stop',
+      changed: true,
+      runtime: { name: 'demo', status: 'shutdown' },
+    });
+    expect(stub.calls.some((c) => new URL(c.url).pathname.endsWith('/stop'))).toBe(true);
+  });
+
+  it('sends expected_revision, so a concurrent change cannot be clobbered', async () => {
+    const { stub, deps } = harness([
+      LIST(page([runtime({ revision: 9 })])),
+      GET({ data: runtime({ revision: 9 }) }),
+      GET({ data: runtime({ revision: 9 }) }),
+      ACT('pause'),
+      GET({ data: runtime({ status: 'paused' }) }),
+    ]);
+
+    await lifecycle('pause', 'demo', { json: true }, deps);
+
+    const call = stub.calls.find((c) => new URL(c.url).pathname.endsWith('/pause'));
+    expect(new URL(call?.url ?? '').searchParams.get('expected_revision')).toBe('9');
+  });
+
+  /**
+   * The response to a transition still carries the *old* status, because the control plane has only
+   * accepted the request at that point. The production CLI returns that body as its answer, so
+   * `pause` reports `running` (CLI_ISSUES.md C-14). Ours must report what polling found.
+   */
+  it('reports the settled status, not the one the transition response echoed', async () => {
+    const { out, deps } = harness([
+      LIST(page([runtime()])),
+      GET({ data: runtime() }),
+      GET({ data: runtime() }),
+      ACT('pause', { data: runtime({ status: 'running' }) }), // stale, as the real API is
+      GET({ data: runtime({ status: 'running' }) }), // still catching up
+      GET({ data: runtime({ status: 'paused', desired_status: 'paused' }) }),
+    ]);
+
+    await lifecycle('pause', 'demo', { json: true }, deps);
+
+    expect(JSON.parse(out.text)).toMatchObject({ waited: true, runtime: { status: 'paused' } });
+  });
+
+  it('returns immediately with --detach, without polling', async () => {
+    const { stub, out, deps } = harness([
+      LIST(page([runtime()])),
+      GET({ data: runtime() }),
+      GET({ data: runtime() }),
+      ACT('stop'),
+    ]);
+
+    await lifecycle('stop', 'demo', { detach: true, json: true }, deps);
+
+    // Under --detach the status is the pre-transition one, so the payload has to say so rather
+    // than presenting `running` as the outcome of a stop (C-14).
+    expect(JSON.parse(out.text)).toMatchObject({
+      accepted: true,
+      changed: true,
+      waited: false,
+      target_status: 'shutdown',
+      runtime: { status: 'running' },
+    });
+    // Two reads to resolve and transition; none after.
+    expect(stub.calls.filter((c) => new URL(c.url).pathname === `/v2/runtimes/${ID}`).length).toBe(
+      2,
+    );
+  });
+
+  it('is idempotent: stopping a stopped runtime makes no request', async () => {
+    const { stub, out, deps } = harness([
+      LIST(page([runtime({ status: 'shutdown' })])),
+      GET({ data: runtime({ status: 'shutdown' }) }),
+    ]);
+
+    await lifecycle('stop', 'demo', { json: true }, deps);
+
+    expect(JSON.parse(out.text)).toMatchObject({
+      changed: false,
+      reason: 'already_in_state',
+    });
+    expect(stub.calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+
+  it('refuses a transition that cannot apply, naming the state', async () => {
+    const { deps } = harness([
+      LIST(page([runtime({ status: 'crashed' })])),
+      GET({ data: runtime({ status: 'crashed' }) }),
+    ]);
+
+    const error = await lifecycle('pause', 'demo', {}, deps).catch((e: unknown) => e);
+
+    expect(isCliError(error)).toBe(true);
+    expect(String(error)).toMatch(/is crashed, which `pause` cannot change/);
+  });
+
+  it('dry run resolves the real plan and sends nothing', async () => {
+    const { stub, out, deps } = harness([
+      LIST(page([runtime({ status: 'paused', revision: 4 })])),
+      GET({ data: runtime({ status: 'paused', revision: 4 }) }),
+    ]);
+
+    await lifecycle('start', 'demo', { dryRun: true, json: true }, deps);
+
+    expect(JSON.parse(out.text)).toMatchObject({
+      action: 'start',
+      dry_run: true,
+      endpoint: 'resume',
+      target_status: 'running',
+      revision: 4,
+    });
+    expect(stub.calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+
+  it('retries once when the revision went stale underneath it', async () => {
+    const { stub, deps } = harness([
+      LIST(page([runtime()])),
+      GET({ data: runtime({ revision: 2 }) }),
+      GET({ data: runtime({ revision: 2 }) }),
+      ACT('stop', { error: { code: 'conflict', message: 'stale revision' } }, 409),
+      GET({ data: runtime({ revision: 3 }) }),
+      ACT('stop'),
+      GET({ data: runtime({ status: 'shutdown' }) }),
+    ]);
+
+    await lifecycle('stop', 'demo', { json: true }, deps);
+
+    const revisions = stub.calls
+      .filter((c) => new URL(c.url).pathname.endsWith('/stop'))
+      .map((c) => new URL(c.url).searchParams.get('expected_revision'));
+    expect(revisions).toEqual(['2', '3']);
+  });
+
+  it('emits four fields, not the whole runtime object', async () => {
+    const { out, deps } = harness([
+      LIST(page([runtime()])),
+      GET({ data: runtime() }),
+      GET({ data: runtime() }),
+      ACT('pause'),
+      GET({ data: runtime({ status: 'paused' }) }),
+    ]);
+
+    await lifecycle('pause', 'demo', { json: true }, deps);
+
+    // C-22: the production CLI returns all 45 fields to convey one state change.
+    expect(Object.keys(JSON.parse(out.text).runtime).sort()).toEqual([
+      'desired_status',
+      'id',
+      'name',
+      'status',
+    ]);
+  });
+
+  it('never suggests the command that just ran', async () => {
+    setLogLevel('info');
+    const lines: string[] = [];
+    vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      lines.push(args.join(' '));
+    });
+    const { deps } = harness([
+      LIST(page([runtime()])),
+      GET({ data: runtime() }),
+      GET({ data: runtime() }),
+      ACT('stop'),
+      GET({ data: runtime({ status: 'shutdown' }) }),
+    ]);
+
+    await lifecycle('stop', 'demo', {}, deps);
+
+    // C-11: upstream's `resume` answers `required_action: runta resume <name>`, which loops.
+    const suggestions = lines.filter((l) => l.includes('runta-next '));
+    expect(suggestions.length).toBeGreaterThan(0);
+    expect(suggestions.some((l) => /runta-next stop\b/.test(l))).toBe(false);
+    expect(suggestions.some((l) => /runta-next start\b/.test(l))).toBe(true);
   });
 });

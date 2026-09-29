@@ -39,6 +39,9 @@ runta-next [global options] <command> [command options]
 | `runta-next inspect <runtime>` | Show everything about one runtime |
 | `runta-next delete <runtime>...` | Delete runtimes, with `--dry-run` and confirmation |
 | `runta-next exec <runtime> -- <cmd>` | Run a command inside a runtime; `-it` for an interactive pty |
+| `runta-next start <runtime>` | Start a stopped runtime, or resume a paused one |
+| `runta-next stop <runtime>` | Shut a runtime down, releasing its resources |
+| `runta-next pause <runtime>` | Pause a running runtime, keeping its memory |
 | `runta-next login` | Sign in through a browser using a one-time device code |
 | `runta-next logout` | Revoke the stored credential and remove it locally |
 | `runta-next whoami` | Show the authenticated user and active team |
@@ -161,6 +164,7 @@ builds the site from it, so there is nothing to keep in sync between the repo an
 | [Authentication](./docs/authentication.md) | Device flow, CI tokens, credential storage |
 | [Configuration](./docs/configuration.md) | Every variable, the config file, precedence |
 | [Output and scripting](./docs/output-and-scripting.md) | `--json`, NDJSON, exit codes, agents |
+| [start, stop, pause](./docs/commands/lifecycle.md) | Parking a runtime and bringing it back |
 | [Commands](./docs/commands/index.md) | Per-command reference |
 
 For agents, every page is also served as plain text — [`/docs/llms.txt`][llms] indexes the site,

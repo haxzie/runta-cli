@@ -265,6 +265,143 @@
         }
       }
     },
+    "/v2/checkpoints": {
+      "get": {
+        "operationId": "listCheckpoints",
+        "summary": "List checkpoints",
+        "tags": [
+          "checkpoints"
+        ],
+        "description": "Cursor-paginated like the runtime list. Described here so `create --from-checkpoint` can accept a checkpoint name \u2014 `checkpoint_id` itself must be a UUID.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of checkpoints.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckpointListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          }
+        }
+      }
+    },
+    "/v2/images": {
+      "get": {
+        "operationId": "listRuntimeImages",
+        "summary": "List runtime images",
+        "tags": [
+          "images"
+        ],
+        "description": "Images carry both a slug `id` (what create takes) and a display `name`, so the CLI lists them to accept either.",
+        "responses": {
+          "200": {
+            "description": "Available runtime images.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeImageListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          }
+        }
+      }
+    },
     "/v2/me": {
       "get": {
         "operationId": "getMe",
@@ -722,21 +859,64 @@
         }
       }
     },
-    "/v2/images": {
-      "get": {
-        "operationId": "listRuntimeImages",
-        "summary": "List runtime images",
+    "/v2/runtimes/{runtime_id}/pause": {
+      "post": {
+        "operationId": "pauseRuntime",
+        "summary": "Pause a running runtime",
         "tags": [
-          "images"
+          "runtimes"
         ],
-        "description": "Images carry both a slug `id` (what create takes) and a display `name`, so the CLI lists them to accept either.",
+        "description": "Takes a `running` runtime to `paused`. Distinct from `suspended`, which only the idle policy produces \u2014 there is no `/suspend` endpoint.\n\nVerified by probing the production CLI against a local endpoint: it sends `POST /v2/runtimes/{runtime_id}/pause?expected_revision=N` with an empty JSON object as the body. Optimistic concurrency works exactly as `deleteRuntime` does \u2014 `expected_revision` must match the runtime's current `revision`, so a caller has to read the runtime first, and a stale value is a 409.",
+        "parameters": [
+          {
+            "name": "runtime_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Runtime UUID. A display name is rejected; see NOTES.md."
+          },
+          {
+            "name": "expected_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "The runtime's current `revision`."
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "description": "The production CLI sends `{}`; no fields are documented.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Available runtime images.",
+            "description": "The transition was accepted. The runtime reaches the new state asynchronously, so `status` in this body is usually still the old one.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RuntimeImageListResponse"
+                  "$ref": "#/components/schemas/RuntimeResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted, pending.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeResponse"
                 }
               }
             }
@@ -780,42 +960,266 @@
         }
       }
     },
-    "/v2/checkpoints": {
-      "get": {
-        "operationId": "listCheckpoints",
-        "summary": "List checkpoints",
+    "/v2/runtimes/{runtime_id}/resume": {
+      "post": {
+        "operationId": "resumeRuntime",
+        "summary": "Resume a paused runtime",
         "tags": [
-          "checkpoints"
+          "runtimes"
         ],
-        "description": "Cursor-paginated like the runtime list. Described here so `create --from-checkpoint` can accept a checkpoint name \u2014 `checkpoint_id` itself must be a UUID.",
+        "description": "Returns a `paused` runtime to `running`. Separate from `/start`, which is for `shutdown`; the API has no single endpoint covering both.\n\nVerified by probing the production CLI against a local endpoint: it sends `POST /v2/runtimes/{runtime_id}/resume?expected_revision=N` with an empty JSON object as the body. Optimistic concurrency works exactly as `deleteRuntime` does \u2014 `expected_revision` must match the runtime's current `revision`, so a caller has to read the runtime first, and a stale value is a 409.",
         "parameters": [
           {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 50
-            }
-          },
-          {
-            "name": "after",
-            "in": "query",
-            "required": false,
+            "name": "runtime_id",
+            "in": "path",
+            "required": true,
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "Runtime UUID. A display name is rejected; see NOTES.md."
+          },
+          {
+            "name": "expected_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "The runtime's current `revision`."
           }
         ],
+        "requestBody": {
+          "required": false,
+          "description": "The production CLI sends `{}`; no fields are documented.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "A page of checkpoints.",
+            "description": "The transition was accepted. The runtime reaches the new state asynchronously, so `status` in this body is usually still the old one.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CheckpointListResponse"
+                  "$ref": "#/components/schemas/RuntimeResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted, pending.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          }
+        }
+      }
+    },
+    "/v2/runtimes/{runtime_id}/start": {
+      "post": {
+        "operationId": "startRuntime",
+        "summary": "Start a stopped runtime",
+        "tags": [
+          "runtimes"
+        ],
+        "description": "Brings a `shutdown` runtime back to `running`. The production CLI exposes this as `boot`; the API's own verb is `start`.\n\nVerified by probing the production CLI against a local endpoint: it sends `POST /v2/runtimes/{runtime_id}/start?expected_revision=N` with an empty JSON object as the body. Optimistic concurrency works exactly as `deleteRuntime` does \u2014 `expected_revision` must match the runtime's current `revision`, so a caller has to read the runtime first, and a stale value is a 409.",
+        "parameters": [
+          {
+            "name": "runtime_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Runtime UUID. A display name is rejected; see NOTES.md."
+          },
+          {
+            "name": "expected_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "The runtime's current `revision`."
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "description": "The production CLI sends `{}`; no fields are documented.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The transition was accepted. The runtime reaches the new state asynchronously, so `status` in this body is usually still the old one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted, pending.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          },
+          "default": {
+            "$ref": "#/components/responses/ErrorDefault"
+          }
+        }
+      }
+    },
+    "/v2/runtimes/{runtime_id}/stop": {
+      "post": {
+        "operationId": "stopRuntime",
+        "summary": "Stop a runtime",
+        "tags": [
+          "runtimes"
+        ],
+        "description": "Takes a runtime to `shutdown`. The production CLI exposes this as `shutdown`; the API's own verb is `stop`.\n\nVerified by probing the production CLI against a local endpoint: it sends `POST /v2/runtimes/{runtime_id}/stop?expected_revision=N` with an empty JSON object as the body. Optimistic concurrency works exactly as `deleteRuntime` does \u2014 `expected_revision` must match the runtime's current `revision`, so a caller has to read the runtime first, and a stale value is a 409.",
+        "parameters": [
+          {
+            "name": "runtime_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Runtime UUID. A display name is rejected; see NOTES.md."
+          },
+          {
+            "name": "expected_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "The runtime's current `revision`."
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "description": "The production CLI sends `{}`; no fields are documented.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The transition was accepted. The runtime reaches the new state asynchronously, so `status` in this body is usually still the old one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted, pending.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeResponse"
                 }
               }
             }

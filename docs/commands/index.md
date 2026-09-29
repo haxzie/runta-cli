@@ -22,6 +22,9 @@ runta-next [global options] <command> [command options]
 | [`runta-next inspect`](./inspect.md) | Show everything about one runtime |
 | [`runta-next delete`](./delete.md) | Delete one or more runtimes |
 | [`runta-next exec`](./exec.md) | Run a command inside a runtime |
+| [`runta-next start`](./lifecycle.md) | Start a stopped runtime, or resume a paused one |
+| [`runta-next stop`](./lifecycle.md) | Shut a runtime down, releasing its resources |
+| [`runta-next pause`](./lifecycle.md) | Pause a running runtime, keeping its memory |
 | [`runta-next login`](./login.md) | Sign in through a browser using a one-time device code |
 | [`runta-next logout`](./logout.md) | Revoke the stored credential and remove it locally |
 | [`runta-next whoami`](./whoami.md) | Show the authenticated user and active team |
@@ -121,12 +124,13 @@ If this documentation and `--help` disagree, `--help` is right.
 ## Not yet implemented
 
 The [Runta REST API](https://runta.com/docs/reference/api/) exposes 85 operations. The CLI
-currently covers four. Nothing below exists yet as a command:
+currently covers eight. Nothing below exists yet as a command:
 
 | Area | API operations | Status |
 | --- | --- | --- |
 | Runtimes — create, list, inspect, delete | 4 | **Done** |
-| Runtimes — resize, pause, resume, start, stop, VNC | 17 | Not started |
+| Runtimes — start, stop, pause, resume | 4 | **Done** (as three commands; see `Improvements.md` I-9) |
+| Runtimes — resize, VNC, and the rest | 13 | Not started |
 | `exec` — run a command in a runtime (WebSocket, not REST) | — | **Done** |
 | Cloud agents — create, run, follow up, artifacts, workspace | 22 | Not started |
 | GitHub — connect, repositories, runtime bindings | 9 | Not started |

@@ -5,9 +5,13 @@ import {
   listCheckpoints,
   listRuntimeImages,
   listRuntimes,
+  pauseRuntime,
   type RuntaClient,
   type Runtime,
   type RuntimeImage,
+  resumeRuntime,
+  startRuntime,
+  stopRuntime,
 } from '@runta/api';
 import { fail } from '@runta/utils';
 
@@ -210,6 +214,28 @@ export async function waitUntilRunning(
   deps: WaitDeps,
   options: WaitOptions = {},
 ): Promise<Runtime> {
+  return await waitUntilStatus(client, runtimeId, 'running', deps, options);
+}
+
+/**
+ * Polls until the runtime reaches `target`.
+ *
+ * Every state transition is asynchronous and — this is the part that bites — the response to the
+ * transition request still carries the *old* status, because the control plane has only accepted
+ * the request at that point. The production CLI returns that body as the answer, so `pause` reports
+ * `running` and a script that reads it acts on a state that is already wrong
+ * (CLI_ISSUES.md C-14). Polling is what makes the command's output true.
+ *
+ * `FATAL` still short-circuits, so waiting for `shutdown` on a runtime that crashed fails fast
+ * instead of burning the whole timeout.
+ */
+export async function waitUntilStatus(
+  client: RuntaClient,
+  runtimeId: string,
+  target: Runtime['status'],
+  deps: WaitDeps,
+  options: WaitOptions = {},
+): Promise<Runtime> {
   const { timeoutMs, intervalMs } = { ...DEFAULTS, ...options };
   const deadline = deps.now() + timeoutMs;
 
@@ -222,7 +248,7 @@ export async function waitUntilRunning(
     const runtime = data.data;
     deps.onPoll?.(runtime);
 
-    if (runtime.status === 'running') return runtime;
+    if (runtime.status === target) return runtime;
 
     if (FATAL.has(runtime.status)) {
       throw new RuntimeWaitError(
@@ -338,4 +364,116 @@ export async function deleteAtCurrentRevision(
     }
   }
   throw last;
+}
+
+// ---------------------------------------------------------------- state transitions
+
+/** The four transition endpoints the API exposes. There is no `/suspend`. */
+export type RuntimeAction = 'start' | 'stop' | 'pause' | 'resume';
+
+/** The status each action is trying to reach, for the wait that follows it. */
+export const TARGET_STATUS: Record<RuntimeAction, Runtime['status']> = {
+  start: 'running',
+  stop: 'shutdown',
+  pause: 'paused',
+  resume: 'running',
+};
+
+/**
+ * Which endpoint brings a runtime in `status` back to `running`.
+ *
+ * The API splits this across two endpoints — `/start` for a `shutdown` runtime and `/resume` for a
+ * paused one — and the production CLI exposes that split as two commands (`boot` and `resume`), so a
+ * user has to know which state their runtime is in before they can name the right verb, and picking
+ * wrong is an API error. Since the CLI must read the runtime anyway to get `expected_revision`, it
+ * already knows the answer. Returns `null` when the runtime is already running or on its way.
+ *
+ * `suspended` resumes rather than starts: it is a memory-suspended runtime, and `/start` is for one
+ * that was shut down. Only the idle policy produces that state — there is no command for it.
+ */
+export function wakeAction(status: Runtime['status']): 'start' | 'resume' | null {
+  switch (status) {
+    case 'running':
+    case 'creating':
+      return null;
+    case 'paused':
+    case 'suspended':
+      return 'resume';
+    case 'shutdown':
+      return 'start';
+    default:
+      // error, crashed, deleting, unavailable: not something a verb can fix.
+      return null;
+  }
+}
+
+/**
+ * Runs a transition against the runtime's current revision.
+ *
+ * Same optimistic-concurrency dance as `deleteAtCurrentRevision`, and the same reason for retrying:
+ * `expected_revision` must match, and anything else touching the runtime between the read and the
+ * write makes it stale. One retry covers a concurrent poll; a persistent 409 is a real conflict and
+ * is surfaced.
+ *
+ * Returns the runtime as the API described it, which is deliberately *not* treated as the new state
+ * anywhere — see `waitUntilStatus`.
+ */
+export async function transitionAtCurrentRevision(
+  client: RuntaClient,
+  runtimeId: string,
+  action: RuntimeAction,
+  attempts = 2,
+): Promise<Runtime> {
+  let last: unknown;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const { data } = await getRuntime({
+      client,
+      path: { runtime_id: runtimeId },
+      throwOnError: true,
+    });
+    const runtime = data.data;
+
+    try {
+      const { data: updated } = await callTransition(client, runtimeId, action, runtime.revision);
+      return updated?.data ?? runtime;
+    } catch (error) {
+      if (!isRuntaApiError(error) || error.status !== 409) throw error;
+      last = error;
+    }
+  }
+
+  throw last;
+}
+
+/**
+ * Dispatches to the generated operation for `action`.
+ *
+ * A switch rather than a lookup table because each generated function has its own request and
+ * response types; a table would need a cast, and the cast is the thing that would hide a mismatch.
+ */
+function callTransition(
+  client: RuntaClient,
+  runtimeId: string,
+  action: RuntimeAction,
+  revision: number,
+) {
+  const options = {
+    client,
+    path: { runtime_id: runtimeId },
+    query: { expected_revision: revision },
+    body: {},
+    throwOnError: true,
+  } as const;
+
+  switch (action) {
+    case 'start':
+      return startRuntime(options);
+    case 'stop':
+      return stopRuntime(options);
+    case 'pause':
+      return pauseRuntime(options);
+    case 'resume':
+      return resumeRuntime(options);
+  }
 }

@@ -10,12 +10,17 @@ import {
   createContext,
   deleteAtCurrentRevision,
   modelProviderProtocol,
+  type RuntimeAction,
   RuntimeWaitError,
   resolveCheckpointId,
   resolveImage,
   resolveRuntimeId,
+  TARGET_STATUS,
+  transitionAtCurrentRevision,
   waitUntilDeleted,
   waitUntilRunning,
+  waitUntilStatus,
+  wakeAction,
 } from '@runta/core';
 import { type Column, fail, logger, renderTable } from '@runta/utils';
 import type { Command } from 'commander';
@@ -529,6 +534,249 @@ export async function remove(
   }
 }
 
+// ---------------------------------------------------------------- lifecycle
+
+export interface LifecycleOptions {
+  detach?: boolean;
+  dryRun?: boolean;
+  json?: boolean;
+  timeout?: string;
+}
+
+/**
+ * `stop`, `pause` and `start` — three commands over the API's four transition endpoints.
+ *
+ * The asymmetry is deliberate and is the main thing this fixes. The API splits waking a runtime
+ * across `/start` (from `shutdown`) and `/resume` (from `paused`), and the production CLI exposes
+ * that split as `boot` and `resume`, so the user has to know the current state to name the right
+ * verb — and naming the wrong one is an API error, not a no-op. Since we read the runtime anyway
+ * for `expected_revision`, `start` can just pick. See Improvements.md I-9.
+ */
+export async function lifecycle(
+  action: 'stop' | 'pause' | 'start',
+  reference: string,
+  options: LifecycleOptions = {},
+  deps: CommandDeps = defaultDeps,
+): Promise<void> {
+  const { client } = await createContext();
+
+  const runtime = await run(async () => {
+    const { data } = await getRuntime({
+      client,
+      path: { runtime_id: await resolveRuntimeId(client, reference) },
+      throwOnError: true,
+    });
+    return data.data;
+  });
+
+  const resolved = resolveAction(action, runtime);
+
+  // Already there: say so and stop. The production CLI sends the request regardless, which either
+  // 409s or silently bumps a revision for no change — neither is what "stop a stopped runtime"
+  // should mean. Idempotence is the useful reading, and it makes the command safe in a script that
+  // cannot know the current state.
+  if (resolved === null) {
+    emitLifecycle(runtime, options, deps, {
+      action,
+      changed: false,
+      reason: 'already_in_state',
+      waited: true,
+      message: `Runtime '${runtime.display_name}' is already ${runtime.status}.`,
+    });
+    if (!options.json) printNextSteps(lifecycleNextSteps(action, runtime, false));
+    return;
+  }
+
+  if (resolved === undefined) {
+    fail(
+      `Runtime '${runtime.display_name}' is ${runtime.status}, which \`${action}\` cannot change.`,
+      {
+        exitCode: 1,
+        hint:
+          runtime.status === 'error' || runtime.status === 'crashed'
+            ? `This runtime cannot be recovered. Remove it with \`runta-next delete ${runtime.display_name}\`.`
+            : 'Check the current state with `runta-next inspect`.',
+      },
+    );
+  }
+
+  const target = TARGET_STATUS[resolved];
+
+  if (options.dryRun) {
+    const plan = {
+      action,
+      dry_run: true,
+      runtime: { id: runtime.id, name: runtime.display_name, status: runtime.status },
+      endpoint: resolved,
+      target_status: target,
+      revision: runtime.revision,
+    };
+    if (options.json) {
+      deps.write(`${JSON.stringify(plan, null, 2)}\n`);
+      return;
+    }
+    deps.write(
+      `Would ${action} '${runtime.display_name}' (${runtime.id})\n` +
+        `  currently ${runtime.status}, would become ${target}\n` +
+        `  via POST /v2/runtimes/{id}/${resolved} at revision ${runtime.revision}\n`,
+    );
+    return;
+  }
+
+  await run(() => transitionAtCurrentRevision(client, runtime.id, resolved));
+
+  if (options.detach) {
+    emitLifecycle(runtime, options, deps, {
+      action,
+      changed: true,
+      accepted: true,
+      waited: false,
+      targetStatus: target,
+      message: `${VERB[action].gerund} '${runtime.display_name}' — not waiting. It will become ${target}.`,
+    });
+    if (!options.json) printNextSteps(lifecycleNextSteps(action, runtime, true));
+    return;
+  }
+
+  logger.info(`${VERB[action].gerund} '${runtime.display_name}'…`);
+  const settled = await waitFor(() =>
+    waitUntilStatus(
+      client,
+      runtime.id,
+      target,
+      { sleep: deps.sleep, now: deps.now, onPoll: (r) => logger.debug(`status: ${r.status}`) },
+      timeoutOf(options.timeout),
+    ),
+  );
+
+  emitLifecycle(settled, options, deps, {
+    action,
+    changed: true,
+    waited: true,
+    message: `Runtime '${settled.display_name}' is ${settled.status}.`,
+  });
+  if (!options.json) printNextSteps(lifecycleNextSteps(action, settled, true));
+}
+
+const VERB: Record<'stop' | 'pause' | 'start', { gerund: string }> = {
+  stop: { gerund: 'Stopping' },
+  pause: { gerund: 'Pausing' },
+  start: { gerund: 'Starting' },
+};
+
+/**
+ * The endpoint to call, `null` when the runtime is already in the requested state, and `undefined`
+ * when no transition applies.
+ */
+export function resolveAction(
+  action: 'stop' | 'pause' | 'start',
+  runtime: Runtime,
+): RuntimeAction | null | undefined {
+  if (action === 'start') {
+    if (runtime.status === 'running') return null;
+    const wake = wakeAction(runtime.status);
+    // `creating` returns null from wakeAction because it is already on its way to running.
+    if (wake === null) return runtime.status === 'creating' ? null : undefined;
+    return wake;
+  }
+
+  if (action === 'stop') {
+    if (runtime.status === 'shutdown') return null;
+    // A paused or suspended runtime can still be shut down.
+    return runtime.status === 'error' ||
+      runtime.status === 'crashed' ||
+      runtime.status === 'deleting'
+      ? undefined
+      : 'stop';
+  }
+
+  if (runtime.status === 'paused') return null;
+  // Only a running runtime can be paused; suspended is already parked.
+  return runtime.status === 'running' ? 'pause' : undefined;
+}
+
+/**
+ * Deliberately a small payload rather than the runtime object.
+ *
+ * The production CLI answers `pause` with all 45 fields of the runtime to convey one state change —
+ * roughly 350 tokens of context for one bit of information (CLI_ISSUES.md C-22). `inspect` is the
+ * command for the whole object.
+ */
+function emitLifecycle(
+  runtime: Runtime,
+  options: LifecycleOptions,
+  deps: CommandDeps,
+  result: {
+    action: string;
+    changed: boolean;
+    accepted?: boolean;
+    reason?: string;
+    message: string;
+    /**
+     * Whether `runtime.status` was read after the transition settled. False under `--detach`, where
+     * the status is whatever it was when the request was accepted — which for a `stop` is still
+     * `running`. Reporting that as the outcome is exactly the defect this command exists to avoid
+     * (C-14), so the flag and `target_status` say plainly that it is not settled yet.
+     */
+    waited: boolean;
+    targetStatus?: Runtime['status'];
+  },
+): void {
+  if (options.json) {
+    deps.write(
+      `${JSON.stringify(
+        {
+          action: result.action,
+          changed: result.changed,
+          ...(result.reason ? { reason: result.reason } : {}),
+          ...(result.accepted ? { accepted: true } : {}),
+          waited: result.waited,
+          ...(result.targetStatus ? { target_status: result.targetStatus } : {}),
+          runtime: {
+            id: runtime.id,
+            name: runtime.display_name,
+            status: runtime.status,
+            desired_status: runtime.desired_status,
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
+  logger.info(result.message);
+}
+
+/**
+ * What to do next after a state change.
+ *
+ * The production CLI's `resume` answers with `required_action: runta resume <name>` — an agent
+ * following that field, which is what it is for, loops forever (CLI_ISSUES.md C-11). Nothing here
+ * ever names the command that just ran.
+ */
+function lifecycleNextSteps(
+  action: 'stop' | 'pause' | 'start',
+  runtime: Runtime,
+  changed: boolean,
+): NextStep[] {
+  const name = runtime.display_name;
+
+  if (action === 'start') {
+    return changed
+      ? [{ command: `runta-next exec ${name} -- uname -a`, why: 'run a command inside it' }]
+      : [];
+  }
+
+  // Stopped or paused: the one thing you will want is to bring it back.
+  return [
+    { command: `runta-next start ${name}`, why: 'bring it back to running' },
+    ...(action === 'pause'
+      ? [{ command: `runta-next stop ${name}`, why: 'shut it down instead, releasing more' }]
+      : []),
+  ];
+}
+
 // ---------------------------------------------------------------- shared
 
 /** Turns an API error into a CliError so no command has to repeat the mapping. */
@@ -706,7 +954,28 @@ function addRuntimeVerbs(parent: Command): void {
     .action(async (references: string[], opts: DeleteOptions) => {
       await remove(references, opts);
     });
+
+  for (const action of ['start', 'stop', 'pause'] as const) {
+    parent
+      .command(action)
+      .description(LIFECYCLE_DESCRIPTIONS[action])
+      .argument('<runtime>', 'runtime name or id')
+      .option('--dry-run', 'show what would change and exit')
+      .option('-d, --detach', 'return as soon as the change is accepted, without waiting')
+      .option('--timeout <secs>', 'how long to wait before giving up (default 180)')
+      .option('--json', 'print the result as JSON')
+      .action(async (reference: string, opts: LifecycleOptions) => {
+        await lifecycle(action, reference, opts);
+      });
+  }
 }
+
+/** `start` covers both of the API's wake endpoints, so its description has to say so. */
+const LIFECYCLE_DESCRIPTIONS = {
+  start: 'Start a stopped runtime, or resume a paused one',
+  stop: 'Shut a runtime down, releasing its resources',
+  pause: 'Pause a running runtime, keeping its memory',
+} as const;
 
 const collectRepeat = (value: string, previous: string[]): string[] => [...previous, value];
 

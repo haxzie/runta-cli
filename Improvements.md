@@ -342,3 +342,66 @@ An earlier draft of this document said Runta has "~12 resources". That was loose
 documented API groups**, **15 distinct top-level `/v2` path segments** (11 once `healthz`,
 `ssh-host-key` and the three observability paths are folded in), and — separately — **12
 non-lifecycle command groups in the production CLI**. The three counts coincide at 12 by accident.
+
+## I-9 — Three lifecycle verbs over four endpoints
+
+**Status:** decided, implemented.
+
+The API exposes four transition endpoints — `POST /v2/runtimes/{id}/{start,stop,pause,resume}`, each
+taking `expected_revision` and an empty body. Verified by pointing the production CLI's `--endpoint`
+at a local server and logging what it sent, since none of this is in the published reference.
+
+The production CLI maps those four endpoints to four commands, and renames two of them: `boot` for
+`/start` and `shutdown` for `/stop`. We ship **three**: `start`, `stop`, `pause`.
+
+### `start` covers both wake endpoints
+
+The split between `/start` (from `shutdown`) and `/resume` (from `paused`) is a detail of how the
+control plane works, not a distinction the user is trying to express. Upstream surfaces it as two
+commands, so before you can name a verb you have to know which state your runtime is in — and if you
+guess wrong you get an API error rather than the thing you asked for. Worse, `suspended` exists as a
+third parked state that only the idle policy produces, and no command names it at all.
+
+Since the CLI must read the runtime anyway to obtain `expected_revision`, it already knows the answer
+before it acts. So `start` means "make this runnable again" and picks: `/resume` from `paused` or
+`suspended`, `/start` from `shutdown`. `--dry-run --json` reports which endpoint it chose, so the
+mapping is inspectable rather than magic.
+
+We do not ship `resume` or `boot`, per [I-3](#i-3--no-compatibility-aliases).
+
+### Asking for the state you are in is not an error
+
+`stop` on a stopped runtime reports `changed: false, reason: "already_in_state"` and makes no request.
+Upstream sends it regardless, which either 409s or bumps a revision for no change. Idempotence is the
+useful reading, and it is what makes these commands safe in a script that cannot know the current
+state — which is most scripts.
+
+Asking for a state that cannot be reached *is* an error: `pause` on a `crashed` runtime exits 1 and
+names the state, rather than failing at the transport layer.
+
+### The output says whether the status settled
+
+Every transition is asynchronous, and the response to the request still carries the **old** status
+because the control plane has only accepted it at that point. Upstream returns that body as its
+answer, so `pause` reports `running` (`CLI_ISSUES.md` C-14). We poll until the target status is
+observed, and under `--detach` — where by definition we cannot know — the payload carries
+`waited: false` and `target_status`, so a caller is never handed a stale status dressed up as an
+outcome.
+
+The payload is four fields, not the runtime object. Upstream answers a one-bit state change with all
+45 fields, about 350 tokens of context for one bit (C-22). `inspect` is the command for the object.
+
+### Next steps never name the command that just ran
+
+Upstream's `resume` answers with `required_action: runta resume <name>`, so an agent following that
+field loops (C-11). After `stop` and `pause` we suggest `start`; after `start`, `exec`. A test asserts
+`stop` never suggests `stop`.
+
+### Not included
+
+`resize` is a `PATCH /v2/runtimes/{id}` with `{"resources":{"requests":{…}}}` — the same general
+update endpoint that would back an `update` command, so it belongs with
+[I-5](#i-5--runtime-configuration-is-not-a-resource) rather than with the lifecycle verbs. Note
+upstream's `resize` changes memory and disk but **not** vCPUs, despite `create` accepting `--cpus`;
+whether that is an API limit or an upstream omission needs checking live before `update` claims to
+offer it.

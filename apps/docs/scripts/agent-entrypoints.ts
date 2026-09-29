@@ -35,6 +35,7 @@ const ORDER = [
   'commands/inspect.md',
   'commands/delete.md',
   'commands/exec.md',
+  'commands/lifecycle.md',
   'commands/login.md',
   'commands/logout.md',
   'commands/whoami.md',

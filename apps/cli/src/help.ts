@@ -28,7 +28,11 @@ const DOCS_URL = 'https://runta-cli.haxzie.com/docs';
 const LLMS_URL = `${DOCS_URL}/llms-full.txt`;
 
 const GROUPS: Group[] = [
-  { title: 'Runtimes', commands: ['create', 'list', 'inspect', 'delete', 'exec'] },
+  {
+    title: 'Runtimes',
+    // Lifecycle order, not alphabetical: make one, look at it, use it, park it, remove it.
+    commands: ['create', 'list', 'inspect', 'exec', 'start', 'stop', 'pause', 'delete'],
+  },
   { title: 'Account', commands: ['login', 'logout', 'whoami'] },
   { title: 'More', commands: ['runtime', 'upgrade', 'help'] },
 ];
@@ -38,6 +42,9 @@ const USAGE: Record<string, string> = {
   inspect: 'inspect <runtime>',
   delete: 'delete <runtime>...',
   exec: 'exec <runtime> -- <command>',
+  start: 'start <runtime>',
+  stop: 'stop <runtime>',
+  pause: 'pause <runtime>',
   help: 'help [command]',
 };
 

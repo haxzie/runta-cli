@@ -54,6 +54,7 @@ export default defineConfig({
           { text: 'inspect', link: '/commands/inspect' },
           { text: 'delete', link: '/commands/delete' },
           { text: 'exec', link: '/commands/exec' },
+          { text: 'start, stop, pause', link: '/commands/lifecycle' },
           { text: 'login', link: '/commands/login' },
           { text: 'logout', link: '/commands/logout' },
           { text: 'whoami', link: '/commands/whoami' },

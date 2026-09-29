@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BeginDeviceAuthorizationData, BeginDeviceAuthorizationErrors, BeginDeviceAuthorizationResponses, CreateRuntimeData, CreateRuntimeErrors, CreateRuntimeResponses, DeleteRuntimeData, DeleteRuntimeErrors, DeleteRuntimeResponses, ExchangeDeviceTokenData, ExchangeDeviceTokenErrors, ExchangeDeviceTokenResponses, GetMeData, GetMeErrors, GetMeResponses, GetRuntimeData, GetRuntimeErrors, GetRuntimeResponses, ListCheckpointsData, ListCheckpointsErrors, ListCheckpointsResponses, ListManagedModelProvidersData, ListManagedModelProvidersErrors, ListManagedModelProvidersResponses, ListRuntimeImagesData, ListRuntimeImagesErrors, ListRuntimeImagesResponses, ListRuntimesData, ListRuntimesErrors, ListRuntimesResponses, RevokeCurrentTokenData, RevokeCurrentTokenErrors, RevokeCurrentTokenResponses } from './types.gen';
+import type { BeginDeviceAuthorizationData, BeginDeviceAuthorizationErrors, BeginDeviceAuthorizationResponses, CreateRuntimeData, CreateRuntimeErrors, CreateRuntimeResponses, DeleteRuntimeData, DeleteRuntimeErrors, DeleteRuntimeResponses, ExchangeDeviceTokenData, ExchangeDeviceTokenErrors, ExchangeDeviceTokenResponses, GetMeData, GetMeErrors, GetMeResponses, GetRuntimeData, GetRuntimeErrors, GetRuntimeResponses, ListCheckpointsData, ListCheckpointsErrors, ListCheckpointsResponses, ListManagedModelProvidersData, ListManagedModelProvidersErrors, ListManagedModelProvidersResponses, ListRuntimeImagesData, ListRuntimeImagesErrors, ListRuntimeImagesResponses, ListRuntimesData, ListRuntimesErrors, ListRuntimesResponses, PauseRuntimeData, PauseRuntimeErrors, PauseRuntimeResponses, ResumeRuntimeData, ResumeRuntimeErrors, ResumeRuntimeResponses, RevokeCurrentTokenData, RevokeCurrentTokenErrors, RevokeCurrentTokenResponses, StartRuntimeData, StartRuntimeErrors, StartRuntimeResponses, StopRuntimeData, StopRuntimeErrors, StopRuntimeResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -54,6 +54,28 @@ export const exchangeDeviceToken = <ThrowOnError extends boolean = false>(option
 export const revokeCurrentToken = <ThrowOnError extends boolean = false>(options?: Options<RevokeCurrentTokenData, ThrowOnError>): RequestResult<RevokeCurrentTokenResponses, RevokeCurrentTokenErrors, ThrowOnError> => (options?.client ?? client).delete<RevokeCurrentTokenResponses, RevokeCurrentTokenErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/v2/auth/token',
+    ...options
+});
+
+/**
+ * List checkpoints
+ *
+ * Cursor-paginated like the runtime list. Described here so `create --from-checkpoint` can accept a checkpoint name — `checkpoint_id` itself must be a UUID.
+ */
+export const listCheckpoints = <ThrowOnError extends boolean = false>(options?: Options<ListCheckpointsData, ThrowOnError>): RequestResult<ListCheckpointsResponses, ListCheckpointsErrors, ThrowOnError> => (options?.client ?? client).get<ListCheckpointsResponses, ListCheckpointsErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/checkpoints',
+    ...options
+});
+
+/**
+ * List runtime images
+ *
+ * Images carry both a slug `id` (what create takes) and a display `name`, so the CLI lists them to accept either.
+ */
+export const listRuntimeImages = <ThrowOnError extends boolean = false>(options?: Options<ListRuntimeImagesData, ThrowOnError>): RequestResult<ListRuntimeImagesResponses, ListRuntimeImagesErrors, ThrowOnError> => (options?.client ?? client).get<ListRuntimeImagesResponses, ListRuntimeImagesErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/images',
     ...options
 });
 
@@ -130,23 +152,69 @@ export const getRuntime = <ThrowOnError extends boolean = false>(options: Option
 });
 
 /**
- * List runtime images
+ * Pause a running runtime
  *
- * Images carry both a slug `id` (what create takes) and a display `name`, so the CLI lists them to accept either.
+ * Takes a `running` runtime to `paused`. Distinct from `suspended`, which only the idle policy produces — there is no `/suspend` endpoint.
+ *
+ * Verified by probing the production CLI against a local endpoint: it sends `POST /v2/runtimes/{runtime_id}/pause?expected_revision=N` with an empty JSON object as the body. Optimistic concurrency works exactly as `deleteRuntime` does — `expected_revision` must match the runtime's current `revision`, so a caller has to read the runtime first, and a stale value is a 409.
  */
-export const listRuntimeImages = <ThrowOnError extends boolean = false>(options?: Options<ListRuntimeImagesData, ThrowOnError>): RequestResult<ListRuntimeImagesResponses, ListRuntimeImagesErrors, ThrowOnError> => (options?.client ?? client).get<ListRuntimeImagesResponses, ListRuntimeImagesErrors, ThrowOnError>({
+export const pauseRuntime = <ThrowOnError extends boolean = false>(options: Options<PauseRuntimeData, ThrowOnError>): RequestResult<PauseRuntimeResponses, PauseRuntimeErrors, ThrowOnError> => (options.client ?? client).post<PauseRuntimeResponses, PauseRuntimeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v2/images',
-    ...options
+    url: '/v2/runtimes/{runtime_id}/pause',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
- * List checkpoints
+ * Resume a paused runtime
  *
- * Cursor-paginated like the runtime list. Described here so `create --from-checkpoint` can accept a checkpoint name — `checkpoint_id` itself must be a UUID.
+ * Returns a `paused` runtime to `running`. Separate from `/start`, which is for `shutdown`; the API has no single endpoint covering both.
+ *
+ * Verified by probing the production CLI against a local endpoint: it sends `POST /v2/runtimes/{runtime_id}/resume?expected_revision=N` with an empty JSON object as the body. Optimistic concurrency works exactly as `deleteRuntime` does — `expected_revision` must match the runtime's current `revision`, so a caller has to read the runtime first, and a stale value is a 409.
  */
-export const listCheckpoints = <ThrowOnError extends boolean = false>(options?: Options<ListCheckpointsData, ThrowOnError>): RequestResult<ListCheckpointsResponses, ListCheckpointsErrors, ThrowOnError> => (options?.client ?? client).get<ListCheckpointsResponses, ListCheckpointsErrors, ThrowOnError>({
+export const resumeRuntime = <ThrowOnError extends boolean = false>(options: Options<ResumeRuntimeData, ThrowOnError>): RequestResult<ResumeRuntimeResponses, ResumeRuntimeErrors, ThrowOnError> => (options.client ?? client).post<ResumeRuntimeResponses, ResumeRuntimeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/v2/checkpoints',
-    ...options
+    url: '/v2/runtimes/{runtime_id}/resume',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Start a stopped runtime
+ *
+ * Brings a `shutdown` runtime back to `running`. The production CLI exposes this as `boot`; the API's own verb is `start`.
+ *
+ * Verified by probing the production CLI against a local endpoint: it sends `POST /v2/runtimes/{runtime_id}/start?expected_revision=N` with an empty JSON object as the body. Optimistic concurrency works exactly as `deleteRuntime` does — `expected_revision` must match the runtime's current `revision`, so a caller has to read the runtime first, and a stale value is a 409.
+ */
+export const startRuntime = <ThrowOnError extends boolean = false>(options: Options<StartRuntimeData, ThrowOnError>): RequestResult<StartRuntimeResponses, StartRuntimeErrors, ThrowOnError> => (options.client ?? client).post<StartRuntimeResponses, StartRuntimeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/runtimes/{runtime_id}/start',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Stop a runtime
+ *
+ * Takes a runtime to `shutdown`. The production CLI exposes this as `shutdown`; the API's own verb is `stop`.
+ *
+ * Verified by probing the production CLI against a local endpoint: it sends `POST /v2/runtimes/{runtime_id}/stop?expected_revision=N` with an empty JSON object as the body. Optimistic concurrency works exactly as `deleteRuntime` does — `expected_revision` must match the runtime's current `revision`, so a caller has to read the runtime first, and a stale value is a 409.
+ */
+export const stopRuntime = <ThrowOnError extends boolean = false>(options: Options<StopRuntimeData, ThrowOnError>): RequestResult<StopRuntimeResponses, StopRuntimeErrors, ThrowOnError> => (options.client ?? client).post<StopRuntimeResponses, StopRuntimeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/runtimes/{runtime_id}/stop',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
