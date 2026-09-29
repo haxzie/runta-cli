@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Documentation site for runta-next, served at runta-cli.haxzie.com/docs",
+  "description": "Documentation site for runta-next, served at runta.haxzie.com/docs",
   "scripts": {
     "sync": "bun run scripts/sync-content.ts",
     "dev": "pnpm run sync && vitepress dev",
