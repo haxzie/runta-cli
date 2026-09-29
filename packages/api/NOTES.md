@@ -93,7 +93,25 @@ $ curl -H "Authorization: Bearer $RUNTA_TOKEN" 'https://api.runta.com/v2/runtime
 
 The `Pagination` schema is already defined here so the list operations can use it when we add them.
 Note the CLI hard-codes the page size at 100 and exposes no `--limit`; it does follow
-`next_cursor` internally (see `CLI_ISSUES.md` C-15).
+`next_cursor` internally (see `CLI_ISSUES.md` C-15). Confirmed 2026-09-29 by serving the production
+binary 250 runtimes from a local mock: it walks every page.
+
+```
+→ GET /v2/runtimes?limit=100&status=running,suspended
+→ GET /v2/runtimes?limit=100&after=100&status=running,suspended
+→ GET /v2/runtimes?limit=100&after=200&status=running,suspended
+```
+
+**The cursor goes back as `after`, not `cursor`** — and passing the wrong name is silent, because
+unknown query parameters are ignored rather than rejected:
+
+```console
+$ curl -H "Authorization: Bearer $RUNTA_TOKEN" 'https://api.runta.com/v2/runtimes?limit=1&cursor=01a0dcc4-…'
+{"data":[{"display_name":"jesting_kalong",…}]}   # page 1 again
+```
+
+Anything paging until `has_more` is false would loop forever on that typo. The `next_cursor`
+description in `openapi.json` said `cursor` until 2026-09-29; it now names `after` and says why.
 
 ### 5. `GET /v2/me` rejects organization API keys
 
