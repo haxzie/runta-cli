@@ -10,7 +10,7 @@
     "binding": "ASSETS",
     // The site is fully static, so a miss is a genuine 404 rather than a route to hand back index.
     "not_found_handling": "404-page"
-  },
+  }
   // No route and no workers.dev: this Worker is reachable only through the install Worker's
   // `DOCS` service binding, which owns runta.haxzie.com and forwards `/docs/*` to it. One public
   // hostname for the whole project means one canonical URL to print, one certificate, and no
