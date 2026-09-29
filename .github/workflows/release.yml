@@ -11,6 +11,8 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  # npm provenance signs the package against this workflow run.
+  id-token: write
 
 jobs:
   release:
@@ -26,6 +28,8 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+          # Writes the .npmrc that `npm publish` reads NODE_AUTH_TOKEN through.
+          registry-url: 'https://registry.npmjs.org'
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -34,7 +38,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # With pending changesets this opens/updates the "Version Packages" PR and stops.
-      # Nothing is published to npm — every package is private.
+      # It never publishes: the npm step below is gated on the same tag-gap check as the
+      # GitHub release, so both channels ship from one decision rather than two.
       - name: Open or update the version PR
         uses: changesets/action@v1
         with:
@@ -160,3 +165,32 @@ jobs:
             dist/runta-next-linux-arm64-musl.tar.gz \
             dist/runta-next-linux-x64-musl.tar.gz \
             dist/checksums.txt
+
+      # Last, because the GitHub release is what install.sh resolves and it should not be held up
+      # by npm. `build:binaries` compiles straight from src, so dist/index.js does not exist yet —
+      # this is the step that produces it, through turbo so the workspace packages it bundles are
+      # built first.
+      - name: Publish to npm
+        if: steps.check.outputs.release == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          pnpm build
+
+          # The published bin must report the version being released, the same guarantee the
+          # binary smoke test gives.
+          actual=$(node apps/cli/dist/index.js --version)
+          if [ "$actual" != "$VERSION" ]; then
+            echo "::error::npm build reports $actual but the release is $VERSION"
+            exit 1
+          fi
+
+          # A published version can never be replaced, so re-running this workflow must not fail
+          # the whole release on an already-published version.
+          if npm view "@haxzie/runta-next@$VERSION" version >/dev/null 2>&1; then
+            echo "@haxzie/runta-next@$VERSION is already on npm, skipping."
+            exit 0
+          fi
+
+          cd apps/cli && npm publish --access public --provenance

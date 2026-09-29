@@ -7,9 +7,9 @@
     }
   ],
   "commit": false,
-  "fixed": [["@runta/*"]],
+  "fixed": [["@runta/*", "@haxzie/runta-next"]],
   "linked": [],
-  "access": "restricted",
+  "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": ["@runta/tsconfig", "@runta/install-worker", "@runta/docs"],

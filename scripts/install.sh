@@ -12,6 +12,8 @@
 #   RUNTA_INSTALL_DIR   install location (default: $HOME/.runta-next/bin)
 #   RUNTA_BIN_NAME      command name to install as (default: runta-next)
 #   RUNTA_BASE_URL      override the release download base (for testing)
+#   RUNTA_NO_MODIFY_PATH  set to any value to be shown the PATH line instead of having the
+#                         installer add it to your shell profile
 #
 # The command installs as `runta-next`, not `runta`, so it sits beside Runta's own npm-published
 # CLI without shadowing it. Override with RUNTA_BIN_NAME to call it something else.
@@ -117,6 +119,126 @@ warn_about_other_runta() {
   info "  curl -fsSL https://runta.haxzie.com/install.sh | sh    # installs as runta-next"
 }
 
+# The shell profiles worth editing for the user's login shell. $SHELL is what the terminal
+# actually starts, so it beats guessing from what exists on disk. bash gets two on macOS:
+# interactive non-login shells read ~/.bashrc, while Terminal starts a login shell that reads
+# ~/.bash_profile instead, and only one of them being right is how "it works in one window but
+# not the other" happens.
+profile_files() {
+  case "${SHELL:-}" in
+    */zsh) printf '%s\n' "$HOME/.zshrc" ;;
+    */bash)
+      printf '%s\n' "$HOME/.bashrc"
+      # Only where it is already read: creating a .bash_profile on Linux would silently stop
+      # that machine's ~/.profile from being sourced.
+      if [ -f "$HOME/.bash_profile" ] || [ "$(uname -s)" = Darwin ]; then
+        printf '%s\n' "$HOME/.bash_profile"
+      fi
+      ;;
+    */fish) printf '%s\n' "$HOME/.config/fish/config.fish" ;;
+    *) ;;
+  esac
+}
+
+# fish has no `export`, and its own helper is both idempotent and universe-aware.
+path_line() {
+  # $1 profile path, $2 install dir
+  case "$1" in
+    */config.fish) printf 'fish_add_path %s' "$2" ;;
+    *) printf 'export PATH="%s:$PATH"' "$2" ;;
+  esac
+}
+
+path_command() {
+  # What to paste into the shell that is already open, for $1 install dir.
+  case "${SHELL:-}" in
+    */fish) printf 'fish_add_path %s' "$1" ;;
+    *) printf 'export PATH="%s:$PATH"' "$1" ;;
+  esac
+}
+
+manual_instructions() {
+  install_dir=$1
+  case "${SHELL:-}" in
+    */zsh) rc="~/.zshrc" ;;
+    */bash) rc="~/.bashrc" ;;
+    */fish) rc="~/.config/fish/config.fish" ;;
+    *) rc="your shell profile" ;;
+  esac
+  info ""
+  info "$install_dir is not on your PATH. Add this line to $rc:"
+  info ""
+  info "  $(path_command "$install_dir")"
+}
+
+# Put the PATH line in the login shell's profile so a fresh install is runnable without the user
+# copy-pasting anything — the ones who skip that step are left with a binary they cannot invoke.
+# Set RUNTA_NO_MODIFY_PATH=1 to be shown the line instead of having it written.
+ensure_on_path() {
+  install_dir=$1
+
+  case ":$PATH:" in
+    *":$install_dir:"*) return 0 ;;
+  esac
+
+  if [ -n "${RUNTA_NO_MODIFY_PATH:-}" ]; then
+    manual_instructions "$install_dir"
+    return 0
+  fi
+
+  profiles=$(profile_files)
+  if [ -z "$profiles" ]; then
+    # An unrecognised shell: guessing at its syntax risks writing a line that breaks every new
+    # terminal, which is a worse outcome than printing one.
+    manual_instructions "$install_dir"
+    return 0
+  fi
+
+  # Dotfiles get copied between machines, so write $HOME rather than this machine's home path
+  # whenever the install lives under it.
+  case "$install_dir" in
+    "$HOME"/*) profile_dir="\$HOME/${install_dir#"$HOME"/}" ;;
+    *) profile_dir=$install_dir ;;
+  esac
+
+  edited=""
+  # A here-doc rather than a pipeline: `while read` after a pipe runs in a subshell, where the
+  # names collected below would be lost. Newline-separated, because $HOME can contain spaces.
+  while IFS= read -r profile; do
+    [ -n "$profile" ] || continue
+
+    # Idempotent across re-installs and upgrades. Matching the directory rather than the exact
+    # line means a hand-edited variant of the same export still counts as present.
+    if [ -f "$profile" ] &&
+      { grep -qF "$install_dir" "$profile" || grep -qF "$profile_dir" "$profile"; }; then
+      continue
+    fi
+
+    mkdir -p "$(dirname -- "$profile")" 2>/dev/null || true
+    if printf '\n# added by the %s installer\n%s\n' \
+      "$BIN_NAME" "$(path_line "$profile" "$profile_dir")" >>"$profile" 2>/dev/null; then
+      edited="${edited}${edited:+, }$profile"
+    else
+      info ""
+      info "warning: could not write to $profile."
+      manual_instructions "$install_dir"
+      return 0
+    fi
+  done <<EOF
+$profiles
+EOF
+
+  info ""
+  if [ -n "$edited" ]; then
+    info "Added $install_dir to your PATH in $edited."
+  else
+    info "$install_dir is already in your shell profile, but not in this shell's PATH."
+  fi
+  info "Open a new terminal, or run this once in the current one:"
+  info ""
+  info "  $(path_command "$install_dir")"
+}
+
 main() {
   need curl
   need tar
@@ -154,21 +276,7 @@ main() {
 
   warn_about_other_runta "$install_dir"
 
-  case ":$PATH:" in
-    *":$install_dir:"*) ;;
-    *)
-      case "${SHELL:-}" in
-        */zsh) rc="~/.zshrc" ;;
-        */bash) rc="~/.bashrc" ;;
-        */fish) rc="~/.config/fish/config.fish" ;;
-        *) rc="your shell profile" ;;
-      esac
-      info ""
-      info "$install_dir is not on your PATH. Add this line to $rc:"
-      info ""
-      info "  export PATH=\"$install_dir:\$PATH\""
-      ;;
-  esac
+  ensure_on_path "$install_dir"
 }
 
 main "$@"
