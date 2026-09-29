@@ -2,6 +2,12 @@
 
 The `runta-next` command line interface, and the packages it is built from.
 
+**Start with [`DESIGN.md`](DESIGN.md)** — what the interface is, why it takes this shape, and the
+evidence behind it. From there: [`FAILURE-AND-RECOVERY.md`](FAILURE-AND-RECOVERY.md) for what
+happens when an agent gets something wrong, [`CLI_ISSUES.md`](CLI_ISSUES.md) for the 37 findings
+against the official CLI, [`Improvements.md`](Improvements.md) for the decision log, and
+[`evals/cli-ab/`](evals/cli-ab/) for the A/B harness the claims are measured with.
+
 ## Install
 
 ```sh

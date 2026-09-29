@@ -1,6 +1,6 @@
 ---
 title: runta-next list
-description: List runtimes, with the default active filter, --all, --status, --limit, pagination and JSON output.
+description: List runtimes, with the default active filter, --all, --status, --limit, --fields, pagination and JSON output.
 sidebar_position: 8
 ---
 
@@ -19,6 +19,7 @@ runta-next runtime list [options]
 | `-a, --all` | Include stopped, failed and deleting runtimes |
 | `--status <statuses>` | Comma-separated statuses to include |
 | `--limit <n>` | Stop after this many runtimes |
+| `--fields <names>` | Comma-separated fields to show, in that order |
 | `--json` | Print the runtimes as JSON |
 
 ```console
@@ -85,3 +86,60 @@ Prints the array of runtime objects verbatim, so `jq` paths match the
 ```sh
 runta-next list --json | jq -r '.[] | select(.status == "running") | .display_name'
 ```
+
+## `--fields` narrows both halves
+
+`--fields` names columns. The table renders them in the order given, and `--json` keys each row by
+the same names, so one vocabulary covers what a person reads and what a script parses:
+
+| Field | Table cell | `--json` value |
+| --- | --- | --- |
+| `name` | `demo` | `"demo"` |
+| `id` | the UUID | the UUID |
+| `status` | `running (degraded)` | `"running"` |
+| `degraded` | `true` | `true` |
+| `vcpus` | `1` | `1` |
+| `memory` | `512 MiB` | `512` (MiB) |
+| `image` | `clean` | `"clean"` |
+| `created` | the timestamp | the timestamp |
+
+```console
+$ runta-next list --fields name,vcpus
+NAME            VCPUS
+jesting_kalong      1
+prequel-dev         2
+```
+
+```console
+$ runta-next list --fields name,vcpus --json
+[
+  {
+    "name": "jesting_kalong",
+    "vcpus": 1
+  }
+]
+```
+
+Note that `memory` is `512 MiB` in the table and `512` in JSON. The unit belongs in a cell a person
+reads, not in a value a script is about to do arithmetic on; the field list in `--help` states it.
+
+Without `--fields`, `--json` is unchanged — the API's own objects, with `display_name` and nested
+`resources`. The flag is additive, so existing `jq` paths keep working.
+
+A misspelled field is an error naming it and the valid ones, with exit code 2, before any request
+is made:
+
+```console
+$ runta-next list --fields name,vcpu
+error Unknown --fields value: vcpu
+Available fields: name, id, status, degraded, vcpus, memory, image, created
+```
+
+A short row is worse than an error, because a script will act on it.
+
+### Why it exists
+
+`--json` returns every field of every runtime. An agent that wants two of them still pays for all
+of them, and on a near-empty tenant the full payload is already 15× the table. Narrowing the
+response is the cheapest way to keep an agent's context affordable — the same concern as
+`CLI_ISSUES.md` C-31, one layer out.

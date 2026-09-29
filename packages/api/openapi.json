@@ -1347,7 +1347,7 @@
               "string",
               "null"
             ],
-            "description": "Pass as `cursor` to fetch the next page."
+            "description": "Pass as the `after` query parameter to fetch the next page. Not `cursor`: an unknown query parameter is ignored rather than rejected, so that name silently re-returns the first page."
           },
           "has_more": {
             "type": "boolean"

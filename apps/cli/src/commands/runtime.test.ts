@@ -404,6 +404,74 @@ describe('list', () => {
 
     expect(JSON.parse(out.text)).toHaveLength(1);
   });
+
+  it('narrows the table to --fields, in the order asked for', async () => {
+    const { out, deps } = harness([LIST(page([runtime()]))]);
+
+    await list({ fields: 'vcpus,name' }, deps);
+
+    const [header] = out.text.split('\n');
+    expect(header).toContain('VCPUS');
+    expect(header).toContain('NAME');
+    expect(header?.indexOf('VCPUS')).toBeLessThan(header?.indexOf('NAME') as number);
+    expect(header).not.toContain('IMAGE');
+    expect(header).not.toContain('CREATED');
+  });
+
+  it('keys --json by the same field names, so one vocabulary covers both halves', async () => {
+    const { out, deps } = harness([LIST(page([runtime()]))]);
+
+    await list({ json: true, fields: 'name,vcpus' }, deps);
+
+    expect(JSON.parse(out.text)).toEqual([{ name: 'demo', vcpus: 1 }]);
+  });
+
+  it('gives --json numbers rather than rendered cells, so a script need not parse units', async () => {
+    const { out, deps } = harness([LIST(page([runtime()]))]);
+
+    await list({ json: true, fields: 'memory' }, deps);
+
+    // The table says '512 MiB'; the machine half must not make a caller strip the suffix.
+    expect(JSON.parse(out.text)).toEqual([{ memory: 512 }]);
+  });
+
+  it('leaves the --json payload untouched without --fields', async () => {
+    const { out, deps } = harness([LIST(page([runtime()]))]);
+
+    await list({ json: true }, deps);
+
+    // The default contract is the API's own object; --fields is additive, not a replacement.
+    expect(JSON.parse(out.text)[0]).toHaveProperty('display_name', 'demo');
+  });
+
+  it('rejects an unknown field before calling the API, naming it and the valid ones', async () => {
+    const { stub, deps } = harness([]);
+
+    const error = await list({ fields: 'name,vcpu' }, deps).catch((e: unknown) => e);
+
+    expect(isCliError(error)).toBe(true);
+    expect((error as { exitCode: number }).exitCode).toBe(2);
+    expect((error as { message: string }).message).toContain('vcpu');
+    expect((error as { hint?: string }).hint).toContain('vcpus');
+    // A short row a caller might act on is worse than an error, so nothing is fetched.
+    expect(stub.calls).toHaveLength(0);
+  });
+
+  it('rejects an empty --fields', async () => {
+    const { deps } = harness([]);
+
+    const error = await list({ fields: ' , ' }, deps).catch((e: unknown) => e);
+
+    expect((error as { exitCode: number }).exitCode).toBe(2);
+  });
+
+  it('treats a repeated field as one column rather than an error', async () => {
+    const { out, deps } = harness([LIST(page([runtime()]))]);
+
+    await list({ json: true, fields: 'name,name' }, deps);
+
+    expect(JSON.parse(out.text)).toEqual([{ name: 'demo' }]);
+  });
 });
 
 // ------------------------------------------------------------------ inspect

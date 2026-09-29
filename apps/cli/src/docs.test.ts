@@ -15,6 +15,30 @@ import { buildProgram } from './program.js';
  * emits a bare array.
  */
 const DOCS = join(import.meta.dirname, '..', '..', '..', 'docs');
+const ROOT = join(import.meta.dirname, '..', '..', '..');
+
+/**
+ * Design documents at the repository root, which quote the CLI as heavily as `docs/` does and
+ * drift the same way. `DESIGN.md` is the submission's front door, so a stale flag there is the
+ * most expensive kind.
+ */
+const ROOT_DOCS = ['DESIGN.md', 'FAILURE-AND-RECOVERY.md'];
+
+/**
+ * Invocations that are wrong on purpose, because the surrounding prose is about what happens when
+ * an agent gets something wrong. Each must stay wrong for its page to make sense, so they are
+ * listed rather than silently skipped.
+ */
+const INTENTIONALLY_INVALID = new Set([
+  // FAILURE-AND-RECOVERY §1: an agent assumed `inspect` had `list`'s flag.
+  'runta-next inspect jesting_kalong --json --fields status,desired_status',
+  'runta-next inspect $R --json --fields status,desired_status',
+  // FAILURE-AND-RECOVERY §3: arriving from the official CLI, and a typo.
+  'runta-next ps',
+  'runta-next lst',
+  // docs/commands/list.md: the unknown-field error the page documents.
+  'runta-next list --fields name,vcpu',
+]);
 
 /** Every `runta-next …` invocation shown inside a fenced code block, with its source page. */
 function documentedInvocations(): { page: string; line: string; words: string[] }[] {
@@ -27,6 +51,7 @@ function documentedInvocations(): { page: string; line: string; words: string[] 
     }
   };
   walk(DOCS);
+  for (const name of ROOT_DOCS) pages.push(join(ROOT, name));
 
   const found: { page: string; line: string; words: string[] }[] = [];
   for (const page of pages) {
@@ -44,7 +69,11 @@ function documentedInvocations(): { page: string; line: string; words: string[] 
       if (!line.startsWith('runta-next ')) continue;
       // Shell pipelines: only the runta-next side is ours to verify.
       const ours = line.split('|')[0]?.trim() ?? line;
-      found.push({ page: page.slice(DOCS.length + 1), line, words: ours.split(/\s+/).slice(1) });
+      if (INTENTIONALLY_INVALID.has(ours)) continue;
+      const label = page.startsWith(DOCS)
+        ? page.slice(DOCS.length + 1)
+        : page.slice(ROOT.length + 1);
+      found.push({ page: label, line, words: ours.split(/\s+/).slice(1) });
     }
   }
   return found;

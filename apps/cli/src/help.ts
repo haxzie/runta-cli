@@ -142,7 +142,8 @@ export function rootHelp(
   lines.push(bold('For agents:', colour));
   lines.push('  Pass --json to any command that returns data. The shape does not change based on');
   lines.push('  whether stdout is a terminal, so behaviour is identical interactively and in a');
-  lines.push('  pipe. Branch on exit codes rather than message text — codes are stable, wording');
+  lines.push('  pipe. Narrow a large payload with --fields, so you read only what you need.');
+  lines.push('  Branch on exit codes rather than message text — codes are stable, wording');
   lines.push(`  is not. Set RUNTA_TOKEN to skip ${name} login entirely.`);
   lines.push(`  Every page of the docs is also served as plain text: ${LLMS_URL}`);
 

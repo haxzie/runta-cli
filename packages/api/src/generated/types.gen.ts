@@ -33,7 +33,7 @@ export type ErrorResponse = {
  */
 export type Pagination = {
     /**
-     * Pass as `cursor` to fetch the next page.
+     * Pass as the `after` query parameter to fetch the next page. Not `cursor`: an unknown query parameter is ignored rather than rejected, so that name silently re-returns the first page.
      */
     next_cursor?: string | null;
     has_more: boolean;

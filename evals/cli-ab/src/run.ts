@@ -56,9 +56,14 @@ const PASSTHROUGH = [
 const { values: opts } = parseArgs({
   options: {
     trials: { type: 'string', default: '5' },
-    tasks: { type: 'string', default: TASKS.map((t) => t.id).join(',') },
+    tasks: {
+      type: 'string',
+      default: TASKS.filter((t) => !t.retired)
+        .map((t) => t.id)
+        .join(','),
+    },
     arms: { type: 'string', default: 'A,B' },
-    model: { type: 'string', default: process.env.EVAL_MODEL ?? 'claude-sonnet-5-5' },
+    model: { type: 'string', default: process.env.EVAL_MODEL ?? 'claude-sonnet-5' },
     'max-turns': { type: 'string', default: '40' },
     'budget-usd': { type: 'string', default: '3' },
     'timeout-min': { type: 'string', default: '15' },
@@ -105,6 +110,18 @@ function preflight(arms: Arm[]): string {
   }
   const claude = spawnSync('sh', ['-c', 'command -v claude'], { encoding: 'utf8' }).stdout.trim();
   if (!claude) fail('`claude` is not on PATH.');
+
+  // An unrecognised model is not an error: the CLI warns on stderr and serves a fallback, so a run
+  // reports a model it never used. Every earlier run asked for `claude-sonnet-5-5`, which does not
+  // exist, and the comparison stayed valid only because both arms got the same fallback. Fail here
+  // instead, so the model named in run.json is the model that answered.
+  const probe = spawnSync(claude, ['-p', 'ok', '--model', opts.model, '--max-turns', '1'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  if (/unrecognized_model/.test(probe.stderr ?? '')) {
+    fail(`model '${opts.model}' is not recognised; the run would silently use a fallback.`);
+  }
 
   for (const arm of arms) {
     const env = armEnv(arm, '/tmp');
@@ -314,6 +331,9 @@ async function main() {
   const tasks = opts.tasks.split(',').map((id) => {
     const t = TASKS.find((x) => x.id === id.trim().toUpperCase());
     if (!t) fail(`unknown task ${id}. Tasks: ${TASKS.map((x) => x.id).join(', ')}`);
+    // Retired tasks stay in TASKS for the record, but running one only burns trials on a
+    // fixture that cannot succeed, so say why instead of letting it fail trial by trial.
+    if (t.retired) fail(`${t.id} is retired: ${t.retired}`);
     return t;
   });
   const arms = opts.arms.split(',').map((id) => {
