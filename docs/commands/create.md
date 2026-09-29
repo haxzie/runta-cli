@@ -31,6 +31,7 @@ Both forms are the same command. See [Commands](./index.md#two-forms-for-runtime
 | `-d, --detach` | Return as soon as creation is accepted, without waiting |
 | `--timeout <secs>` | How long to wait before giving up. Default 180 |
 | `--json` | Print the runtime as JSON |
+| `-o, --output <mode>` | `auto` (JSON when not a terminal), `table`, or `json` |
 
 ```console
 $ runta-next create --name demo --image clean --cpus 1 --memory 512 -p 8080/https

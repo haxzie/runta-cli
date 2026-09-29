@@ -24,6 +24,7 @@ Takes one or more names or ids.
 | `-d, --detach` | Return as soon as deletion is accepted, without waiting |
 | `--timeout <secs>` | How long to wait before giving up. Default 180 |
 | `--json` | Print the result as JSON |
+| `-o, --output <mode>` | `auto` (JSON when not a terminal), `table`, or `json` |
 
 ```console
 $ runta-next delete demo

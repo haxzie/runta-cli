@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fail, logger } from '@runta/utils';
 import type { Command } from 'commander';
+import { outputOption, resolveOutput } from '../output.js';
 import { printNextSteps } from '../suggest.js';
 import { version as currentVersion } from '../version.js';
 
@@ -614,7 +615,8 @@ export function registerUpgrade(program: Command): void {
     .option('--dry-run', 'show what would be installed and exit')
     .option('-y, --yes', 'skip the confirmation when moving to an older version')
     .option('--json', 'print the result as JSON')
+    .addOption(outputOption())
     .action(async (opts: UpgradeOptions) => {
-      await upgrade(opts);
+      await upgrade(resolveOutput(opts));
     });
 }

@@ -21,6 +21,7 @@ runta-next upgrade [options]
 | `--dry-run` | Show what would be installed and exit |
 | `-y, --yes` | Skip the confirmation when moving to an older version |
 | `--json` | Print the result as JSON |
+| `-o, --output <mode>` | `auto` (JSON when not a terminal), `table`, or `json` |
 
 ```console
 $ runta-next upgrade

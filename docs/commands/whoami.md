@@ -16,6 +16,7 @@ runta-next whoami [options]
 | Option | Does |
 | --- | --- |
 | `--json` | Print the result as JSON |
+| `-o, --output <mode>` | `auto` (JSON when not a terminal), `table`, or `json` |
 
 ```console
 $ runta-next whoami

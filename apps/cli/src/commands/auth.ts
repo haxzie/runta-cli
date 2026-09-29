@@ -16,6 +16,7 @@ import {
 import { fail, logger } from '@runta/utils';
 import type { Command } from 'commander';
 import { canOpenBrowser, openUrl } from '../browser.js';
+import { outputOption, resolveOutput } from '../output.js';
 import { printNextSteps } from '../suggest.js';
 
 export interface LoginOptions {
@@ -202,16 +203,18 @@ export function registerAuthCommands(program: Command): void {
     .command('login')
     .description('Sign in through a browser using a one-time device code')
     .option('--json', 'print machine-readable progress instead of prose')
+    .addOption(outputOption())
     .option('--no-browser', 'print the URL instead of opening it')
     .action(async (opts: LoginOptions) => {
-      await login(opts);
+      await login(resolveOutput(opts));
     });
 
   program
     .command('logout')
     .description('Revoke the stored credential and remove it from the local config')
     .option('--json', 'print the result as JSON')
-    .action(async (opts: { json?: boolean }) => {
-      await logout(opts);
+    .addOption(outputOption())
+    .action(async (opts: { json?: boolean; output?: string }) => {
+      await logout(resolveOutput(opts));
     });
 }

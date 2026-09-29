@@ -2,6 +2,7 @@ import { getMe, listManagedModelProviders, RuntaApiError, type RuntaClient } fro
 import { createContext } from '@runta/core';
 import { fail, logger } from '@runta/utils';
 import type { Command } from 'commander';
+import { outputOption, resolveOutput } from '../output.js';
 
 export interface WhoamiDeps {
   write: (text: string) => void;
@@ -84,7 +85,8 @@ export function registerWhoami(program: Command): void {
     .command('whoami')
     .description('Show the currently authenticated user')
     .option('--json', 'print the result as JSON')
-    .action(async (opts: { json?: boolean }) => {
-      await whoami(opts);
+    .addOption(outputOption())
+    .action(async (opts: { json?: boolean; output?: string }) => {
+      await whoami(resolveOutput(opts));
     });
 }
