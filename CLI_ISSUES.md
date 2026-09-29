@@ -52,6 +52,7 @@ npm packages, the Homebrew tap, and the shipped binary (the source repo is priva
 | [C-34](#c-34-the-runtime-argument-is-a-flag-on-two-commands-and-positional-on-34) | Runtime arg is a flag on 2 commands, positional on 34 | medium |
 | [C-35](#c-35-no-published-openapi-document-so-every-client-is-hand-written) | No published OpenAPI document; API docs disagree with the live API in six places | high |
 | [C-36](#c-36--an-ambiguous-runtime-name-silently-resolves-to-the-first-match) | An ambiguous runtime name silently resolves to the first match | high |
+| [C-37](#c-37--vcpus-cannot-be-changed-after-creation-and-nothing-says-so) | vCPUs cannot be changed after creation, and nothing says so | medium |
 
 ---
 
@@ -1293,6 +1294,68 @@ $ echo $?
 
 Verified against the same local server in the same session: official exits `0` and acts, ours exits
 `1` and refuses.
+
+### C-37 — vCPUs cannot be changed after creation, and nothing says so
+_Severity: medium._
+
+`run` takes `--cpus`, and `resize` cannot change it:
+
+```console
+$ runta help resize
+  --memory <MIB>           New memory size in MiB
+  --disk-size-gib <GIB>    New writable overlay capacity in GiB
+```
+
+Searching the whole command tree, `--cpus` exists on exactly one command out of 65 leaves:
+
+```console
+$ runta --help --json | jq '.. | .args? // [] | .[] | select(.long == "cpus")'
+  run: --cpus — Number of vCPUs (uses the Runtime Image recommendation when omitted)
+```
+
+**This is an API limitation, not a missing flag.** `resize` is not its own endpoint — probing shows it
+is a `PATCH /v2/runtimes/{id}`, the general runtime update — and that operation does not accept a CPU
+count. Two independent sources agree:
+
+- The REST reference for `PATCH /v2/runtimes/{runtime_id}` describes `resources.requests` as exactly
+  `memory_mib` and `disk_gib`. Its own worked example sends
+  `"resources":{"limits":{"memory_mib":1},"requests":{"memory_mib":1,"disk_gib":1}}` — no `vcpus`.
+  `vcpus` *is* in the 200 response, marked required, so it is readable and not writable.
+- The generated Python SDK types are `PatchRuntimeResourceRequests(memory_mib=None)` — one field —
+  against `CreateRuntimeResourceRequests(memory_mib=1024, vcpus=1)`, where `vcpus` is documented as
+  the "Initial requested virtual CPU count".
+
+So the CLI could not offer `resize --cpus` even if it wanted to. The defect is the **silence**:
+
+- Nothing in the API reference marks `vcpus` immutable. It is absent from the patch body, and absence
+  is not a statement. The word "Initial" in the create-side description is the only hint.
+- `resize --help` does not say why CPU is missing from a command whose whole job is changing
+  resources, so it reads as an oversight rather than a boundary.
+- `inspect` prints vCPUs beside memory with nothing to distinguish the field you can change from the
+  one you cannot.
+- `run --cpus` accepts a number with no indication it is a permanent choice, and the default is
+  "uses the Runtime Image recommendation" — so a user who never passes it does not know a decision was
+  made on their behalf.
+
+The consequence is a dead end with an expensive exit. Under-provision CPU and the only remedy is to
+destroy the runtime and create a new one — on a product whose value is long-lived stateful runtimes,
+that means restoring from a checkpoint at best, and losing uncommitted work at worst. A user discovers
+this at exactly the wrong moment: when something is already too slow.
+
+→ Say it where the decision is made and where it is reverse-engineered. `run --cpus` should note that
+vCPUs are fixed for the runtime's life; `resize --help` should say CPU cannot be changed and point at
+recreate-from-checkpoint; and `resize --cpus 4` should fail with that explanation rather than clap's
+generic `unexpected argument`. Ideally the API reference marks the field immutable, since three clients
+are currently inferring it from an omission.
+
+**Verified from the published reference and the generated SDK, not live.** The absence of `vcpus` from
+the patch body is documented in two places and consistent with the CLI having no flag for it; what is
+*not* verified is what the live API does if you send `vcpus` anyway — it may 400, or ignore it
+silently, which would be worse. That needs a token to settle. Note this spec has disagreed with the
+live API eleven times (`packages/api/NOTES.md`), so the documented shape is evidence, not proof.
+
+**What ours does.** Nothing yet — we have no `update`. Recorded as a requirement on it in
+`Improvements.md` I-5 so the explanation ships with the command rather than after it.
 
 ## Not exercised
 

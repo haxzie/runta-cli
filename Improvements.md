@@ -332,6 +332,20 @@ does, including rendering the effective egress posture rather than the raw field
 `denylist` with no hosts means unrestricted and an `allowlist` with none means fully blocked
 (`CLI_ISSUES.md` C-10).
 
+### `update` must explain what it cannot change
+
+vCPUs are set by `create` and cannot be changed afterwards: `PATCH /v2/runtimes/{id}` accepts only
+`resources.requests.memory_mib`, `resources.requests.disk_gib` and `resources.limits.memory_mib`. The
+generated Python SDK agrees — `PatchRuntimeResourceRequests(memory_mib=None)` against
+`CreateRuntimeResourceRequests(memory_mib=1024, vcpus=1)`. Nothing in the reference marks the field
+immutable; it is simply absent from the patch body, which is why the production CLI's `resize` has no
+`--cpus` and never says why (`CLI_ISSUES.md` C-37).
+
+So `update` must not merely omit `--cpus`. It should reject it with the reason and the remedy —
+recreate, optionally `--from-checkpoint` — and `create --cpus` should say the choice is permanent.
+An unexplained missing flag reads as an oversight, and the user finds out it is a boundary at the
+moment they most need it not to be.
+
 This is recorded as proposed rather than decided because it concerns resources we have not built
 yet. It is worth settling before the first of them exists: "configuration is not a resource" is
 cheap now and expensive after three groups have shipped.
@@ -401,7 +415,8 @@ field loops (C-11). After `stop` and `pause` we suggest `start`; after `start`, 
 
 `resize` is a `PATCH /v2/runtimes/{id}` with `{"resources":{"requests":{…}}}` — the same general
 update endpoint that would back an `update` command, so it belongs with
-[I-5](#i-5--runtime-configuration-is-not-a-resource) rather than with the lifecycle verbs. Note
-upstream's `resize` changes memory and disk but **not** vCPUs, despite `create` accepting `--cpus`;
-whether that is an API limit or an upstream omission needs checking live before `update` claims to
-offer it.
+[I-5](#i-5--runtime-configuration-is-not-a-resource) rather than with the lifecycle verbs. Note upstream's
+`resize` changes memory and disk but **not** vCPUs, despite `create` accepting `--cpus`. That is an
+**API limitation, not an upstream omission** — the patch body has no CPU field at all, confirmed
+against both the REST reference and the generated Python SDK. `update` therefore cannot offer it
+either, and must say so rather than leaving a gap; see I-5 and `CLI_ISSUES.md` C-37.
