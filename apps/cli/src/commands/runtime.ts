@@ -257,7 +257,8 @@ export async function list(
     return;
   }
   if (runtimes.length === 0) {
-    logger.info(
+    // An empty list is still the answer to `list`, so it goes where the table would have.
+    logger.success(
       options.all ? 'No runtimes.' : 'No active runtimes. Use --all to include stopped ones.',
     );
     // An empty list is the one place a new user is definitely stuck, so it is worth a pointer.
@@ -605,7 +606,7 @@ export async function remove(
     return;
   }
   for (const r of results) {
-    logger.info(r.deleted ? `Deleted '${r.name}'.` : `Deletion of '${r.name}' requested.`);
+    logger.success(r.deleted ? `Deleted '${r.name}'.` : `Deletion of '${r.name}' requested.`);
   }
 
   // Suggesting `runta-next list` here would be noise — you know what you just deleted. Reaching zero is
@@ -831,7 +832,7 @@ function emitLifecycle(
     );
     return;
   }
-  logger.info(result.message);
+  logger.success(result.message);
 }
 
 /**
@@ -932,7 +933,7 @@ function emit(
     deps.write(`${JSON.stringify(runtime, null, 2)}\n`);
     return;
   }
-  logger.info(message);
+  logger.success(message);
 }
 
 function describe(runtime: Runtime): string {

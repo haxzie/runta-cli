@@ -335,7 +335,7 @@ export async function upgrade(
   const staged = await download(baseUrl, target, installed, wanted, deps);
 
   await rename(staged, installed);
-  logger.info(`Upgraded ${currentVersion} → ${wanted}.`);
+  logger.success(`Upgraded ${currentVersion} → ${wanted}.`);
 
   if (options.json) {
     report(
@@ -430,7 +430,7 @@ async function upgradeViaPackageManager(
     });
   });
 
-  logger.info(`Upgraded ${currentVersion} → ${wanted}.`);
+  logger.success(`Upgraded ${currentVersion} → ${wanted}.`);
 
   if (options.json) {
     report(

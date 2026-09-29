@@ -7,6 +7,18 @@ export type LogLevel = (typeof LEVELS)[number];
 export interface Logger {
   error(...args: unknown[]): void;
   warn(...args: unknown[]): void;
+  /**
+   * A completed outcome, on **stdout**.
+   *
+   * Everything else here is commentary and goes to stderr, which is the right default — it keeps
+   * a pipe clean. But a terminal that colours stderr red then renders a successful login entirely
+   * in red, so the one thing the user is waiting to read looks like the thing that went wrong.
+   * Success is a result, and results belong on stdout.
+   *
+   * Only ever reached on the human path: every command returns early under `--json`, so this can
+   * never interleave with a payload a caller is parsing.
+   */
+  success(...args: unknown[]): void;
   info(...args: unknown[]): void;
   debug(...args: unknown[]): void;
 }
@@ -35,6 +47,11 @@ export function createLogger(initialLevel: LogLevel = 'info'): LevelledLogger {
     error(...args: unknown[]) {
       if (enabled('error')) console.error(paint('31', 'error'), ...args);
     },
+    success(...args: unknown[]) {
+      // Gated at `info` with the rest: RUNTA_LOG_LEVEL=silent means silent, not "silent except
+      // the good news".
+      if (enabled('info')) console.log(...args);
+    },
     warn(...args: unknown[]) {
       if (enabled('warn')) console.error(paint('33', 'warn'), ...args);
     },
@@ -47,7 +64,7 @@ export function createLogger(initialLevel: LogLevel = 'info'): LevelledLogger {
   };
 }
 
-/** Shared process-wide logger. All diagnostics go to stderr so stdout stays pipeable. */
+/** Shared process-wide logger. Diagnostics go to stderr so stdout stays pipeable; see `success`. */
 export const logger = createLogger((process.env.RUNTA_LOG_LEVEL as LogLevel | undefined) ?? 'info');
 
 export const setLogLevel = (level: LogLevel): void => {

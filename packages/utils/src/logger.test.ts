@@ -63,4 +63,24 @@ describe('createLogger', () => {
     expect(stderr).toHaveBeenCalled();
     expect(stdout).not.toHaveBeenCalled();
   });
+
+  // A terminal that colours stderr red rendered a successful login entirely in red, so the line
+  // the user was waiting for looked like the failure. Success is a result, not commentary.
+  it('writes success to stdout, not stderr', () => {
+    const stdout = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const stderr = captureStderr();
+
+    createLogger('info').success('Authorized.');
+
+    expect(stdout).toHaveBeenCalledWith('Authorized.');
+    expect(stderr).not.toHaveBeenCalled();
+  });
+
+  it('silences success along with everything else', () => {
+    const stdout = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    createLogger('silent').success('Authorized.');
+
+    expect(stdout).not.toHaveBeenCalled();
+  });
 });
