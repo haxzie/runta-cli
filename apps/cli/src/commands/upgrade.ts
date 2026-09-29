@@ -121,6 +121,38 @@ export function detectInstall(execPath: string, modulePath: string): 'binary' | 
 }
 
 /**
+ * Which package manager installed this copy, inferred from where it was unpacked.
+ *
+ * Each one has its own global root, and upgrading with the wrong one does not fail loudly — it
+ * installs a *second* copy under a different root, leaving whichever comes first on PATH to win.
+ * So this reads the path rather than reaching for whatever `npm` happens to be installed.
+ */
+export function detectPackageManager(modulePath: string): 'npm' | 'pnpm' | 'yarn' | 'bun' {
+  if (/[\\/]\.bun[\\/]/.test(modulePath)) return 'bun';
+  if (/[\\/]\.?pnpm[\\/]/i.test(modulePath)) return 'pnpm';
+  if (/[\\/]\.?yarn[\\/]/i.test(modulePath)) return 'yarn';
+  return 'npm';
+}
+
+/** The global-install invocation for each manager. Yarn is the one that does not take `add -g`. */
+export function installCommand(
+  manager: 'npm' | 'pnpm' | 'yarn' | 'bun',
+  version: string,
+): [string, string[]] {
+  const spec = `${NPM_PACKAGE}@${version}`;
+  switch (manager) {
+    case 'pnpm':
+      return ['pnpm', ['add', '-g', spec]];
+    case 'yarn':
+      return ['yarn', ['global', 'add', spec]];
+    case 'bun':
+      return ['bun', ['add', '-g', spec]];
+    default:
+      return ['npm', ['install', '-g', spec]];
+  }
+}
+
+/**
  * The release asset for this machine.
  *
  * Deliberately a mirror of `detect_target` in `scripts/install.sh` — the same names, the same
@@ -240,19 +272,10 @@ export async function upgrade(
         : `Already on the latest version (${currentVersion}).`,
     );
     if (comparison > 0 && !options.json) {
-      printNextSteps([
-        install === 'npm'
-          ? { command: `npm install -g ${NPM_PACKAGE}@latest`, why: 'install it' }
-          : { command: 'runta-next upgrade', why: 'install it' },
-      ]);
+      // `runta-next upgrade` now works on both, so it is the right suggestion either way.
+      printNextSteps([{ command: 'runta-next upgrade', why: 'install it' }]);
     }
     return;
-  }
-
-  if (install === 'npm' && comparison !== 0) {
-    fail(`This copy was installed from npm, so npm has to replace it.`, {
-      hint: `Run: npm install -g ${NPM_PACKAGE}@${options.to ? normalize(options.to) : 'latest'}`,
-    });
   }
 
   if (comparison === 0) {
@@ -269,6 +292,14 @@ export async function upgrade(
       deps,
       `Already on ${currentVersion}. Nothing to do.`,
     );
+    return;
+  }
+
+  // An npm install is replaced by the package manager that put it there, not by renaming a
+  // downloaded asset over it. Same command, same flags, same confirmation — only the mechanism
+  // differs, and the user should not have to know which one they got.
+  if (install === 'npm') {
+    await upgradeViaPackageManager(wanted, comparison, installed, options, deps);
     return;
   }
 
@@ -298,14 +329,7 @@ export async function upgrade(
     return;
   }
 
-  // Going backwards is a legitimate thing to want and a surprising thing to do by accident, so it
-  // is the one case here that asks. Never under --json or in a pipe, where nothing could answer.
-  if (comparison < 0 && !options.yes && !options.json && deps.isInteractive()) {
-    const ok = await deps.confirm(
-      `This will replace ${currentVersion} with the older ${wanted}. Continue?`,
-    );
-    if (!ok) fail('Aborted.', { exitCode: 1 });
-  }
+  await confirmDowngrade(wanted, comparison, options, deps);
 
   logger.info(`Downloading ${target} ${wanted}…`);
   const staged = await download(baseUrl, target, installed, wanted, deps);
@@ -321,6 +345,103 @@ export async function upgrade(
         previous_version: currentVersion,
         current_version: wanted,
         target,
+        path: installed,
+      },
+      options,
+      deps,
+      '',
+    );
+  }
+}
+
+/**
+ * Going backwards is a legitimate thing to want and a surprising thing to do by accident, so it is
+ * the one case here that asks. Never under --json or in a pipe, where nothing could answer.
+ */
+async function confirmDowngrade(
+  wanted: string,
+  comparison: number,
+  options: UpgradeOptions,
+  deps: UpgradeDeps,
+): Promise<void> {
+  if (comparison < 0 && !options.yes && !options.json && deps.isInteractive()) {
+    const ok = await deps.confirm(
+      `This will replace ${currentVersion} with the older ${wanted}. Continue?`,
+    );
+    if (!ok) fail('Aborted.', { exitCode: 1 });
+  }
+}
+
+/**
+ * Hands the upgrade to the package manager that owns this install.
+ *
+ * There is no staging step to make this atomic the way the binary path is — the manager owns that
+ * — so the guarantee is weaker by nature. What it does keep is the surface: the same flags mean
+ * the same things, and a failure says which command failed rather than leaking a raw exit code.
+ */
+async function upgradeViaPackageManager(
+  wanted: string,
+  comparison: number,
+  installed: string,
+  options: UpgradeOptions,
+  deps: UpgradeDeps,
+): Promise<void> {
+  const manager = detectPackageManager(installed);
+  const [command, args] = installCommand(manager, wanted);
+  const printable = [command, ...args].join(' ');
+
+  if (options.dryRun) {
+    report(
+      {
+        action: 'upgrade',
+        dry_run: true,
+        current_version: currentVersion,
+        target_version: wanted,
+        downgrade: comparison < 0,
+        install: 'npm',
+        package_manager: manager,
+        command: printable,
+        path: installed,
+      },
+      options,
+      deps,
+      [
+        `Would ${comparison < 0 ? 'downgrade' : 'upgrade'} ${currentVersion} → ${wanted}`,
+        `  via      ${printable}`,
+        `  replacing ${installed}`,
+      ].join('\n'),
+    );
+    return;
+  }
+
+  await confirmDowngrade(wanted, comparison, options, deps);
+
+  logger.info(`Running ${printable}…`);
+  await deps.run(command, args).catch((cause: unknown) => {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    // A global install into a root owned by another user is the common failure, and npm's own
+    // wording for it is buried under a stack of paths.
+    const denied = /EACCES|permission denied/i.test(message);
+    return fail(`\`${printable}\` failed; you are still on ${currentVersion}.`, {
+      hint: denied
+        ? `No permission to write to the global install root. Re-run with sudo, or reinstall ${NPM_PACKAGE} somewhere you own.`
+        : `Run it yourself to see why: ${printable}`,
+      cause,
+    });
+  });
+
+  logger.info(`Upgraded ${currentVersion} → ${wanted}.`);
+
+  if (options.json) {
+    report(
+      {
+        action: 'upgrade',
+        upgraded: true,
+        previous_version: currentVersion,
+        current_version: wanted,
+        install: 'npm',
+        package_manager: manager,
+        command: printable,
         path: installed,
       },
       options,

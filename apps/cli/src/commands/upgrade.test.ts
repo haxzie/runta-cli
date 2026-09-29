@@ -8,6 +8,7 @@ import { version as currentVersion } from '../version.js';
 import {
   compareVersions,
   detectInstall,
+  detectPackageManager,
   detectTarget,
   resolveLatest,
   type UpgradeDeps,
@@ -51,6 +52,23 @@ describe('detectInstall', () => {
 
   it('is not fooled by a directory that merely mentions node_modules', () => {
     expect(detectInstall('/usr/local/bin/node', '/repo/node_modules_backup/index.js')).toBe('dev');
+  });
+});
+
+describe('detectPackageManager', () => {
+  it('reads the manager off the global root it was unpacked into', () => {
+    expect(detectPackageManager('/usr/local/lib/node_modules/@haxzie/runta-next/dist')).toBe('npm');
+    expect(detectPackageManager('/Users/me/Library/pnpm/global/5/node_modules/x/dist')).toBe(
+      'pnpm',
+    );
+    expect(detectPackageManager('/Users/me/.bun/install/global/node_modules/x/dist')).toBe('bun');
+    expect(detectPackageManager('/Users/me/.config/yarn/global/node_modules/x/dist')).toBe('yarn');
+  });
+
+  // Guessing wrong installs a second copy under a different root instead of failing, so the
+  // fallback has to be the one almost everyone actually has.
+  it('falls back to npm for an unrecognised root', () => {
+    expect(detectPackageManager('/opt/somewhere/node_modules/x/dist')).toBe('npm');
   });
 });
 
@@ -462,22 +480,118 @@ describe('upgrade', () => {
       ...overrides,
     });
 
-  it('sends an npm install to npm, not to install.sh', async () => {
-    const error = await upgrade({}, npmDeps()).catch((e: unknown) => e);
+  /** Records what was run, so a test can assert the command without a real package manager. */
+  const recordingNpmDeps = (
+    overrides: Partial<UpgradeDeps> = {},
+  ): { d: UpgradeDeps; ran: string[] } => {
+    const ran: string[] = [];
+    const d = npmDeps({
+      run: async (command, args) => {
+        ran.push([command, ...args].join(' '));
+        return '';
+      },
+      ...overrides,
+    });
+    return { d, ran };
+  };
+
+  it('upgrades an npm install by running npm, rather than refusing', async () => {
+    const { d, ran } = recordingNpmDeps();
+
+    await upgrade({}, d);
+
+    expect(ran).toEqual([`npm install -g @haxzie/runta-next@${NEW_VERSION}`]);
+  });
+
+  it('installs the version --to asked for', async () => {
+    const { d, ran } = recordingNpmDeps();
+
+    await upgrade({ to: 'v9.9.9' }, d);
+
+    expect(ran).toEqual(['npm install -g @haxzie/runta-next@9.9.9']);
+  });
+
+  it('never touches the release assets on an npm install', async () => {
+    const asset = vi.fn();
+    const { d } = recordingNpmDeps({
+      fetch: async (url) => {
+        if (url.endsWith('/releases/latest')) {
+          return redirectedTo(`https://github.com/x/y/releases/tag/v${NEW_VERSION}`);
+        }
+        asset(url);
+        return new Response('nope', { status: 500 });
+      },
+    });
+
+    await upgrade({}, d);
+
+    expect(asset).not.toHaveBeenCalled();
+  });
+
+  it('uses each manager\u2019s own global-install command', async () => {
+    const cases: [string, string][] = [
+      ['/Users/me/Library/pnpm/global/5/node_modules/@haxzie/runta-next/dist', 'pnpm add -g'],
+      ['/Users/me/.bun/install/global/node_modules/@haxzie/runta-next/dist', 'bun add -g'],
+      ['/Users/me/.config/yarn/global/node_modules/@haxzie/runta-next/dist', 'yarn global add'],
+      ['/usr/local/lib/node_modules/@haxzie/runta-next/dist', 'npm install -g'],
+    ];
+
+    for (const [path, expected] of cases) {
+      const { d, ran } = recordingNpmDeps({ modulePath: () => path });
+      await upgrade({}, d);
+      expect(ran).toEqual([`${expected} @haxzie/runta-next@${NEW_VERSION}`]);
+    }
+  });
+
+  it('shows the command under --dry-run and runs nothing', async () => {
+    const { d, ran } = recordingNpmDeps();
+
+    await upgrade({ dryRun: true, json: true }, d);
+
+    expect(ran).toEqual([]);
+    const payload = JSON.parse(written.join('')) as Record<string, unknown>;
+    expect(payload.command).toBe(`npm install -g @haxzie/runta-next@${NEW_VERSION}`);
+    expect(payload.package_manager).toBe('npm');
+  });
+
+  it('blames the command, not the CLI, when the manager fails', async () => {
+    const { d } = recordingNpmDeps({
+      run: async () => {
+        throw new Error('npm ERR! code EACCES\nnpm ERR! syscall mkdir');
+      },
+    });
+
+    const error = await upgrade({}, d).catch((e: unknown) => e);
 
     expect(isCliError(error)).toBe(true);
-    expect(String(error)).toMatch(/installed from npm/);
-    expect((error as { hint?: string }).hint).toContain('npm install -g @haxzie/runta-next@latest');
-    expect(String(error)).not.toMatch(/development checkout/);
+    expect(String(error)).toMatch(/npm install -g @haxzie\/runta-next/);
+    expect(String(error)).toMatch(new RegExp(`still on ${currentVersion}`));
+    expect((error as { hint?: string }).hint).toMatch(/sudo/);
   });
 
-  it('names the requested version in the npm hint, so --to still means something', async () => {
-    const error = await upgrade({ to: 'v9.9.9' }, npmDeps()).catch((e: unknown) => e);
+  it('reports a package-manager upgrade as JSON', async () => {
+    const { d } = recordingNpmDeps();
 
-    expect((error as { hint?: string }).hint).toContain('@haxzie/runta-next@9.9.9');
+    await upgrade({ json: true }, d);
+
+    const payload = JSON.parse(written.join('')) as Record<string, unknown>;
+    expect(payload.upgraded).toBe(true);
+    expect(payload.current_version).toBe(NEW_VERSION);
+    expect(payload.package_manager).toBe('npm');
   });
 
-  it('still answers --check on an npm install, and suggests the npm command', async () => {
+  it('confirms before a package-manager downgrade, and aborts on no', async () => {
+    const { d, ran } = recordingNpmDeps({
+      isInteractive: () => true,
+      confirm: async () => false,
+      fetch: async () => redirectedTo('https://github.com/x/y/releases/tag/v0.0.1'),
+    });
+
+    await expect(upgrade({}, d)).rejects.toThrow(/Aborted/);
+    expect(ran).toEqual([]);
+  });
+
+  it('still answers --check on an npm install', async () => {
     await upgrade({ check: true }, npmDeps());
 
     expect(written.join('')).toBe('');
