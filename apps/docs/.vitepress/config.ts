@@ -33,6 +33,11 @@ export default defineConfig({
 
     // Hand-ordered rather than derived from frontmatter: the reading order of a docs site is a
     // judgement, and `sidebar_position` numbers are the thing that rots when a page is inserted.
+    //
+    // The cost of that judgement is that a new page can ship without an entry — `images` did, and
+    // was reachable only by URL for two releases. `sidebar.test.ts` now fails the build when a
+    // page under `docs/commands/` has no link here, so the order stays a judgement but the
+    // coverage does not.
     sidebar: [
       {
         text: 'Getting started',
@@ -49,6 +54,7 @@ export default defineConfig({
         text: 'Commands',
         items: [
           { text: 'Overview', link: '/commands/' },
+          { text: 'image list, image delete', link: '/commands/images' },
           { text: 'create', link: '/commands/create' },
           { text: 'list', link: '/commands/list' },
           { text: 'inspect', link: '/commands/inspect' },
