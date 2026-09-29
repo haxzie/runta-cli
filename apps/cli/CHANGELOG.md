@@ -1,5 +1,18 @@
 # @haxzie/runta-next
 
+## 0.11.2
+
+### Patch Changes
+
+- [#25](https://github.com/haxzie/runta-cli/pull/25) [`0033254`](https://github.com/haxzie/runta-cli/commit/0033254ba98df94af32d2334d51e9d5d0541dd3a) Thanks [@haxzie](https://github.com/haxzie)! - Link the `image` commands from the docs sidebar.
+  
+  `docs/commands/images.md` shipped, released and deployed without a sidebar entry,
+  so for two releases it was reachable only by typing the URL. The sidebar is
+  hand-ordered on the argument that reading order is a judgement — which is true, and
+  whose cost is that a page can ship with no entry at all. A test now fails the build
+  when a page under `docs/commands/` has no link, and when a link points at a page
+  that does not exist.
+
 ## 0.11.1
 
 ### Patch Changes
