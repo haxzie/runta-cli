@@ -54,6 +54,7 @@ npm packages, the Homebrew tap, and the shipped binary (the source repo is priva
 | [C-36](#c-36--an-ambiguous-runtime-name-silently-resolves-to-the-first-match) | An ambiguous runtime name silently resolves to the first match | high |
 | [C-37](#c-37--vcpus-cannot-be-changed-after-creation-and-nothing-says-so) | vCPUs cannot be changed after creation, and nothing says so | medium |
 | [C-38](#c-38--an-existing-claude-subscription-cannot-be-used-when-creating-a-runtime) | A connected Claude subscription cannot be used when creating a runtime | high |
+| [C-39](#c-39--the-api-calls-the-same-concept-name-on-some-resources-and-display_name-on-others) | `name` on some resources, `display_name` on others — and both on runtimes | medium |
 
 ---
 
@@ -1415,6 +1416,60 @@ empty list that implies nothing is connected.
 **What ours does.** Nothing — `runta-next create` has no secret, provider or sign-in flags at all, so
 it inherits the same wall one step earlier. Worth recording as a requirement before we add any of
 them: whatever we build should accept a subscription wherever it accepts a provider.
+
+
+### C-39 — The API calls the same concept `name` on some resources and `display_name` on others
+_Severity: medium._
+
+There is no single word for "what this thing is called". Which one a resource uses has to be
+memorised per endpoint:
+
+| Uses `display_name` | Uses `name` |
+| --- | --- |
+| `Runtime` | `RuntimeImage` |
+| `CheckpointSummary` | `SecretEnvironmentBinding` |
+| `ModelProvider` | `SecretEgressRule` |
+| `User` | |
+
+All are required fields, so this is not a nullable-versus-not distinction — it is two spellings of
+one idea. `GET /v2/images` and `GET /v2/runtimes` are the pair a caller is most likely to hit in the
+same breath, since you read the image catalog to choose what to create:
+
+```console
+$ curl .../v2/images   | jq -r '.data[0] | keys[] | select(contains("name"))'
+"name"
+$ curl .../v2/runtimes | jq -r '.data[0] | keys[] | select(contains("name"))'
+"display_name"
+```
+
+So no generic accessor works across the two, which is the same shape of defect as C-18's
+per-command array keys (`runtimes`, `checkpoints`, `secrets`, `keys`): every list is *almost* the
+same and has to be special-cased anyway.
+
+Worse, one resource manages both spellings by itself. `POST /v2/runtimes` accepts the name as
+**`name`**, and the runtime it returns carries it as **`display_name`**:
+
+```console
+$ runta-next create --name scratch-claude …      # request body: { "name": "scratch-claude" }
+{ "display_name": "scratch-claude", … }          # response
+```
+
+A caller who round-trips a runtime — read it, change something, send it back — has to rename the
+field in both directions, and nothing in the response hints that it should.
+
+This bit us during this audit: a script reading `display_name` off the official CLI's `ps` output
+printed `None` for every row, because that CLI reshapes the field into its own key. Three
+vocabularies for one concept — the API's two, plus whatever a client invents on top.
+
+→ Pick one and alias the other for compatibility. `display_name` is the better choice of the two:
+it distinguishes the human label from an `id`, which `name` does not, and it is already the majority
+spelling. At minimum, make the create request and the runtime response agree with each other.
+
+**What ours does.** `runta-next` says `name` everywhere a user types or reads one — `create --name`,
+`--fields name`, the `NAME` table column — and translates at the API boundary. That is the right
+call for the CLI and it does hide the problem from our users, but it also means the CLI's vocabulary
+and the API's do not match, which anyone reading `--json` output will notice immediately: the
+payload is the API's own object, so it says `display_name` while every flag says `name`.
 
 
 ## Not exercised
