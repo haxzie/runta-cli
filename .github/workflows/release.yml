@@ -172,6 +172,41 @@ jobs:
             dist/runta-next-linux-x64-musl.tar.gz \
             dist/checksums.txt
 
+      # The docs describe the CLI being released, so they ship with it. Deployed by hand until
+      # now, which is how the site fell five releases behind the binary: nothing enforced the pair.
+      #
+      # Both Workers, in dependency order. The docs Worker has no public route of its own — the
+      # install Worker owns runta.haxzie.com and reaches it over a `DOCS` service binding — so the
+      # binding must resolve, which means the docs Worker has to exist before the install Worker
+      # is deployed against it.
+      - name: Deploy the docs
+        if: steps.check.outputs.release == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN is not set; skipping the docs deploy."
+            exit 0
+          fi
+          pnpm --filter @runta/docs run deploy
+          pnpm --filter @runta/install-worker run deploy
+
+      # The site has to actually be serving the version just released, or the deploy above
+      # succeeded at publishing the wrong thing.
+      - name: The docs are live on the released hostname
+        if: steps.check.outputs.release == 'true'
+        run: |
+          for _ in $(seq 1 10); do
+            status=$(curl -sS -o /dev/null -w '%{http_code}' https://runta.haxzie.com/docs/)
+            [ "$status" = "200" ] && break
+            sleep 5
+          done
+          [ "$status" = "200" ] || {
+            echo "::error::runta.haxzie.com/docs returned $status after the deploy"
+            exit 1
+          }
+
       # Last, because the GitHub release is what install.sh resolves and it should not be held up
       # by npm. `build:binaries` compiles straight from src, so dist/index.js does not exist yet —
       # this is the step that produces it, through turbo so the workspace packages it bundles are

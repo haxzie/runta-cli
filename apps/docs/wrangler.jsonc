@@ -10,6 +10,13 @@
     "binding": "ASSETS",
     // The site is fully static, so a miss is a genuine 404 rather than a route to hand back index.
     "not_found_handling": "404-page"
-  },
-  "routes": [{ "pattern": "runta-cli.haxzie.com", "custom_domain": true }]
+  }
+  // No route and no workers.dev: this Worker is reachable only through the install Worker's
+  // `DOCS` service binding, which owns runta.haxzie.com and forwards `/docs/*` to it. One public
+  // hostname for the whole project means one canonical URL to print, one certificate, and no
+  // second address that can drift out of date while still answering 200.
+  //
+  // Dropping a custom domain from this file does not detach it — Cloudflare keeps the binding
+  // until it is removed. runta-cli.haxzie.com has to be deleted in the dashboard under
+  // Workers & Pages > runta-next-docs > Settings > Domains & Routes.
 }

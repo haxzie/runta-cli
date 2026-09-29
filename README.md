@@ -336,7 +336,8 @@ config, deployment infrastructure and the docs site are not things a user instal
 
 ### Deploying the Workers
 
-Both Workers are deployed by hand, from a machine with `wrangler login`:
+`release.yml` deploys both on every release. To do it by hand, from a machine with
+`wrangler login`:
 
 ```sh
 pnpm --filter @runta/docs run deploy             # must go first; see below
@@ -349,6 +350,10 @@ reached by a service binding: the install Worker answers `/install.sh` itself, f
 to `runta-next-docs`, and 404s everything else. Deploy the docs Worker first — a binding to a
 service that does not exist yet fails the install Worker's deploy.
 
+That is the project's only public hostname. The docs Worker has no route of its own: one address
+means one canonical URL to print and no second one that can answer 200 with stale content while
+nobody is looking.
+
 That last part is a safety property, not tidiness. `/` must never be a 2xx, because
 `curl -fsSL runta.haxzie.com | sh` is a plausible mistyping of the install command and `curl -fsSL`
 aborts on a non-2xx rather than piping a rendered page into a shell. `install-health.yml` asserts
@@ -359,10 +364,26 @@ directory, so `pnpm --filter … deploy` fails with `ERR_PNPM_INVALID_DEPLOY_TAR
 running the script. The docs script builds first — deploying with bare `wrangler deploy` uploads
 whatever is already in `dist/`, which is how you ship a site without your last edit in it.
 
-There is no CI deploy and no Cloudflare credential in this repository, on purpose. The Worker reads
-`scripts/install.sh` from the default branch **at request time**, so editing the install script
-needs no deploy at all — the Worker itself changes about as often as the repo moves. Automating a
-once-a-year deploy is not worth a long-lived token in a repository secret.
+### Why this is in CI now
+
+An earlier version of this file argued the opposite, and the argument was right about the install
+Worker and wrong about the docs. The install Worker reads `scripts/install.sh` from the default
+branch **at request time**, so editing the install script needs no deploy at all and the Worker
+itself changes about as often as the repo's shape does — automating that alone would not have been
+worth a long-lived token.
+
+The docs are the other case. Their content is baked into the bundle at build time, so every
+release that changes a command's flags makes the deployed site wrong until someone remembers. By
+0.10.0 the site was five releases behind: `/docs/commands/images` 404ed and `llms-full.txt`
+described a CLI with no `-o/--output`, which is the output contract agents were being pointed at.
+`docs.test.ts` already guarantees the *source* matches the binary; nothing guaranteed the *site*
+matched the source.
+
+So `release.yml` deploys both, gated on the same tag-gap check as the npm publish, and then
+asserts `runta.haxzie.com/docs/` answers 200 — a deploy that succeeds at publishing the wrong
+thing is not a success. It needs a `CLOUDFLARE_API_TOKEN` repository secret; without one the step
+warns and skips rather than failing the release, because a broken docs deploy must not strand a
+published binary.
 
 What *is* automated is noticing when the URL breaks. `install-health.yml` runs daily and needs no
 credential: it checks that `runta.haxzie.com/install.sh` returns a shell script byte-identical to
