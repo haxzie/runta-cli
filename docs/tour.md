@@ -150,7 +150,36 @@ $ runta-next list --json | jq -r '.[] | select(.status != "running") | .display_
 stdout is a terminal, so what you get in a pipe is what you saw by hand — only colour varies, and
 `NO_COLOR=1` turns that off everywhere. See [Output and scripting](/output-and-scripting).
 
-## 5. Clean up
+## 5. Park it instead of destroying it
+
+Deleting is not the only way to stop paying for a runtime. `stop` shuts it down and releases its
+resources; `pause` keeps its memory so it comes back faster.
+
+```
+$ runta-next stop demo
+Stopping 'demo'…
+Runtime 'demo' is shutdown.
+
+Next steps:
+  runta-next start demo  bring it back to running
+```
+
+`start` brings it back from either, and — this is the part worth knowing — you do not have to
+remember which. The API uses different endpoints for waking a stopped runtime and a paused one, but
+`start` reads the current state and picks, so one verb covers all of them. There is no `resume` or
+`boot` command to get wrong.
+
+Asking for a state a runtime is already in is not an error and sends nothing:
+
+```
+$ runta-next stop demo
+Runtime 'demo' is already shutdown.
+```
+
+That makes these safe in a script that cannot know the current state. See
+[start, stop, pause](/commands/lifecycle) for the state table and the `--detach` semantics.
+
+## 6. Clean up
 
 ```
 $ runta-next delete demo

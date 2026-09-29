@@ -49,8 +49,11 @@ The CLI is early. Today it covers the runtime lifecycle, authentication and iden
 - [`runta-next create`](./commands/create.md) · [`runta-next list`](./commands/list.md) ·
   [`runta-next inspect`](./commands/inspect.md) · [`runta-next delete`](./commands/delete.md) ·
   [`runta-next exec`](./commands/exec.md)
+- [`runta-next start`](./commands/lifecycle.md) · [`runta-next stop`](./commands/lifecycle.md) ·
+  [`runta-next pause`](./commands/lifecycle.md)
 - [`runta-next login`](./commands/login.md) · [`runta-next logout`](./commands/logout.md) ·
   [`runta-next whoami`](./commands/whoami.md)
+- [`runta-next upgrade`](./commands/upgrade.md)
 
 Checkpoints, secrets, file transfer, images and agents are not implemented yet. See
 [Commands → not yet implemented](./commands/index.md#not-yet-implemented) for what the API
