@@ -30,8 +30,9 @@ const LLMS_URL = `${DOCS_URL}/llms-full.txt`;
 const GROUPS: Group[] = [
   {
     title: 'Runtimes',
-    // Lifecycle order, not alphabetical: make one, look at it, use it, park it, remove it.
-    commands: ['create', 'list', 'inspect', 'exec', 'start', 'stop', 'pause', 'delete'],
+    // Lifecycle order, not alphabetical: pick what to build from, make one, look at it, use it,
+    // park it, remove it.
+    commands: ['images', 'create', 'list', 'inspect', 'exec', 'start', 'stop', 'pause', 'delete'],
   },
   { title: 'Account', commands: ['login', 'logout', 'whoami'] },
   { title: 'More', commands: ['runtime', 'upgrade', 'help'] },
@@ -50,6 +51,7 @@ const USAGE: Record<string, string> = {
 
 const EXAMPLES: [string, string?][] = [
   ['runta-next login'],
+  ['runta-next images', 'what create can build from'],
   ['runta-next create --name demo --cpus 1 --memory 512'],
   ['runta-next exec demo -- uname -a'],
   ['runta-next exec demo -it -- sh', 'interactive shell'],

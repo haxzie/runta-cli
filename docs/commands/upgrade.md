@@ -1,7 +1,7 @@
 ---
 title: runta-next upgrade
 description: Replace the installed binary with a newer release, verifying the download before anything is swapped.
-sidebar_position: 11
+sidebar_position: 12
 ---
 
 # `runta-next upgrade`

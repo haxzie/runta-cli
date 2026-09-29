@@ -244,6 +244,7 @@ describe('documented commands and flags exist', () => {
 describe('every command and flag is documented', () => {
   /** Where a command's flags are expected to be written down. */
   const PAGE_FOR: Record<string, string> = {
+    images: 'images.md',
     create: 'create.md',
     list: 'list.md',
     inspect: 'inspect.md',

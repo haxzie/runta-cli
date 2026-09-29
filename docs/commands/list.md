@@ -1,7 +1,7 @@
 ---
 title: runta-next list
 description: List runtimes, with the default active filter, --all, --status, --limit, --fields, pagination and JSON output.
-sidebar_position: 8
+sidebar_position: 9
 ---
 
 # `runta-next list`

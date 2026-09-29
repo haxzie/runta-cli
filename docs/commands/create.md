@@ -1,7 +1,7 @@
 ---
 title: runta-next create
 description: Create a runtime and wait until it can accept commands, including sizing, published ports, idle policy, and restoring from a checkpoint.
-sidebar_position: 7
+sidebar_position: 8
 ---
 
 # `runta-next create`
@@ -22,7 +22,7 @@ Both forms are the same command. See [Commands](./index.md#two-forms-for-runtime
 | `--memory <mib>` | Memory in MiB |
 | `--memory-max <mib>` | Auto-scaling memory ceiling in MiB |
 | `--disk <gib>` | Overlay disk in GiB, 16–256 |
-| `--image <id>` | Runtime image variant id |
+| `--image <id>` | Runtime image variant id — see [`images`](./images.md) |
 | `-p, --publish <spec>` | Publish a port, e.g. `8080/https`. Repeatable |
 | `--idle-mode <mode>` | `disabled`, `suspend_only` or `suspend_and_wakeup` |
 | `--idle-timeout <secs>` | Idle seconds before suspending. Required with a suspending mode |
@@ -101,6 +101,10 @@ $ runta-next create --image kimi
 error Image 'kimi' supports several model-provider protocols.
 Pick one with --model-provider-protocol: anthropic_messages, openai_chat, openai_responses.
 ```
+
+[`runta-next images`](./images.md) tells you which case an image is in before you try: its
+`MODEL PROVIDER` column shows the single protocol when one is inferred, and a count when the flag
+is required.
 
 A protocol the image does not support is rejected the same way, naming what it does support.
 

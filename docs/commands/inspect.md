@@ -1,7 +1,7 @@
 ---
 title: runta-next inspect
 description: Show everything about one runtime, including the effective egress posture and the fields the list table omits.
-sidebar_position: 9
+sidebar_position: 10
 ---
 
 # `runta-next inspect`
