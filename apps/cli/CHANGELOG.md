@@ -1,5 +1,46 @@
 # @runta/cli
 
+## 0.7.0
+
+### Minor Changes
+
+- [#8](https://github.com/haxzie/runta-cli/pull/8) [`7435426`](https://github.com/haxzie/runta-cli/commit/74354263a00f22f600fcfb8cd322fc804affeed2) Thanks [@haxzie](https://github.com/haxzie)! - Add `--fields` to `list`, selecting which columns appear and in what order.
+  
+  The same names key both halves of the output — the table renders them as columns, `--json` keys each
+  row by them — so one vocabulary covers what a person reads and what a script parses. The human cell
+  and the machine value are decided separately: `memory` is `512 MiB` in the table and `512` in JSON,
+  and `status` serialises as `"running"` with `degraded` available as its own field, so nothing has to
+  substring-match `running (degraded)` to learn one boolean.
+  
+  Additive: without `--fields`, `--json` is unchanged, so existing `jq` paths keep working. An unknown
+  field is an error naming it and the valid ones, exit code 2, before any request goes out.
+  
+  Measured honestly in `evals/cli-ab`: the narrow path is 26× smaller than a full `list --json`, but
+  rerunning the agent suite showed no aggregate saving, because most tasks reach for `inspect` rather
+  than `list`. See `Improvements.md` I-10.
+
+### Patch Changes
+
+- [#8](https://github.com/haxzie/runta-cli/pull/8) [`3575246`](https://github.com/haxzie/runta-cli/commit/3575246793e6b895fa50bd83206d30016e90588a) Thanks [@haxzie](https://github.com/haxzie)! - Correct the pagination cursor's name in the API spec, and add the design documents.
+  
+  `Pagination.next_cursor` in `openapi.json` said "Pass as `cursor` to fetch the next page". The
+  parameter is `after`. The failure was silent — the API ignores an unknown query parameter rather
+  than rejecting it, so following the old description returns the first page forever. Our client
+  already used `after`, so nothing was broken; a client generated from the spec would have looped.
+  
+  `packages/api/NOTES.md` §4 gains the evidence behind `CLI_ISSUES.md` C-15, captured by serving the
+  production binary 250 runtimes from a local mock: it walks every page, with `limit=100` hard-coded
+  and `after` as the cursor.
+  
+  New at the repository root: `DESIGN.md` explains the interface and the reasoning, opening with the
+  naming decisions and what they bought humans and agents; `FAILURE-AND-RECOVERY.md` writes up what
+  happens when an agent gets something wrong, from real eval transcripts. `docs.test.ts` now checks
+  both against the real command tree, so a documented flag cannot drift from the binary.
+- Updated dependencies []:
+  - @runta/api@0.7.0
+  - @runta/core@0.7.0
+  - @runta/utils@0.7.0
+
 ## 0.6.1
 
 ### Patch Changes
