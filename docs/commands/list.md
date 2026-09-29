@@ -21,6 +21,7 @@ runta-next runtime list [options]
 | `--limit <n>` | Stop after this many runtimes |
 | `--fields <names>` | Comma-separated fields to show, in that order |
 | `--json` | Print the runtimes as JSON |
+| `-o, --output <mode>` | `auto` (JSON when not a terminal), `table`, or `json` |
 
 ```console
 $ runta-next list

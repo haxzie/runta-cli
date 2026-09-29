@@ -77,11 +77,11 @@ describe('command surface', () => {
   });
 
   it('keeps the login flags', () => {
-    expect(optionsOf('login')).toEqual(['--json', '--no-browser']);
+    expect(optionsOf('login')).toEqual(['--json', '--no-browser', '--output']);
   });
 
   it('keeps the logout flag', () => {
-    expect(optionsOf('logout')).toEqual(['--json']);
+    expect(optionsOf('logout')).toEqual(['--json', '--output']);
   });
 
   it('keeps the exec flags', () => {
@@ -89,7 +89,13 @@ describe('command surface', () => {
   });
 
   it('keeps the whoami flag', () => {
-    expect(optionsOf('whoami')).toEqual(['--json']);
+    expect(optionsOf('whoami')).toEqual(['--json', '--output']);
+  });
+
+  // `exec` streams the remote command's own bytes, so it is deliberately the one command
+  // without `-o`: auto-detecting a pipe would wrap a redirected binary in a JSON envelope.
+  it('leaves exec out of the output-mode flag', () => {
+    expect(optionsOf('exec')).not.toContain('--output');
   });
 
   it('declares the global options', () => {

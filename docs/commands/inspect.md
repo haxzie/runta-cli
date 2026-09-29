@@ -19,6 +19,7 @@ runta-next runtime inspect <runtime> [options]
 | Option | Does |
 | --- | --- |
 | `--json` | Print the runtime as JSON |
+| `-o, --output <mode>` | `auto` (JSON when not a terminal), `table`, or `json` |
 
 ```console
 $ runta-next inspect demo

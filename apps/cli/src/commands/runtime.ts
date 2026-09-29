@@ -24,6 +24,7 @@ import {
 } from '@runta/core';
 import { type Column, fail, logger, renderTable } from '@runta/utils';
 import type { Command } from 'commander';
+import { outputOption, resolveOutput } from '../output.js';
 import { type NextStep, printNextSteps } from '../suggest.js';
 
 /**
@@ -257,7 +258,8 @@ export async function list(
     return;
   }
   if (runtimes.length === 0) {
-    logger.info(
+    // An empty list is still the answer to `list`, so it goes where the table would have.
+    logger.success(
       options.all ? 'No runtimes.' : 'No active runtimes. Use --all to include stopped ones.',
     );
     // An empty list is the one place a new user is definitely stuck, so it is worth a pointer.
@@ -605,7 +607,7 @@ export async function remove(
     return;
   }
   for (const r of results) {
-    logger.info(r.deleted ? `Deleted '${r.name}'.` : `Deletion of '${r.name}' requested.`);
+    logger.success(r.deleted ? `Deleted '${r.name}'.` : `Deletion of '${r.name}' requested.`);
   }
 
   // Suggesting `runta-next list` here would be noise — you know what you just deleted. Reaching zero is
@@ -831,7 +833,7 @@ function emitLifecycle(
     );
     return;
   }
-  logger.info(result.message);
+  logger.success(result.message);
 }
 
 /**
@@ -932,7 +934,7 @@ function emit(
     deps.write(`${JSON.stringify(runtime, null, 2)}\n`);
     return;
   }
-  logger.info(message);
+  logger.success(message);
 }
 
 function describe(runtime: Runtime): string {
@@ -1004,8 +1006,9 @@ function addRuntimeVerbs(parent: Command): void {
     .option('-d, --detach', 'return as soon as creation is accepted, without waiting')
     .option('--timeout <secs>', 'how long to wait before giving up (default 180)')
     .option('--json', 'print the runtime as JSON')
+    .addOption(outputOption())
     .action(async (opts: CreateOptions) => {
-      await create(opts);
+      await create(resolveOutput(opts));
     });
 
   parent
@@ -1020,8 +1023,9 @@ function addRuntimeVerbs(parent: Command): void {
         'memory (MiB), image, created. Applies to the table and to --json',
     )
     .option('--json', 'print the runtimes as JSON')
+    .addOption(outputOption())
     .action(async (opts: ListOptions) => {
-      await list(opts);
+      await list(resolveOutput(opts));
     });
 
   parent
@@ -1029,8 +1033,9 @@ function addRuntimeVerbs(parent: Command): void {
     .description('Show everything about one runtime')
     .argument('<runtime>', 'runtime name or id')
     .option('--json', 'print the runtime as JSON')
-    .action(async (reference: string, opts: { json?: boolean }) => {
-      await inspect(reference, opts);
+    .addOption(outputOption())
+    .action(async (reference: string, opts: { json?: boolean; output?: string }) => {
+      await inspect(reference, resolveOutput(opts));
     });
 
   parent
@@ -1042,8 +1047,9 @@ function addRuntimeVerbs(parent: Command): void {
     .option('-d, --detach', 'return as soon as deletion is accepted, without waiting')
     .option('--timeout <secs>', 'how long to wait before giving up (default 180)')
     .option('--json', 'print the result as JSON')
+    .addOption(outputOption())
     .action(async (references: string[], opts: DeleteOptions) => {
-      await remove(references, opts);
+      await remove(references, resolveOutput(opts));
     });
 
   for (const action of ['start', 'stop', 'pause'] as const) {
@@ -1055,8 +1061,9 @@ function addRuntimeVerbs(parent: Command): void {
       .option('-d, --detach', 'return as soon as the change is accepted, without waiting')
       .option('--timeout <secs>', 'how long to wait before giving up (default 180)')
       .option('--json', 'print the result as JSON')
+      .addOption(outputOption())
       .action(async (reference: string, opts: LifecycleOptions) => {
-        await lifecycle(action, reference, opts);
+        await lifecycle(action, reference, resolveOutput(opts));
       });
   }
 }

@@ -206,6 +206,10 @@ export function registerExec(program: Command): void {
     .option('-i, --interactive', 'forward stdin to the command')
     .option('-t, --tty', 'allocate a pty; needs a terminal on stdout')
     .option('--env <KEY=VALUE>', 'set an environment variable (repeatable)', collect, [])
+    // Deliberately no `-o`: `exec` streams the remote command's own bytes through, so
+    // `exec demo -- cat f.bin > out` has to write the file, not a JSON envelope around it.
+    // Auto-detecting a pipe here would corrupt the most obvious use of the command. `--json`
+    // still works, explicitly.
     .option('--json', 'stream NDJSON frames instead of raw output')
     .action(async (reference: string, command: string[], opts: ExecOptions) => {
       const code = await exec(reference, command, opts);

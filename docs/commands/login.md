@@ -16,6 +16,7 @@ runta-next login [options]
 | Option | Does |
 | --- | --- |
 | `--json` | Stream NDJSON progress instead of prose |
+| `-o, --output <mode>` | `auto` (JSON when not a terminal), `table`, or `json` |
 | `--no-browser` | Print the URL instead of opening it |
 ## Interactive
 

@@ -16,6 +16,7 @@ import {
 import { fail, logger } from '@runta/utils';
 import type { Command } from 'commander';
 import { canOpenBrowser, openUrl } from '../browser.js';
+import { outputOption, resolveOutput } from '../output.js';
 import { printNextSteps } from '../suggest.js';
 
 export interface LoginOptions {
@@ -90,7 +91,7 @@ export async function login(
     deps.write(`${JSON.stringify({ status: 'authorized', config_path: path })}\n`);
     return;
   }
-  logger.info(`Authorized. Token saved to ${path}`);
+  logger.success(`Authorized. Token saved to ${path}`);
   printNextSteps([
     { command: 'runta-next whoami', why: 'confirm which account and team you are on' },
     { command: 'runta-next create --name demo', why: 'create your first runtime' },
@@ -117,14 +118,16 @@ async function prompt(
     return;
   }
 
-  logger.info(`Your code is ${authorization.user_code}`);
+  logger.success(`Your code is ${authorization.user_code}`);
 
   const opened =
     options.browser !== false && deps.canOpenBrowser()
       ? await deps.openUrl(authorization.verification_uri_complete)
       : false;
 
-  logger.info(
+  // The not-opened branch carries the URL the user has to visit, which makes it the result
+  // rather than progress. Both spellings go the same way so the flow reads as one block.
+  logger.success(
     opened
       ? 'Opened your browser to approve it.'
       : `Open ${authorization.verification_uri_complete} to approve it.`,
@@ -176,7 +179,7 @@ export async function logout(
     deps.write(`${JSON.stringify({ status: 'logged_out', revoked, cleared })}\n`);
     return;
   }
-  logger.info(cleared || revoked ? 'Logged out.' : 'Not logged in — nothing to do.');
+  logger.success(cleared || revoked ? 'Logged out.' : 'Not logged in — nothing to do.');
 
   // The one thing logout cannot do is unset your shell. Revoking a token that came from the
   // environment leaves every future command sending a credential the server has forgotten, and
@@ -200,16 +203,18 @@ export function registerAuthCommands(program: Command): void {
     .command('login')
     .description('Sign in through a browser using a one-time device code')
     .option('--json', 'print machine-readable progress instead of prose')
+    .addOption(outputOption())
     .option('--no-browser', 'print the URL instead of opening it')
     .action(async (opts: LoginOptions) => {
-      await login(opts);
+      await login(resolveOutput(opts));
     });
 
   program
     .command('logout')
     .description('Revoke the stored credential and remove it from the local config')
     .option('--json', 'print the result as JSON')
-    .action(async (opts: { json?: boolean }) => {
-      await logout(opts);
+    .addOption(outputOption())
+    .action(async (opts: { json?: boolean; output?: string }) => {
+      await logout(resolveOutput(opts));
     });
 }

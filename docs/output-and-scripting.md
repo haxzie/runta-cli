@@ -16,8 +16,48 @@ runta-next whoami > who.txt        # only the identity lands in the file
 runta-next whoami 2>/dev/null      # drop the commentary
 ```
 
-This is why `runta-next login` prints "Waiting for authorization…" on stderr while `--json`
-writes machine-readable records to stdout: you can pipe one and watch the other.
+Success counts as a result, not as commentary — `Authorized. Token saved to …`, `Deleted …`
+and the `login` device code are on stdout. Routing them through stderr made a successful
+`login` render entirely in red in terminals that colour stderr, so the line you were waiting
+for looked like the thing that failed.
+
+This is why `runta-next login` prints "Waiting for authorization…" on stderr while the code
+itself goes to stdout: you can pipe one and watch the other.
+
+## Choosing table or JSON
+
+Output defaults to **`auto`**: a table when stdout is a terminal, JSON when it isn't. So a pipe
+just works, with no flag to remember:
+
+```sh
+runta-next list | jq -r '.[].display_name'
+```
+
+`auto` is a default, not a trap — `-o table` and `RUNTA_OUTPUT` both take it back, which is the
+difference between this and the behaviour recorded as
+[C-08](https://github.com/haxzie/runta-cli/blob/main/CLI_ISSUES.md) in the upstream CLI, where
+JSON off-TTY could not be turned off at all.
+
+| You run | You get |
+| --- | --- |
+| `runta-next list` | Table |
+| `runta-next list \| jq` | JSON |
+| `runta-next list > out.txt` | JSON |
+| `runta-next list -o table \| less` | Table |
+| `runta-next list --json` | JSON |
+| `RUNTA_OUTPUT=table runta-next list \| less` | Table |
+
+Precedence runs most-explicit-first: the flag on the command, then `RUNTA_OUTPUT`, then the
+shape of stdout. An explicit `-o table` beats `RUNTA_OUTPUT=json`, so pinning the variable in
+CI never makes a flag lie.
+
+`--json` is the explicit alias for `-o json` and is not going anywhere.
+
+::: warning `exec` is the exception
+`exec` streams the remote command's own bytes through unchanged, so it has no `-o` and never
+switches format on its own. `runta-next exec demo -- cat report.pdf > report.pdf` writes the
+file, not a JSON envelope around it. `--json` still works on `exec`, explicitly.
+:::
 
 ## `--json`
 

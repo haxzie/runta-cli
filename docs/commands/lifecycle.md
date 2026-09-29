@@ -24,6 +24,7 @@ Each is also available noun-first as `runta-next runtime start`, and so on.
 | `-d, --detach` | Return as soon as the change is accepted, without waiting |
 | `--timeout <secs>` | How long to wait before giving up (default 180) |
 | `--json` | Print the result as JSON |
+| `-o, --output <mode>` | `auto` (JSON when not a terminal), `table`, or `json` |
 
 ```console
 $ runta-next stop demo
