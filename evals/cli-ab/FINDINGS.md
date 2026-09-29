@@ -52,10 +52,10 @@ Four mechanisms, all visible in `runs/full1/trials/*/transcript.jsonl`.
 
 ### 1. Help output that cannot be read (the dominant cause)
 
-```
-runta      --help  →  78,370 chars of JSON
-runta-next --help  →   2,233 chars of grouped text
-```
+| `--help` output | Size | Format |
+| --- | --- | --- |
+| `runta` | 78,370 chars | JSON (the whole clap command tree) |
+| `runta-next` | 2,233 chars | grouped text |
 
 35×, and it is a format difference rather than a content one: the official CLI dumps its whole
 clap command tree as JSON. That is not skimmable, so the agent stops trying to read it and writes a
