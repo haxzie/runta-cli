@@ -292,7 +292,7 @@ each other.
 
 ## 6. Evidence, and what it did not support
 
-Two headless agents, same model, same tasks, isolated `PATH` per arm, graded against the tenant's
+Two headless agents on Claude Sonnet 5, same tasks, isolated `PATH` per arm, graded against the tenant's
 real state through an independent REST client. Method in
 [`evals/cli-ab/README.md`](evals/cli-ab/README.md).
 

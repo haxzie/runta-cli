@@ -40,7 +40,7 @@ bun src/run.ts --trials 5                        # full run: 13 tasks × 2 arms 
 | `--trials` | `5` | Trials per task per arm |
 | `--tasks` | all but retired | Comma-separated, e.g. `T2,T7` |
 | `--arms` | `A,B` | |
-| `--model` | `$EVAL_MODEL` or `claude-sonnet-5-5` | Same model for both arms |
+| `--model` | `$EVAL_MODEL` or `claude-sonnet-5` | Same model for both arms. Preflight refuses an unrecognised id, because the CLI warns and serves a fallback rather than failing |
 | `--max-turns` | `40` | Per agent |
 | `--budget-usd` | `3` | Per agent (`--max-budget-usd`) |
 | `--timeout-min` | `15` | Kills the agent after this |
