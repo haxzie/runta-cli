@@ -149,6 +149,12 @@ jobs:
             echo '## Install'
             echo
             echo '```sh'
+            echo "npm install -g @haxzie/runta-next"
+            echo '```'
+            echo
+            echo 'Or a standalone binary, with no Node.js requirement:'
+            echo
+            echo '```sh'
             echo "curl -fsSL https://runta.haxzie.com/install.sh | sh"
             echo '```'
           } >> release-notes.md

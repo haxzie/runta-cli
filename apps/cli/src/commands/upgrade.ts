@@ -19,6 +19,8 @@ import { printNextSteps } from '../suggest.js';
 import { version as currentVersion } from '../version.js';
 
 const REPO = 'haxzie/runta-cli';
+/** The npm package, for the one upgrade path this command cannot perform itself. */
+const NPM_PACKAGE = '@haxzie/runta-next';
 /** Release assets are named after the project, whatever the command was installed as. */
 const ARTIFACT_PREFIX = 'runta-next';
 const LATEST_URL = `https://github.com/${REPO}/releases/latest`;
@@ -47,6 +49,13 @@ export interface UpgradeDeps {
   fetch: FetchLike;
   /** Absolute path of the running executable. */
   execPath: () => string;
+  /**
+   * Where this module itself lives, which is what distinguishes an npm install from a checkout.
+   *
+   * Not `process.argv[1]`: for a global install that is the bin *symlink* — `<prefix>/bin/runta-next`
+   * — which says nothing about where the package was unpacked.
+   */
+  modulePath: () => string;
   platform: () => string;
   arch: () => string;
   /** True on a musl system, where the glibc builds will not run. */
@@ -61,6 +70,7 @@ export const defaultDeps: UpgradeDeps = {
   write: (text) => process.stdout.write(text),
   fetch: (url, init) => fetch(url, init),
   execPath: () => process.execPath,
+  modulePath: () => import.meta.dirname ?? '',
   platform: () => process.platform,
   arch: () => process.arch,
   isMusl,
@@ -94,6 +104,20 @@ function isMusl(): boolean {
   const report = process.report?.getReport();
   const header = (report as { header?: { glibcVersionRuntime?: string } } | undefined)?.header;
   return !header?.glibcVersionRuntime;
+}
+
+/**
+ * How this CLI was installed, which decides whether `upgrade` can do anything.
+ *
+ * A standalone binary is its own `process.execPath`, so anything else means node is running a
+ * bundle — either the published npm package or a checkout. Only the npm package lives under
+ * `node_modules`, and telling those two apart matters: sending an npm user to install.sh would
+ * leave them with a second copy in ~/.runta-next/bin, racing the first on PATH.
+ */
+export function detectInstall(execPath: string, modulePath: string): 'binary' | 'npm' | 'dev' {
+  const name = basename(execPath);
+  if (name !== 'node' && name !== 'bun' && !name.startsWith('node.')) return 'binary';
+  return /[\\/]node_modules[\\/]/.test(modulePath) ? 'npm' : 'dev';
 }
 
 /**
@@ -176,7 +200,20 @@ export async function upgrade(
   options: UpgradeOptions = {},
   deps: UpgradeDeps = defaultDeps,
 ): Promise<void> {
-  const installed = await locateBinary(deps);
+  const install = detectInstall(deps.execPath(), deps.modulePath());
+
+  // A checkout has nothing to upgrade and never did. Fail before the network call.
+  if (install === 'dev') {
+    fail('This looks like a development checkout, not an installed binary.', {
+      hint: 'Run the installed `runta-next upgrade`, or reinstall with: curl -fsSL https://runta.haxzie.com/install.sh | sh',
+    });
+  }
+
+  // An npm install is upgraded by npm. Resolving the binary would fail, and the path this command
+  // knows how to take — download a release asset and rename it over itself — would be wrong even
+  // if it succeeded. `--check` still answers below, because "is there a newer version" has an
+  // answer here; only the install half is somebody else's job.
+  const installed = install === 'npm' ? deps.modulePath() : await locateBinary(deps);
   const target = detectTarget(deps.platform(), deps.arch(), deps.isMusl());
 
   const wanted = options.to ? normalize(options.to) : await resolveLatest(deps.fetch);
@@ -203,9 +240,19 @@ export async function upgrade(
         : `Already on the latest version (${currentVersion}).`,
     );
     if (comparison > 0 && !options.json) {
-      printNextSteps([{ command: 'runta-next upgrade', why: 'install it' }]);
+      printNextSteps([
+        install === 'npm'
+          ? { command: `npm install -g ${NPM_PACKAGE}@latest`, why: 'install it' }
+          : { command: 'runta-next upgrade', why: 'install it' },
+      ]);
     }
     return;
+  }
+
+  if (install === 'npm' && comparison !== 0) {
+    fail(`This copy was installed from npm, so npm has to replace it.`, {
+      hint: `Run: npm install -g ${NPM_PACKAGE}@${options.to ? normalize(options.to) : 'latest'}`,
+    });
   }
 
   if (comparison === 0) {
@@ -387,20 +434,13 @@ export function verifyChecksum(archive: Buffer, checksums: string, name: string)
 /**
  * The binary this command would replace.
  *
- * Refuses in development, where `process.execPath` is node or bun and the "binary" is a directory
- * of JavaScript — replacing that with a compiled release would break the checkout. Also refuses
- * when the file is not writable, which is the `sudo`-installed case: saying so beats a confusing
- * EACCES from halfway through.
+ * Only ever called for a standalone binary; `detectInstall` has already turned away the checkout
+ * and npm cases, where `process.execPath` is node and there is no binary to replace. Refuses when
+ * the file is not writable, which is the `sudo`-installed case: saying so beats a confusing EACCES
+ * from halfway through.
  */
 async function locateBinary(deps: UpgradeDeps): Promise<string> {
   const execPath = deps.execPath();
-  const name = basename(execPath);
-
-  if (name === 'node' || name === 'bun' || name.startsWith('node.')) {
-    fail('This looks like a development checkout, not an installed binary.', {
-      hint: 'Run the installed `runta-next upgrade`, or reinstall with: curl -fsSL https://runta.haxzie.com/install.sh | sh',
-    });
-  }
 
   const real = await resolvePath(execPath).catch(() => execPath);
   try {
