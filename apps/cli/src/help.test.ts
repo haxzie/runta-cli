@@ -118,7 +118,7 @@ describe('the introduction', () => {
  * read at the moment it matters instead of scrolled past on the way to the command list.
  */
 describe('what root help deliberately leaves out', () => {
-  it.each(['For agents:', 'Waiting:', 'Examples:'])('has no %s section', (heading) => {
+  it.each(['For agents:', 'Waiting:'])('has no %s section', (heading) => {
     expect(plain()).not.toContain(heading);
   });
 
@@ -127,6 +127,10 @@ describe('what root help deliberately leaves out', () => {
     expect(text).toContain('Runtimes:');
     expect(text).toContain('Account:');
     expect(text).toContain('Options:');
+    // Examples are not prose: a reader skimming for a command's shape finds it faster here than
+    // in any paragraph, so they stayed when the paragraphs went.
+    expect(text).toContain('Examples:');
+    expect(text).toMatch(/\$ runta-next login/);
   });
 
   // The content did not vanish; it is on the commands now.
