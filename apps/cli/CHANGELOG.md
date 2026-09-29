@@ -1,5 +1,64 @@
 # @haxzie/runta-next
 
+## 0.9.0
+
+### Minor Changes
+
+- [#15](https://github.com/haxzie/runta-cli/pull/15) [`eab9d55`](https://github.com/haxzie/runta-cli/commit/eab9d5546ded03dfd0f75af17329ab916fa9ad82) Thanks [@haxzie](https://github.com/haxzie)! - Output now defaults to `auto`: a table on a terminal, JSON in a pipe.
+  
+  `runta-next list | jq` works with no flag. `-o/--output {auto,table,json}` and a
+  `RUNTA_OUTPUT` environment variable both override it, so `| less` and `| grep` are
+  a flag away from the table rather than unreachable — that override is the whole
+  difference between this and the upstream behaviour recorded as C-08, where JSON
+  off-TTY could not be turned off. Precedence is flag, then environment, then the
+  shape of stdout, so pinning `RUNTA_OUTPUT` in CI never makes an explicit `-o` lie.
+  
+  `--json` is unchanged and remains the explicit alias for `-o json`.
+  
+  `exec` is deliberately exempt. It streams the remote command's own bytes through,
+  so `exec demo -- cat report.pdf > report.pdf` has to write the file rather than a
+  JSON envelope around it.
+
+- [#15](https://github.com/haxzie/runta-cli/pull/15) [`eab9d55`](https://github.com/haxzie/runta-cli/commit/eab9d5546ded03dfd0f75af17329ab916fa9ad82) Thanks [@haxzie](https://github.com/haxzie)! - `upgrade` now upgrades npm installs itself, and success messages go to stdout.
+  
+  `upgrade` recognised an npm install last release but only printed the command to
+  run. It now runs the package manager — pnpm, yarn, bun and npm each get their own
+  global-install spelling, read off the path the package was unpacked into rather
+  than from whatever `npm` is on PATH, because the wrong manager installs a second
+  copy instead of failing. Same flags, same confirmation, same `--dry-run` and
+  `--json` shapes on both mechanisms.
+  
+  Success lines — `Authorized. Token saved to …`, `Logged out.`, `Deleted …`,
+  `Upgraded … → …`, the login device code — now go to stdout instead of stderr. A
+  terminal that colours stderr red rendered a successful `login` entirely in red, so
+  the line you were waiting for looked like the failure. Progress and hints stay on
+  stderr, so pipes are unaffected.
+
+### Patch Changes
+
+- [#12](https://github.com/haxzie/runta-cli/pull/12) [`91bb4ab`](https://github.com/haxzie/runta-cli/commit/91bb4ab04dce1b836b63b5e3659576ac2447e2ed) Thanks [@haxzie](https://github.com/haxzie)! - Serve the docs from `runta.haxzie.com/docs/`, and point the CLI at it.
+  
+  `--help`, the `llms-full.txt` link and the docs-site entrypoints now name
+  `https://runta.haxzie.com/docs` instead of `runta-cli.haxzie.com/docs`. The old hostname still
+  works — the docs Worker keeps its own custom domain — so nothing that already pointed there breaks.
+  
+  The install Worker owns `runta.haxzie.com` as a Cloudflare custom domain, so a second Worker cannot
+  be routed alongside it; the docs are reached by service binding instead. `/install.sh` is unchanged
+  and `/` is still a 404, because `curl -fsSL runta.haxzie.com | sh` is a plausible mistyping of the
+  install command and must abort rather than pipe a rendered page into a shell.
+
+- [#16](https://github.com/haxzie/runta-cli/pull/16) [`3dd518d`](https://github.com/haxzie/runta-cli/commit/3dd518d7828aab1ec79202fde613304ff22d1fa6) Thanks [@haxzie](https://github.com/haxzie)! - Correct the release and overview docs for npm publishing.
+  
+  The Releasing section still said "Nothing is published to npm — every package is private, and the
+  CLI ships as a standalone binary", which stopped being true when the CLI went to npm as
+  `@haxzie/runta-next`. It now describes the npm step, why it runs last (the GitHub Release is what
+  `install.sh` resolves, so it should not wait on the registry), and the version check that gates it.
+  Two smaller staleness fixes alongside: the fixed-version group now lists both `@runta/*` and
+  `@haxzie/runta-next`, and `@runta/docs` joins the packages excluded from versioning.
+  
+  The docs overview described the CLI as a standalone binary only; it now leads with both install
+  routes.
+
 ## 0.8.0
 
 ### Minor Changes
