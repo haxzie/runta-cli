@@ -8,12 +8,12 @@ section links to where the evidence lives rather than restating it.
 
 | Document | What it holds |
 | --- | --- |
-| [`CLI_ISSUES.md`](CLI_ISSUES.md) | 37 findings against the official CLI (C-01…C-37), each with a live transcript |
-| [`Improvements.md`](Improvements.md) | Decision log (I-1…I-10): what we changed, why, and what it commits us to |
+| [`CLI_ISSUES.md`](CLI_ISSUES.md) | 39 findings against the official CLI (C-01…C-39), each with a live transcript |
+| [`Improvements.md`](Improvements.md) | Decision log (I-1…I-11): what we changed, why, and what it commits us to |
 | [`RESEARCH.md`](RESEARCH.md) | Field research behind the interaction model |
 | [`FAILURE-AND-RECOVERY.md`](FAILURE-AND-RECOVERY.md) | What happens when an agent gets it wrong |
 | [`evals/cli-ab/`](evals/cli-ab/) | The A/B harness, and [`FINDINGS.md`](evals/cli-ab/FINDINGS.md) |
-| [`docs/`](docs/) | User-facing documentation, 17 pages |
+| [`docs/`](docs/) | User-facing documentation, 18 pages, served at [runta.haxzie.com/docs](https://runta.haxzie.com/docs) |
 | [`.claude/skills/cli-design/`](.claude/skills/cli-design/) | The rules the findings distilled into |
 
 ---
@@ -29,6 +29,8 @@ The first decision, and the one the rest of the surface is built on.
 | `runta rm` | **`runta-next delete`** | `DELETE /v2/runtimes/{id}` |
 | `runta inspect` | `runta-next inspect` *(kept)* | `GET /v2/runtimes/{id}` |
 | `runta exec` | `runta-next exec` *(kept)* | the exec WebSocket |
+| `runta image ls` *(custom only)* | **`runta-next image list`** | `GET /v2/images` |
+| `runta image delete` | `runta-next image delete` *(kept)* | `DELETE /v2/images/{id}` |
 
 The official CLI's vocabulary is inherited from Docker: `run`, `ps`, `rm`. Docker earned those names
 in a different era and a different problem space, and two of them actively misfire here.
@@ -111,7 +113,7 @@ is the same axis measured twice.
 
 ## 2. The insight
 
-The naming was the first of 37 findings, and it generalises. We audited the official CLI end to end
+The naming was the first of 39 findings, and it generalises. We audited the official CLI end to end
 before writing any code, and the striking thing was how few of those findings were hard problems.
 Almost every one was a small local decision that looked reasonable in isolation: `ls` here and
 `list` there, a boolean that takes `true` in the JSON help but not on the command line, an error
@@ -139,6 +141,7 @@ the front and deletion at the back.
 ```sh
 runta-next login                                  # device flow, or RUNTA_TOKEN
 runta-next whoami                                 # which identity, and from which source
+runta-next image list                             # what create can build from
 runta-next create --name demo --cpus 1 --memory 512
 runta-next exec demo -- sh -c 'echo hi > /tmp/x; cat /tmp/x'
 runta-next list --fields name,status,vcpus
@@ -148,8 +151,8 @@ runta-next delete demo --dry-run                  # show the plan
 runta-next delete demo
 ```
 
-Full API parity was not attempted. The REST API exposes 85 operations and the CLI covers eight,
-plus `exec` over its WebSocket. The authoritative breakdown is
+Full API parity was not attempted. The REST API exposes 85 operations; the CLI covers ten, plus
+`exec` over its WebSocket. The authoritative breakdown is
 [Commands → not yet implemented](docs/commands/index.md#not-yet-implemented); the largest untouched
 areas are cloud agents (22 operations), GitHub integration (9), SSH keys (7), secrets (5) and
 checkpoints (4).
@@ -165,9 +168,9 @@ This is the finding with the largest measured effect.
 | `--help` output | Size | Format |
 | --- | --- | --- |
 | `runta` | 78,370 chars | JSON (the whole clap command tree) |
-| `runta-next` | 2,233 chars | grouped text |
+| `runta-next` | 2,108 chars | grouped text |
 
-35×, and a format difference rather than a content one — the official CLI dumps its entire clap
+37×, and a format difference rather than a content one — the official CLI dumps its entire clap
 command tree as JSON. Nothing can skim that, so agents do not try. They write a parser:
 
 ```
@@ -182,9 +185,16 @@ That pattern appears in four of nine tasks in `runs/full1`. Each occurrence is a
 building scaffolding to read documentation, and it usually extracts a fragment, so the agent comes
 back for more: **37 help calls against 14**, and 93.4k characters of CLI output against 44.6k.
 
-Ours groups commands under headings with one-line summaries, adds an explicit "For agents" block
-naming the contract, and keeps `--help` the source of truth — `program.test.ts` asserts the
-command surface so a rename cannot half-land.
+Ours groups commands under headings with one-line summaries, then a worked path through them as
+runnable examples. It also carried prose blocks explaining the output contract and the waiting
+contract; those are gone, moved to the commands they describe, where they are read at the moment
+they matter instead of scrolled past on the way to the command list. The examples stayed because
+they are not prose — a reader skimming for a command's shape finds it faster there than in any
+paragraph.
+
+`--help` stays the source of truth. `program.test.ts` asserts the command surface so a rename
+cannot half-land, and `docs.test.ts` resolves every flag quoted in the examples and the docs
+against the real command tree, so neither can rot into describing a CLI that does not ship.
 
 ### 4.2 The machine-readable contract must be *true*
 
@@ -208,15 +218,26 @@ thesis: **the contract penalised the agent for trusting it.** Full transcripts i
 
 Ours has one boolean convention, bare `--flag` / `--no-flag`, with no values advertised anywhere.
 
-### 4.3 Predictable output, identical in a pipe
+### 4.3 Output that follows the reader, with a way out
 
-The official CLI implies `--json` when stdout is not a TTY, with no way to turn it off, so
-`runta ps | less`, `| grep` and `> file` all get JSON (C-08). An agent's output changes shape
-depending on how it spawned the process.
+C-08 is not that the official CLI implies `--json` off-TTY — it calls that a good default. It is
+that there is no way *out*: `runta ps | less`, `| grep` and `> file` all get JSON and nothing can
+ask for the table back.
 
-Ours makes `--json` explicit. Behaviour is identical interactively and in a pipe. stdout is the
-result, stderr is commentary, so pipes stay clean and next-step hints survive `--json` without
-touching the payload.
+We shipped the overcorrection first — `--json` explicit only — and it made
+`runta-next list | jq` a parse error, which is the single most obvious thing anyone pipes this CLI
+into. Output now resolves to `auto`: a table on a terminal, JSON anywhere else. `-o table` per
+command and `RUNTA_OUTPUT` per environment take it back, most-explicit-first, so pinning the
+variable in CI cannot make an explicit flag lie.
+
+`exec` is exempt and says why at the site: it streams the remote command's own bytes, so
+`exec demo -- cat report.pdf > report.pdf` has to write the file rather than a JSON envelope
+around it.
+
+stdout is the result, stderr is commentary — and *success is a result*. Routing completion
+messages through stderr made a successful `login` render entirely in red in terminals that colour
+stderr, so the line the user was waiting for looked like the failure. Progress and hints stay on
+stderr; outcomes do not.
 
 ### 4.4 Errors that name the fix
 
@@ -275,9 +296,9 @@ each other.
 - **`--fields memory` is `512 MiB` in the table and `512` in JSON.** A unit belongs in a cell a
   person reads, not in a value a script is about to do arithmetic on.
 - **Next steps, but only when there is one.** A freshly created runtime says what to do next; a
-  completed task says nothing, because advice printed every time is advice nobody reads. On stderr,
-  so `--json` payloads stay clean. Never the command that just ran (C-11), and never a command that
-  does not exist — `suggest.test.ts` resolves every suggestion against the real command tree (C-30).
+  completed task says nothing, because advice printed every time is advice nobody reads. Never the
+  command that just ran (C-11), and never a command that does not exist — `suggest.test.ts`
+  resolves every suggestion against the real command tree (C-30).
 - **Install and first run work on a clean machine.** The official `login` writes its state file
   without creating `~/.config/runta`, so the first command it tells a new user to run fails with
   `os error 2` (C-02) — the worst defect in the audit and the smallest fix.
@@ -342,12 +363,15 @@ likely to try us — someone arriving from the official CLI types `ps` and gets 
 instead of an answer ([`FAILURE-AND-RECOVERY.md`](FAILURE-AND-RECOVERY.md) §3).
 
 **Runtimes are the only noun with a top-level shortcut (I-2).** Across four eval runs agents used
-the shortcut every time and `runta-next runtime <verb>` exactly zero times, so the canonical
-noun-first form is currently justified by predictability for nouns we have not shipped rather than
-by use. Worth revisiting once a second resource exists.
+the shortcut every time and `runta-next runtime <verb>` exactly zero times. `image` is the second
+resource and takes no shortcut, so the rule now has a case rather than only an intention — and the
+asymmetry is the thing to watch: if `image list` proves as heavily typed as `list`, the rule is
+describing our habits rather than the surface.
 
-**Explicit `--json` over implied.** Slightly more typing for scripts; identical behaviour in every
-context. We think predictability wins (C-08).
+**`auto` output over explicit-only (C-08).** A pipe gets JSON with no flag, which is what anyone
+piping into `jq` expects — at the cost of output shape depending on whether stdout is a terminal.
+`-o table` and `RUNTA_OUTPUT` are the way out that C-08 says upstream lacks, and they are what make
+the default defensible rather than the same trap. We shipped explicit-only first and it was wrong.
 
 **Polling lifecycle transitions.** Upstream returns the pre-transition status, so `pause` reports
 `running` (C-14). We poll until the target is observed, which is slower and correct, with
@@ -366,9 +390,15 @@ pending a decision, rather than quietly adjusting either.
 
 ## 8. Known limitations
 
-- Eight of the API's 85 operations are implemented. Cloud agents, GitHub, SSH keys, secrets,
+- Ten of the API's 85 operations are implemented. Cloud agents, GitHub, SSH keys, secrets,
   checkpoints, files, events and model providers are not started —
   [full table](docs/commands/index.md#not-yet-implemented).
+- No way to supply a credential at create time. An image that fronts a model provider is built
+  through an automatic in-runtime sign-in fallback (I-11), and a Claude subscription connected in
+  the Dashboard cannot be used at all (C-38) — so the runtime comes up with its agent installed and
+  not signed in, which the CLI says outright but cannot fix.
+- `inspect` cannot report a pending sign-in. `create --json` carries `sign_in_pending`, but the
+  API's runtime object has no field distinguishing a signed-in agent from one that never was.
 - `inspect` has no `--fields`; an agent reached for it in `runs/full2` T11 and had to recover.
 - No row filtering on `list`, because the API offers none.
 - No shell completions yet, despite being called out as high-leverage.
@@ -381,13 +411,13 @@ pending a decision, rather than quietly adjusting either.
 ## 9. Running it
 
 ```sh
-sh scripts/install.sh                    # or, from a clone: pnpm install && pnpm cli --help
+npm install -g @haxzie/runta-next        # or: curl -fsSL https://runta.haxzie.com/install.sh | sh
 runta-next login                         # or export RUNTA_TOKEN=rt_…
 runta-next --help
 ```
 
 ```sh
-pnpm typecheck && pnpm test              # 343 tests
+pnpm typecheck && pnpm test              # 423 tests
 cd evals/cli-ab && ./setup.sh && bun src/run.ts --trials 1
 ```
 

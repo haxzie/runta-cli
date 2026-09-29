@@ -51,6 +51,26 @@ const USAGE: Record<string, string> = {
 };
 
 /**
+ * A worked path through the CLI, in the order someone actually meets it: sign in, see what you can
+ * build from, build one, use it, read it, throw it away.
+ *
+ * These are the one thing that survived the cut of root help's prose blocks, because they are not
+ * prose — a reader skimming for the shape of a command finds it here faster than in any paragraph,
+ * and `docs.test.ts` resolves every flag in them against the real command so they cannot rot.
+ */
+const EXAMPLES: [string, string?][] = [
+  ['runta-next login'],
+  ['runta-next image list', 'what create can build from'],
+  ['runta-next create --name demo --cpus 1 --memory 512'],
+  ['runta-next exec demo -- uname -a'],
+  ['runta-next exec demo -it -- sh', 'interactive shell'],
+  ['runta-next list --json', 'machine-readable'],
+  ['runta-next delete demo --dry-run', 'show what would go, change nothing'],
+  ['runta-next create --name demo --detach', 'do not wait for it to be ready'],
+  ['runta-next upgrade --check', 'is there a newer version?'],
+];
+
+/**
  * Bold only where escapes will render. Commander also strips styling when it decides colours are
  * unsupported, but depending on that would mean this file's behaviour is defined by another
  * library's detection rather than by the shared rule in `@runta/utils`.
@@ -129,6 +149,13 @@ export function rootHelp(
     lines.push(`  ${option.flags.padEnd(width)}  ${option.description}`);
   }
   lines.push(`  ${'-h, --help'.padEnd(width)}  Show this help`);
+
+  lines.push('');
+  lines.push(bold('Examples:', colour));
+  for (const [example, note] of EXAMPLES) {
+    const padded = note ? example.padEnd(46) : example;
+    lines.push(`  ${dim('$', colour)} ${padded}${note ? dim(`# ${note}`, colour) : ''}`);
+  }
 
   lines.push('');
   lines.push(`Docs: ${dim(DOCS_URL, colour)}`);
