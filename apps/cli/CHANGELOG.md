@@ -1,5 +1,17 @@
 # @haxzie/runta-next
 
+## 0.11.1
+
+### Patch Changes
+
+- [#23](https://github.com/haxzie/runta-cli/pull/23) [`87a93b2`](https://github.com/haxzie/runta-cli/commit/87a93b2969a44d8c92109a2ed616979ddd23b24d) Thanks [@haxzie](https://github.com/haxzie)! - Bring the examples back to `runta-next --help`.
+  
+  Root help was cut to a command index, and the examples went with the prose blocks.
+  They should not have: a reader skimming for a command's shape finds it faster in a
+  runnable line than in any paragraph, and `docs.test.ts` resolves every flag in them
+  against the real command tree, so unlike prose they cannot rot. The output-contract
+  and waiting explanations stay where they moved — on the commands they describe.
+
 ## 0.11.0
 
 ### Minor Changes

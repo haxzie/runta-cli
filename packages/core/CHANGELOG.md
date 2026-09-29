@@ -1,5 +1,13 @@
 # @runta/core
 
+## 0.11.1
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @runta/api@0.11.1
+  - @runta/utils@0.11.1
+
 ## 0.11.0
 
 ### Patch Changes
