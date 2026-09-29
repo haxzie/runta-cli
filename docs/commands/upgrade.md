@@ -28,6 +28,20 @@ Downloading runta-next-darwin-arm64 0.4.1…
 Upgraded 0.3.0 → 0.4.1.
 ```
 
+## If you installed from npm
+
+This command replaces a standalone binary. A copy installed with `npm install -g @haxzie/runta-next`
+is owned by npm, so it says so rather than downloading a release alongside it:
+
+```console
+$ runta-next upgrade
+error This copy was installed from npm, so npm has to replace it.
+Run: npm install -g @haxzie/runta-next@latest
+```
+
+`--check` still works either way — whether a newer version exists has an answer regardless of who
+installs it.
+
 ## Asking without acting
 
 `--check` is a question, so it answers and stops:

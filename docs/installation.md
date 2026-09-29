@@ -1,10 +1,27 @@
 ---
 title: Installation
-description: Install the runta-next binary, pin a version, choose an install directory, and uninstall.
+description: Install runta-next from npm or as a standalone binary, pin a version, choose an install directory, and uninstall.
 sidebar_position: 2
 ---
 
 # Installation
+
+Two channels, same CLI. Both give you a `runta-next` command.
+
+## npm
+
+```sh
+npm install -g @haxzie/runta-next
+```
+
+The package is a single bundled file with **no dependencies**. It needs Node.js 22 or newer, and
+it lands in npm's global bin directory — which is already on your `PATH`, so there is nothing to
+configure and no new terminal to open.
+
+Use this one if you already have Node.js. `pnpm add -g`, `bun add -g` and `yarn global add` work
+the same way, and `npx @haxzie/runta-next <command>` runs it without installing.
+
+## Standalone binary
 
 ```sh
 curl -fsSL https://runta.haxzie.com/install.sh | sh
@@ -14,8 +31,11 @@ The script downloads a standalone binary for your platform from the latest GitHu
 verifies its SHA-256 checksum against the release's `checksums.txt`, and installs it to
 `~/.runta-next/bin/runta-next`.
 
-There is **no Node.js requirement** and nothing is published to npm — the binary is
-self-contained.
+There is **no Node.js requirement** — the binary is self-contained. Use this one on a machine
+without Node.js, or in a container image where you do not want one.
+
+Because it installs to a directory of its own, it has to put that directory on your `PATH`; see
+[PATH](#path) below.
 
 :::note
 Checksum verification needs `sha256sum` or `shasum` on the machine. If neither is present the
@@ -29,13 +49,15 @@ musl build.
 
 ## Options
 
-Both are environment variables read by the install script:
+All are environment variables read by the install script. They do not apply to the npm package —
+pin that with `npm install -g @haxzie/runta-next@0.7.0` instead:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `RUNTA_VERSION` | latest release | Install a specific version, e.g. `v0.3.1` |
 | `RUNTA_INSTALL_DIR` | `~/.runta-next/bin` | Where the binary lands |
 | `RUNTA_BIN_NAME` | `runta-next` | What to call the command, so it can sit beside the official CLI |
+| `RUNTA_NO_MODIFY_PATH` | unset | Set it to leave your shell profile alone; the installer prints the `PATH` line instead |
 
 ```sh
 RUNTA_VERSION=v0.3.1 curl -fsSL …/install.sh | sh
@@ -146,13 +168,33 @@ the installer.
 
 Windows is not supported.
 
-## Put it on your PATH
+## PATH
 
-The default install directory is not on `PATH` on a fresh machine. Add it to your shell
-profile:
+This applies to the install script only — the npm package lands somewhere already on `PATH`.
+
+The install directory is not on `PATH` on a fresh machine, so the installer adds it for you. It
+appends one line to the profile your login shell reads — `~/.zshrc`, `~/.bashrc` (plus
+`~/.bash_profile` on macOS, which is what Terminal's login shell reads), or
+`~/.config/fish/config.fish`:
 
 ```sh
+# added by the runta-next installer
 export PATH="$HOME/.runta-next/bin:$PATH"
+```
+
+Re-running the installer does not add it twice, and the line is written with `$HOME` rather than
+your machine's home path so a copied dotfile still works. The shell you ran the installer in is
+already running, so it does not pick this up — open a new terminal, or run that line once in the
+current one.
+
+Two cases where it stops and prints the line for you to add yourself instead: an unrecognised
+`$SHELL`, where guessing at the syntax risks breaking every new terminal, and a profile it cannot
+write to.
+
+To keep your shell profile untouched:
+
+```sh
+RUNTA_NO_MODIFY_PATH=1 curl -fsSL https://runta.haxzie.com/install.sh | sh
 ```
 
 ## Verify
@@ -163,7 +205,16 @@ runta-next --version
 
 ## Uninstall
 
-The CLI keeps everything under one directory, so removing it is a single step:
+From npm:
+
+```sh
+npm uninstall -g @haxzie/runta-next
+```
+
+That leaves your stored credential behind in `~/.runta-next/config.json`; `runta-next logout`
+before uninstalling, or delete the directory afterwards.
+
+The standalone binary keeps everything under one directory, so removing it is a single step:
 
 ```sh
 rm -rf ~/.runta-next
@@ -172,3 +223,6 @@ rm -rf ~/.runta-next
 That removes the binary **and** your stored credential
 (see [Authentication → where credentials live](./authentication.md#where-credentials-live)).
 To remove only the credential, use `runta-next logout`.
+
+The one thing left outside that directory is the `PATH` line the installer appended to your shell
+profile, marked `# added by the runta-next installer`. Delete those two lines to finish.

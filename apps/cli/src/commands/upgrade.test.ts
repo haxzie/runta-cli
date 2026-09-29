@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { version as currentVersion } from '../version.js';
 import {
   compareVersions,
+  detectInstall,
   detectTarget,
   resolveLatest,
   type UpgradeDeps,
@@ -28,6 +29,30 @@ const redirectedTo = (url: string): Response => {
   Object.defineProperty(response, 'url', { value: url });
   return response;
 };
+
+describe('detectInstall', () => {
+  it('calls a standalone binary a binary', () => {
+    expect(detectInstall('/home/me/.runta-next/bin/runta-next', '')).toBe('binary');
+  });
+
+  it('calls a bundle under node_modules an npm install', () => {
+    expect(
+      detectInstall(
+        '/usr/local/bin/node',
+        '/usr/local/lib/node_modules/@haxzie/runta-next/dist/index.js',
+      ),
+    ).toBe('npm');
+  });
+
+  it('calls a bundle anywhere else a checkout', () => {
+    expect(detectInstall('/usr/local/bin/node', '/repo/apps/cli/src/index.ts')).toBe('dev');
+    expect(detectInstall('/opt/homebrew/bin/bun', '/repo/apps/cli/src/index.ts')).toBe('dev');
+  });
+
+  it('is not fooled by a directory that merely mentions node_modules', () => {
+    expect(detectInstall('/usr/local/bin/node', '/repo/node_modules_backup/index.js')).toBe('dev');
+  });
+});
 
 describe('detectTarget', () => {
   it('names the asset for each supported platform', () => {
@@ -192,6 +217,7 @@ function deps(overrides: Partial<UpgradeDeps> = {}): UpgradeDeps {
   return {
     write: (text) => written.push(text),
     execPath: () => installed,
+    modulePath: () => installed,
     platform: () => 'linux',
     arch: () => 'x64',
     isMusl: () => false,
@@ -418,9 +444,59 @@ describe('upgrade', () => {
   // ---- refusing to run in the wrong place ----
 
   it('refuses in a development checkout rather than clobbering it', async () => {
-    const d = deps({ execPath: () => '/usr/local/bin/node' });
+    const d = deps({
+      execPath: () => '/usr/local/bin/node',
+      modulePath: () => '/repo/src/index.ts',
+    });
 
     await expect(upgrade({}, d)).rejects.toThrow(/development checkout/);
+  });
+
+  // An npm install is node running a bundle, which looks exactly like a checkout unless you
+  // check where the bundle lives. Getting this wrong sent npm users to install.sh, which would
+  // have left a second copy in ~/.runta-next/bin racing the first on PATH.
+  const npmDeps = (overrides: Partial<UpgradeDeps> = {}): UpgradeDeps =>
+    deps({
+      execPath: () => '/usr/local/bin/node',
+      modulePath: () => '/usr/local/lib/node_modules/@haxzie/runta-next/dist',
+      ...overrides,
+    });
+
+  it('sends an npm install to npm, not to install.sh', async () => {
+    const error = await upgrade({}, npmDeps()).catch((e: unknown) => e);
+
+    expect(isCliError(error)).toBe(true);
+    expect(String(error)).toMatch(/installed from npm/);
+    expect((error as { hint?: string }).hint).toContain('npm install -g @haxzie/runta-next@latest');
+    expect(String(error)).not.toMatch(/development checkout/);
+  });
+
+  it('names the requested version in the npm hint, so --to still means something', async () => {
+    const error = await upgrade({ to: 'v9.9.9' }, npmDeps()).catch((e: unknown) => e);
+
+    expect((error as { hint?: string }).hint).toContain('@haxzie/runta-next@9.9.9');
+  });
+
+  it('still answers --check on an npm install, and suggests the npm command', async () => {
+    await upgrade({ check: true }, npmDeps());
+
+    expect(written.join('')).toBe('');
+  });
+
+  it('reports the available upgrade as JSON on an npm install', async () => {
+    await upgrade({ check: true, json: true }, npmDeps());
+
+    const payload = JSON.parse(written.join('')) as Record<string, unknown>;
+    expect(payload.upgrade_available).toBe(true);
+    expect(payload.latest_version).toBe(NEW_VERSION);
+  });
+
+  it('does nothing when an npm install is already current', async () => {
+    const d = npmDeps({
+      fetch: async () => redirectedTo(`https://github.com/x/y/releases/tag/v${currentVersion}`),
+    });
+
+    await expect(upgrade({}, d)).resolves.toBeUndefined();
   });
 
   it('refuses when the binary is not writable, naming the path', async () => {

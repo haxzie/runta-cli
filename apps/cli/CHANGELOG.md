@@ -1,4 +1,4 @@
-# @runta/cli
+# @haxzie/runta-next
 
 ## 0.7.0
 

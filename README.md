@@ -11,17 +11,27 @@ against the official CLI, [`Improvements.md`](Improvements.md) for the decision 
 ## Install
 
 ```sh
+npm install -g @haxzie/runta-next
+```
+
+A single bundled file with no dependencies, needing Node.js 22+. It installs into npm's global
+bin directory, which is already on `PATH`.
+
+Or as a standalone binary, with no Node.js requirement:
+
+```sh
 curl -fsSL https://runta.haxzie.com/install.sh | sh
 ```
 
-This downloads a standalone binary for your platform from the latest GitHub Release,
-verifies its SHA-256 checksum, and installs it to `~/.runta-next/bin/runta-next`. Nothing is
-published to npm — there is no Node.js runtime requirement.
+This downloads a binary for your platform from the latest GitHub Release, verifies its SHA-256
+checksum, installs it to `~/.runta-next/bin/runta-next`, and adds that directory to your shell
+profile's `PATH`.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `RUNTA_VERSION` | latest release | Install a specific version |
 | `RUNTA_INSTALL_DIR` | `~/.runta-next/bin` | Where the binary lands |
+| `RUNTA_NO_MODIFY_PATH` | unset | Leave the shell profile alone; print the `PATH` line instead |
 
 Supported targets: macOS and Linux, on `x64` and `arm64` (glibc and musl).
 
@@ -245,12 +255,12 @@ their TypeScript source under the `bun` export condition, so an edit anywhere in
 ## Layout
 
 ```
-apps/cli          @runta/cli       Commander program; compiles to the `runta-next` binary
-apps/docs         @runta/docs      VitePress site + Worker, built from `docs/`
-packages/api      @runta/api       Generated OpenAPI SDK + hand-written client shell
-packages/core     @runta/core      Config loading and command context
-packages/utils    @runta/utils     Logger and error types
-packages/tsconfig @runta/tsconfig  Shared TypeScript configs
+apps/cli          @haxzie/runta-next     Commander program; the published package and the binary
+apps/docs         @runta/docs            VitePress site + Worker, built from `docs/`
+packages/api      @runta/api             Generated OpenAPI SDK + hand-written client shell
+packages/core     @runta/core            Config loading and command context
+packages/utils    @runta/utils           Logger and error types
+packages/tsconfig @runta/tsconfig        Shared TypeScript configs
 workers/install   @runta/install-worker  Cloudflare Worker serving install.sh
 ```
 

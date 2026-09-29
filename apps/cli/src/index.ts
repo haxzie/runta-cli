@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { isCliError, logger } from '@runta/utils';
 import { buildProgram } from './program.js';
 
