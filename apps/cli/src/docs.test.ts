@@ -303,3 +303,43 @@ describe('every command and flag is documented', () => {
     expect(text.includes('--fEilds')).toBe(false);
   });
 });
+
+/**
+ * The sidebar is hand-ordered in `apps/docs/.vitepress/config.ts`, on the argument that reading
+ * order is a judgement and `sidebar_position` numbers rot when a page is inserted. Both halves of
+ * that are true, and the cost is the other failure: a page can ship with no entry at all.
+ *
+ * `images.md` did exactly that. It was built, documented, released and deployed — reachable only
+ * by typing the URL, because nothing linked to it. The `docs.test.ts` suite above guarantees the
+ * docs match the binary; this guarantees the navigation matches the docs.
+ */
+describe('the docs sidebar covers every command page', () => {
+  const CONFIG = join(ROOT, 'apps', 'docs', '.vitepress', 'config.ts');
+
+  /** Slugs the sidebar links to, e.g. `create` from `/commands/create`. */
+  const linked = (): Set<string> => {
+    const source = readFileSync(CONFIG, 'utf8');
+    return new Set(
+      [...source.matchAll(/link:\s*'\/commands\/([a-z-]+)'/g)].map((m) => m[1] as string),
+    );
+  };
+
+  /** Pages that exist, minus the index, which the sidebar links as `/commands/`. */
+  const pages = (): string[] =>
+    readdirSync(join(DOCS, 'commands'))
+      .filter((f) => f.endsWith('.md') && f !== 'index.md')
+      .map((f) => f.replace(/\.md$/, ''));
+
+  it('links every page under docs/commands', () => {
+    const missing = pages().filter((page) => !linked().has(page));
+
+    expect(missing).toEqual([]);
+  });
+
+  it('links no page that does not exist', () => {
+    const existing = new Set(pages());
+    const dangling = [...linked()].filter((slug) => !existing.has(slug));
+
+    expect(dangling).toEqual([]);
+  });
+});
