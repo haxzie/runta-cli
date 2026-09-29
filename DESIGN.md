@@ -18,13 +18,121 @@ section links to where the evidence lives rather than restating it.
 
 ---
 
-## 1. The insight
+## 1. The names, and what they bought
 
-We audited the official CLI end to end before writing any code. The result was 37 findings, and
-the striking thing about them was how few were hard problems. Almost every one was a small local
-decision that looked reasonable in isolation: `ls` here and `list` there, a boolean that takes
-`true` in the JSON help but not on the command line, an error that names an internal field rather
-than the flag the user typed.
+The first decision, and the one the rest of the surface is built on.
+
+| Official Runta | Ours | REST operation |
+| --- | --- | --- |
+| `runta run` | **`runta-next create`** | `POST /v2/runtimes` |
+| `runta ps` | **`runta-next list`** | `GET /v2/runtimes` |
+| `runta rm` | **`runta-next delete`** | `DELETE /v2/runtimes/{id}` |
+| `runta inspect` | `runta-next inspect` *(kept)* | `GET /v2/runtimes/{id}` |
+| `runta exec` | `runta-next exec` *(kept)* | the exec WebSocket |
+
+The official CLI's vocabulary is inherited from Docker: `run`, `ps`, `rm`. Docker earned those names
+in a different era and a different problem space, and two of them actively misfire here.
+
+**`run` collides with `exec`.** We ship `exec`, so with `run` in the set the CLI would have
+`runta run` for the thing that *creates* a runtime and `runta exec` for the thing that *runs*
+something inside it — the word "run" pointing at the command that runs nothing. `runta run npm test`
+is a reasonable thing to type and a completely wrong thing to type. `create` cannot be misread that
+way, and it is the verb Kubernetes, every cloud CLI, every REST API and the HTTP method itself
+already agree on.
+
+**`ps` is ambiguous about scope, not merely obscure.** The obvious objection is that it only parses
+if you already know Docker. The sharper problem is specific to this product: Runta runs containers
+you can exec into, so `runta ps` genuinely reads two ways — list the runtimes in my account, or list
+the processes inside a runtime? The second reading is not a stretch; it is what `ps` means in every
+shell, and we ship the command that would let you run it (`runta-next exec <runtime> -- ps`). A name
+whose scope is ambiguous in the one product where both scopes exist is the wrong name.
+
+**`rm` would be the only abbreviation left.** Once `create`, `list` and `inspect` are full words,
+`rm` is the odd one out. It earns its place next to `ls`, and we are not using `ls`.
+
+`inspect` and `exec` survive on merit rather than inertia — `inspect` is the widest-recognised word
+for "give me the full detail" across Docker, Terraform, AWS and `gh`, and `exec` is universal across
+Docker, E2B, Daytona and Modal. Full reasoning in [`Improvements.md`](Improvements.md) I-1.
+
+### What humans got
+
+**No translation step from the adjacent products.** The tools actually next to Runta have converged
+away from Docker: E2B, Daytona and Modal all use `list`, two of three use `create`, two of three use
+`delete`. A developer arriving from any of them reads our surface directly. A developer arriving
+from Docker has four words to learn either way, and may as well learn the unambiguous four.
+
+**One shape, two paths** ([I-2](Improvements.md)). Noun-first is canonical, with runtimes also
+available at the top level because they are the noun you touch all day:
+
+```sh
+runta-next runtime create | list | inspect | delete     # canonical
+runta-next create | list | inspect | delete             # same commands, shortcut
+```
+
+Runtimes are the only resource with a shortcut. Every other noun — when one ships — is noun-first
+only, because a second shortcut turns one documented convenience into a pattern nobody can predict.
+
+Both forms are registered from one function, so a flag cannot exist on one and not the other, and a
+test asserts they stay in step.
+
+### What agents got
+
+**Verbs on a new noun will be predictable without reading help.** All four names are full words that
+map 1:1 onto the REST operations behind them, so having seen the verbs on `runtime`, an agent can
+apply the same four to whatever noun ships next rather than re-deriving them. Docker's
+flat-for-the-primary-noun rule instead requires knowing *which* noun is primary — an exception you
+can only learn by being corrected, and an agent starts every session uncorrected.
+
+Stated as a promise rather than a result on purpose: `runtime` is the only noun implemented today,
+so this property is designed-for and not yet demonstrated.
+
+**Measured: the first guess lands.** Task T7 asks an agent to delete runtimes by prefix. Both arms
+opened identically in both runs — and both agents independently guessed `list` first:
+
+```
+arm A (official)                          arm B (ours)
+[ERR] runta --help; runta list            [ok ] runta-next --help; runta-next list
+[ok ] runta ls …                          [ok ] runta-next delete …-tmp1 …-tmp2 --dry-run
+[ok ] runta help --json | python3 -c "…"  [ok ] runta-next delete …-tmp1 …-tmp2
+```
+
+The agent's second guess was `ls`. It never guessed `ps`. Two turns went to finding the verb for
+"show me the runtimes", and the third fell back to parsing the JSON help tree — before the task had
+started. Reproduced identically in `runs/full1` and `runs/full2`; transcripts in
+[`evals/cli-ab/`](evals/cli-ab/).
+
+This is the part worth drawing out: **the naming was decided for human reasons and the agent
+benefit came free.** Nothing in I-1 was argued from agent behaviour — it was argued from industry
+convergence and from an ambiguity a person would trip over. The agent evidence arrived weeks later,
+from a harness built for something else. Legibility is not a separate axis from agent-readiness; it
+is the same axis measured twice.
+
+### What it cost
+
+**No compatibility aliases** ([I-3](Improvements.md)). No `ps` for `list`, no `run` for `create`, no
+`rm` for `delete`. An alias hides a decision: `runta-next ps` silently working would mean nobody
+ever learns that `list` is the name, and the scope ambiguity would survive in the surface we removed
+it from. The cost is real and lands on exactly the person most likely to try us — someone arriving
+from the official CLI types `ps` and gets the command list instead of an answer
+([`FAILURE-AND-RECOVERY.md`](FAILURE-AND-RECOVERY.md) §3).
+
+**Agents never used the canonical form.** Across four runs, arm B invoked the top-level shortcut
+every single time — 15 `list`, 12 `create`, 9 `inspect`, 9 `delete` — and `runta-next runtime <verb>`
+exactly zero times. The shortcut was justified in I-2 as a human ergonomic. It turns out to be what
+agents reach for too, which means the noun-first form is currently earning its place through
+*predictability for nouns we have not shipped yet* rather than through use. That is a real
+justification, but it is a promise rather than a measurement, and it should be revisited once a
+second resource exists.
+
+---
+
+## 2. The insight
+
+The naming was the first of 37 findings, and it generalises. We audited the official CLI end to end
+before writing any code, and the striking thing was how few of those findings were hard problems.
+Almost every one was a small local decision that looked reasonable in isolation: `ls` here and
+`list` there, a boolean that takes `true` in the JSON help but not on the command line, an error
+that names an internal field rather than the flag the user typed.
 
 **Individually invisible, collectively decisive.** An 84-command CLI where each decision is
 locally defensible and globally inconsistent cannot be learned — it can only be memorised, and an
@@ -40,7 +148,7 @@ context, and the single largest contributor was help output.
 
 ---
 
-## 2. The workflow we covered
+## 3. The workflow we covered
 
 Create a runtime, do useful work in it, inspect and manage it, clean it up — with authentication at
 the front and deletion at the back.
@@ -65,9 +173,9 @@ checkpoints (4).
 
 ---
 
-## 3. P0 — Agent-native
+## 4. P0 — Agent-native
 
-### 3.1 Discovery has to be affordable
+### 4.1 Discovery has to be affordable
 
 This is the finding with the largest measured effect.
 
@@ -95,7 +203,7 @@ Ours groups commands under headings with one-line summaries, adds an explicit "F
 naming the contract, and keeps `--help` the source of truth — `program.test.ts` asserts the
 command surface so a rename cannot half-land.
 
-### 3.2 The machine-readable contract must be *true*
+### 4.2 The machine-readable contract must be *true*
 
 Present is not the same as correct. The official CLI's `help --json` advertises that boolean flags
 take values:
@@ -117,7 +225,7 @@ thesis: **the contract penalised the agent for trusting it.** Full transcripts i
 
 Ours has one boolean convention, bare `--flag` / `--no-flag`, with no values advertised anywhere.
 
-### 3.3 Predictable output, identical in a pipe
+### 4.3 Predictable output, identical in a pipe
 
 The official CLI implies `--json` when stdout is not a TTY, with no way to turn it off, so
 `runta ps | less`, `| grep` and `> file` all get JSON (C-08). An agent's output changes shape
@@ -127,7 +235,7 @@ Ours makes `--json` explicit. Behaviour is identical interactively and in a pipe
 result, stderr is commentary, so pipes stay clean and next-step hints survive `--json` without
 touching the payload.
 
-### 3.4 Errors that name the fix
+### 4.4 Errors that name the fix
 
 Quoting C-04, the most likely error in the official CLI — `exec` against a stopped runtime:
 
@@ -140,7 +248,7 @@ names what failed, why, and what to do, and translates internal field names back
 was typed (C-24). Exit codes are stable: `0` success, `1` request failed, `2` credential problem,
 `125` unknown outcome.
 
-### 3.5 Three outcomes, not two
+### 4.5 Three outcomes, not two
 
 The official `exec` fails spuriously about 10% of the time (C-01) — 5 of 50 successful commands
 returned `status: null` and exit `1`. The instinct is to retry; that is wrong when the command may
@@ -151,7 +259,7 @@ have had side effects.
 the command's own codes, and a caller decides. Reporting an unknown outcome as a failure is how a
 pipeline re-runs work that already succeeded. Reasoning in I-8.
 
-### 3.6 Build the primitive, do not ask the agent to enforce it
+### 4.6 Build the primitive, do not ask the agent to enforce it
 
 The official CLI has zero occurrences of `--dry-run`, `--yes`, `--force` or `--confirm` across 84
 commands, on eight destructive operations (C-09) — and its agent skill instructs the model to
@@ -162,17 +270,17 @@ Ours has `--dry-run` printing the resolved plan in both human and JSON form, con
 `--yes` to skip, and never a prompt in a pipe. In `runs/full1` and `runs/full2`, T7, the agent used
 `delete --dry-run` unprompted before deleting.
 
-### 3.7 Context cost is a real cost
+### 4.7 Context cost is a real cost
 
 `--limit` caps results and stops fetching, so `--limit 5` is one request rather than a full page
 discarded (C-15). Lifecycle commands return four fields rather than the 45-field runtime object
 (C-22). `--fields` selects columns for the table and the JSON through one vocabulary.
 
-**And `--fields` did not work as intended** — see §5.
+**And `--fields` did not work as intended** — see §6.
 
 ---
 
-## 4. P1 — Developer experience
+## 5. P1 — Developer experience
 
 Human conveniences coexist with the agent interface by being *decided separately*, not derived from
 each other.
@@ -199,7 +307,7 @@ each other.
 
 ---
 
-## 5. Evidence, and what it did not support
+## 6. Evidence, and what it did not support
 
 Two headless agents, same model, same tasks, isolated `PATH` per arm, graded against the tenant's
 real state through an independent REST client. Method in
@@ -241,12 +349,11 @@ error bars.
 
 ---
 
-## 6. Tradeoffs
+## 7. Tradeoffs
 
-**No compatibility aliases (I-3).** `runta-next ps` is an error, not a synonym for `list`. Starting
-from zero means backwards compatibility is not a cost we have to pay, and every name is chosen on
-merit. The cost is real: someone arriving from the official CLI types `ps` and gets nothing but the
-command list.
+**No compatibility aliases (I-3),** and **the canonical noun-first form is currently unused by
+agents (I-2)** — both covered in [§1](#1-the-names-and-what-they-bought), which is where the naming
+decisions and their costs are argued in full.
 
 **Explicit `--json` over implied.** Slightly more typing for scripts; identical behaviour in every
 context. We think predictability wins (C-08).
@@ -266,7 +373,7 @@ pending a decision, rather than quietly adjusting either.
 
 ---
 
-## 7. Known limitations
+## 8. Known limitations
 
 - Eight of the API's 85 operations are implemented. Cloud agents, GitHub, SSH keys, secrets,
   checkpoints, files, events and model providers are not started —
@@ -280,7 +387,7 @@ pending a decision, rather than quietly adjusting either.
 
 ---
 
-## 8. Running it
+## 9. Running it
 
 ```sh
 sh scripts/install.sh                    # or, from a clone: pnpm install && pnpm cli --help
