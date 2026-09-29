@@ -301,18 +301,23 @@ failure — including network failures — into a single `RuntaApiError`.
 ## Releasing
 
 Changesets owns versioning; the release workflow turns a version bump into a GitHub Release with
-the compiled binaries attached. **Nothing is published to npm** — every package is private, and
-the CLI ships as a standalone binary.
+the compiled binaries attached, and publishes the CLI to npm as `@haxzie/runta-next`. The
+`@runta/*` packages stay private — they are inlined into both artefacts rather than shipped.
 
 1. Include a changeset with your PR: `pnpm changeset`, pick the packages and a bump type, commit
    the generated markdown.
 2. On merge to `main`, the release workflow opens or updates a **Version Packages** PR. Nothing
    else happens yet.
-3. Merging that PR bumps every package to one version (`fixed: [["@runta/*"]]`, so
-   `runta-next --version` identifies the whole tree) and writes CHANGELOGs.
+3. Merging that PR bumps every package to one version (`fixed: [["@runta/*",
+   "@haxzie/runta-next"]]`, so `runta-next --version` identifies the whole tree) and writes
+   CHANGELOGs.
 4. That push to `main` leaves a version with no matching tag, which is the signal to release. The
    workflow then cross-compiles all six targets, checks them, tags `v<version>`, and attaches the
    tarballs plus `checksums.txt`.
+5. npm publish goes last, deliberately: the GitHub Release is what `install.sh` resolves, so it
+   should not be held up by the registry. That step builds `dist/index.js` — `build:binaries`
+   compiles straight from source and never produces it — and re-running the workflow skips a
+   version that is already on npm, because a published version can never be replaced.
 
 Three gates stand between a version bump and a published release, because a broken release is
 worse than a late one:
@@ -322,10 +327,12 @@ worse than a late one:
   over HTTP and runs the real installer against it, so a broken installer fails here rather than
   in front of a user;
 - the changelog must actually contain a section for this version, so an empty release is an error
-  rather than a surprise.
+  rather than a surprise;
+- the published npm bin must report the version being released, the same guarantee the binary
+  smoke test gives.
 
-`@runta/tsconfig` and `@runta/install-worker` are excluded from versioning: shared config and
-deployment infrastructure are not things a user installs.
+`@runta/tsconfig`, `@runta/install-worker` and `@runta/docs` are excluded from versioning: shared
+config, deployment infrastructure and the docs site are not things a user installs.
 
 ### Deploying the Workers
 
