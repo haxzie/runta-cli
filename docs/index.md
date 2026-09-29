@@ -7,7 +7,8 @@ sidebar_position: 1
 # runta-next
 
 `runta-next` is a command line interface for the [Runta REST API](https://runta.com/docs/reference/api/).
-It is a single standalone binary with no runtime dependency.
+Install it from npm as `@haxzie/runta-next`, which needs Node.js 22+, or as a standalone binary
+with no runtime dependency at all.
 
 ## Start here
 
@@ -22,7 +23,8 @@ It is a single standalone binary with no runtime dependency.
 ## Quick start
 
 ```sh
-# Install
+# Install — either of these
+npm install -g @haxzie/runta-next
 curl -fsSL https://runta.haxzie.com/install.sh | sh
 
 # Sign in through the browser
