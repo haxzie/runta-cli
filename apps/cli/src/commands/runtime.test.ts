@@ -1,5 +1,5 @@
 import type { Runtime } from '@runta/api';
-import { isCliError, setLogLevel } from '@runta/utils';
+import { isCliError, logger, setLogLevel } from '@runta/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { captureStdout, isolateEnv, type Route, stubFetch } from '../test/harness.js';
 import {
@@ -119,6 +119,104 @@ const bodyOf = async (request: Request): Promise<Record<string, unknown>> =>
   JSON.parse(await request.text()) as Record<string, unknown>;
 
 // ------------------------------------------------------------------ create
+
+describe('create --runtime-sign-in', () => {
+  /** An image that fronts a provider and allows an in-runtime sign-in, like `claude`. */
+  const signInImage = [
+    {
+      id: 'claude',
+      name: 'Claude Code',
+      model_provider: {
+        allow_runtime_sign_in: true,
+        protocol_bindings: [{ protocol: 'anthropic_messages' }],
+      },
+    },
+  ];
+
+  it('sends runtime_sign_in on the image spec', async () => {
+    const { stub, deps } = harness([
+      IMAGES(signInImage as never),
+      POST({ data: runtime() }),
+      GET({ data: runtime() }),
+    ]);
+
+    await create({ image: 'claude', runtimeSignIn: true }, deps);
+
+    const post = stub.calls.find((c) => c.method === 'POST');
+    const body = await bodyOf(post as Request);
+    expect(body.image).toMatchObject({ id: 'claude', runtime_sign_in: true });
+  });
+
+  it('omits the field entirely when the flag is absent', async () => {
+    const { stub, deps } = harness([
+      IMAGES(signInImage as never),
+      POST({ data: runtime() }),
+      GET({ data: runtime() }),
+    ]);
+
+    await create({ image: 'claude' }, deps);
+
+    const body = await bodyOf(stub.calls.find((c) => c.method === 'POST') as Request);
+    expect(body.image).not.toHaveProperty('runtime_sign_in');
+  });
+
+  /**
+   * The flag waives a check; it does not authenticate anything. The runtime comes up `running`,
+   * `degraded: false`, with an agent that cannot reach a model — and the production CLI says
+   * nothing at all about it (CLI_ISSUES.md C-33). Saying so is the point of supporting it.
+   */
+  it('says the agent is not signed in yet', async () => {
+    const { deps } = harness([
+      IMAGES(signInImage as never),
+      POST({ data: runtime() }),
+      GET({ data: runtime() }),
+    ]);
+    const info = vi.spyOn(logger, 'success').mockImplementation(() => {});
+
+    await create({ image: 'claude', runtimeSignIn: true }, deps);
+
+    expect(info.mock.calls.flat().join(' ')).toMatch(/not signed in yet/);
+  });
+
+  it('adds sign_in_pending to the JSON, which the runtime object has no field for', async () => {
+    const { out, deps } = harness([
+      IMAGES(signInImage as never),
+      POST({ data: runtime() }),
+      GET({ data: runtime() }),
+    ]);
+
+    await create({ image: 'claude', runtimeSignIn: true, json: true }, deps);
+
+    const payload = JSON.parse(out.text) as Record<string, unknown>;
+    expect(payload.sign_in_pending).toBe(true);
+    expect(payload.status).toBe('running');
+  });
+
+  it('leaves the JSON untouched without the flag', async () => {
+    const { out, deps } = harness([
+      IMAGES(signInImage as never),
+      POST({ data: runtime() }),
+      GET({ data: runtime() }),
+    ]);
+
+    await create({ image: 'claude', json: true }, deps);
+
+    expect(JSON.parse(out.text)).not.toHaveProperty('sign_in_pending');
+  });
+
+  it('refuses an image that cannot be signed into, before any request', async () => {
+    const { stub, deps } = harness([IMAGES()]);
+
+    const error = await create({ image: 'clean', runtimeSignIn: true }, deps).catch(
+      (e: unknown) => e,
+    );
+
+    expect(isCliError(error)).toBe(true);
+    expect(String(error)).toMatch(/does not support signing in/);
+    expect((error as { exitCode?: number }).exitCode).toBe(2);
+    expect(stub.calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+});
 
 describe('create', () => {
   it('waits until the runtime is running and reports how to use it', async () => {

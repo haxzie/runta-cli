@@ -78,6 +78,7 @@ export interface CreateOptions {
   idleTimeout?: string;
   fromCheckpoint?: string;
   modelProviderProtocol?: string;
+  runtimeSignIn?: boolean;
   detach?: boolean;
   timeout?: string;
   json?: boolean;
@@ -96,8 +97,8 @@ export async function create(
   });
 
   if (options.detach) {
-    emit(runtime, options.json, deps, `Creating runtime '${runtime.display_name}'.`);
-    printNextSteps(createNextSteps(runtime, false));
+    emit(runtime, options.json, deps, `Creating runtime '${runtime.display_name}'.`, options);
+    printNextSteps(createNextSteps(runtime, false, options));
     return;
   }
 
@@ -115,8 +116,8 @@ export async function create(
     ),
   );
 
-  emit(runtime, options.json, deps, describe(runtime));
-  printNextSteps(createNextSteps(runtime, true));
+  emit(runtime, options.json, deps, describeCreated(runtime, options), options);
+  printNextSteps(createNextSteps(runtime, true, options));
 }
 
 /**
@@ -184,11 +185,39 @@ async function createBody(
 async function imageSpec(
   client: RuntaClient,
   options: CreateOptions,
-): Promise<{ id: string; model_provider_protocol?: string }> {
+): Promise<{ id: string; model_provider_protocol?: string; runtime_sign_in?: boolean }> {
   const image = await resolveImage(client, options.image as string);
   const protocol = modelProviderProtocol(image, options.modelProviderProtocol);
-  return { id: image.id, ...(protocol ? { model_provider_protocol: protocol } : {}) };
+
+  // Refuse up front on an image that cannot be signed into, rather than sending a field the API
+  // will either reject confusingly or accept and ignore.
+  if (options.runtimeSignIn && !image.model_provider?.allow_runtime_sign_in) {
+    fail(`Image '${image.id}' does not support signing in inside the runtime.`, {
+      exitCode: 2,
+      hint: image.model_provider
+        ? 'Connect a model provider at https://dashboard.runta.com instead.'
+        : 'That image needs no credential, so --runtime-sign-in has nothing to do.',
+    });
+  }
+
+  return {
+    id: image.id,
+    ...(protocol ? { model_provider_protocol: protocol } : {}),
+    ...(options.runtimeSignIn ? { runtime_sign_in: true } : {}),
+  };
 }
+
+/**
+ * Whether this runtime came up with an agent that still has to be signed into.
+ *
+ * `--runtime-sign-in` is a *waiver*, not a provisioning step: it tells the API not to demand a
+ * credential at create time, and the runtime then starts with none. The production CLI's flag
+ * promises to "configure provider authentication inside the Runtime" and configures nothing, so
+ * you get `status: running`, `degraded: false`, `error_code: null` and an agent that prints
+ * "Not logged in" — invisible to `inspect`, to `list`, and to the output of the flag that caused
+ * it (CLI_ISSUES.md C-33). Saying so is the whole point of supporting the flag at all.
+ */
+const signInPending = (options: CreateOptions): boolean => options.runtimeSignIn === true;
 
 const ingress = (spec: string): { protocol: 'http' | 'https'; runtime_port: number } => {
   const match = /^(\d+)\/(https?)$/.exec(spec);
@@ -930,12 +959,25 @@ function emit(
   json: boolean | undefined,
   deps: CommandDeps,
   message: string,
+  options?: CreateOptions,
 ): void {
   if (json) {
-    deps.write(`${JSON.stringify(runtime, null, 2)}\n`);
+    // The runtime object is the API's own and says nothing about a pending sign-in — there is no
+    // field for it — so the one caller who can know adds it. An agent branching on `status` alone
+    // would otherwise call this runtime ready.
+    const payload =
+      options && signInPending(options) ? { ...runtime, sign_in_pending: true } : runtime;
+    deps.write(`${JSON.stringify(payload, null, 2)}\n`);
     return;
   }
   logger.success(message);
+}
+
+/** `describe`, plus the one thing the runtime object cannot tell you. */
+function describeCreated(runtime: Runtime, options: CreateOptions): string {
+  const base = describe(runtime);
+  if (!signInPending(options)) return base;
+  return `${base}\nIts agent is installed but not signed in yet.`;
 }
 
 function describe(runtime: Runtime): string {
@@ -949,9 +991,25 @@ function describe(runtime: Runtime): string {
 }
 
 /** What to do with a runtime that was just created. */
-function createNextSteps(runtime: Runtime, waited: boolean): NextStep[] {
+function createNextSteps(
+  runtime: Runtime,
+  waited: boolean,
+  options: CreateOptions = {},
+): NextStep[] {
   const name = runtime.display_name;
   const steps: NextStep[] = [];
+
+  // First, because nothing else about the runtime matters until its agent can reach a model.
+  // Interactive by necessity: the sign-in is an OAuth flow that needs a human at a terminal.
+  if (waited && signInPending(options)) {
+    // A shell rather than the agent binary: each image ships a different one (`claude`, `codex`,
+    // `opencode` …) and naming the wrong one is worse than naming none. Interactive by necessity —
+    // the sign-in is an OAuth flow that needs a human at a terminal.
+    steps.push({
+      command: `runta-next exec ${name} -it -- bash`,
+      why: 'start the agent and sign in with /login',
+    });
+  }
 
   if (!waited) {
     // Without waiting the runtime is not usable yet, so watching it is the only sensible step.
@@ -1003,6 +1061,10 @@ function addRuntimeVerbs(parent: Command): void {
     .option(
       '--model-provider-protocol <protocol>',
       'required by images that front a model provider; inferred when the image binds only one',
+    )
+    .option(
+      '--runtime-sign-in',
+      'skip the credential check and sign the agent in inside the runtime instead',
     )
     .option('-d, --detach', 'return as soon as creation is accepted, without waiting')
     .option('--timeout <secs>', 'how long to wait before giving up (default 180)')

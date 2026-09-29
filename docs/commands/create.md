@@ -28,6 +28,7 @@ Both forms are the same command. See [Commands](./index.md#two-forms-for-runtime
 | `--idle-timeout <secs>` | Idle seconds before suspending. Required with a suspending mode |
 | `--from-checkpoint <id>` | Restore from a checkpoint instead of creating fresh |
 | `--model-provider-protocol <p>` | Required by images that front a model provider; inferred when the image binds only one |
+| `--runtime-sign-in` | Skip the credential check; sign the agent in inside the runtime instead |
 | `-d, --detach` | Return as soon as creation is accepted, without waiting |
 | `--timeout <secs>` | How long to wait before giving up. Default 180 |
 | `--json` | Print the runtime as JSON |
@@ -105,6 +106,51 @@ Pick one with --model-provider-protocol: anthropic_messages, openai_chat, openai
 [`runta-next image list`](./images.md) tells you which case an image is in before you try: its
 `MODEL PROVIDER` column shows the single protocol when one is inferred, and a count when the flag
 is required.
+
+### Signing in inside the runtime
+
+An image that fronts a model provider still needs a **credential**, and the protocol only says
+which one. Without one, create is refused:
+
+```console
+$ runta-next create --image claude
+error invalid argument: the selected runtime image reads its model-provider credential from
+ANTHROPIC_API_KEY, which no secret in this request populates
+```
+
+`--runtime-sign-in` waives that check, for images that allow it. The runtime is built with **no
+credential**, and you sign the agent in yourself afterwards:
+
+```console
+$ runta-next create --name demo --image claude --runtime-sign-in
+Runtime 'demo' is running.
+Its agent is installed but not signed in yet.
+
+Next steps:
+  runta-next exec demo -it -- bash  start the agent and sign in with /login
+```
+
+::: warning It waives, it does not configure
+The flag skips a check. It does not inject a credential, consult a subscription you connected in
+the Dashboard, or run a sign-in flow. The runtime comes up with `status: running`,
+`degraded: false` and an agent that prints `Not logged in` — which is why this command says so
+outright and puts the sign-in first in the next steps. The production CLI's flag of the same name
+promises to "configure provider authentication inside the Runtime" and says nothing afterwards
+(CLI_ISSUES.md C-33).
+:::
+
+Because the runtime object has no field for it, `--json` on **this command** adds
+`"sign_in_pending": true`. `inspect` cannot know — nothing on the API's runtime distinguishes a
+signed-in agent from one that never was — so do not expect the field there.
+
+Sign in once, then checkpoint it (see [Restoring from a checkpoint](#restoring-from-a-checkpoint))
+so later runtimes start authenticated. An image that does not allow it is refused before any request:
+
+```console
+$ runta-next create --image clean --runtime-sign-in
+error Image 'clean' does not support signing in inside the runtime.
+That image needs no credential, so --runtime-sign-in has nothing to do.
+```
 
 A protocol the image does not support is rejected the same way, naming what it does support.
 

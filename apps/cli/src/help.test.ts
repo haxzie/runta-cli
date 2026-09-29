@@ -112,55 +112,40 @@ describe('the introduction', () => {
   });
 });
 
-describe('the agent section', () => {
-  it('explains when to reach for --json', () => {
+/**
+ * Root help is a command index and nothing else. The prose that used to live here — how `--json`
+ * and `-o` interact, what `--detach` trades away — moved to the commands it describes, where it is
+ * read at the moment it matters instead of scrolled past on the way to the command list.
+ */
+describe('what root help deliberately leaves out', () => {
+  it.each(['For agents:', 'Waiting:', 'Examples:'])('has no %s section', (heading) => {
+    expect(plain()).not.toContain(heading);
+  });
+
+  it('still fits the things it kept', () => {
     const text = plain();
-    expect(text).toContain('For agents:');
-    expect(text).toContain('--json');
+    expect(text).toContain('Runtimes:');
+    expect(text).toContain('Account:');
+    expect(text).toContain('Options:');
   });
 
-  // Output defaults to `auto`, so an agent that spawns the CLI is already getting JSON. What it
-  // must be told is how to stop depending on that detection, which is the explicit flag.
-  it('says a pipe is already JSON, and names the flag that pins it', () => {
-    const text = plain();
-    expect(text).toMatch(/a pipe is\s+already JSON/);
-    expect(text).toMatch(/-o table forces the table back/);
-  });
-
-  it('never claims the shape is independent of the terminal, which stopped being true', () => {
-    expect(plain()).not.toMatch(/does not change based on/);
-  });
-
-  it('explains that state-changing commands wait, and what --detach trades away', () => {
-    const text = plain();
-    expect(text).toContain('Waiting:');
-    expect(text).toMatch(/wait for the change to finish/);
-    // The trap worth naming: a detached stop reports the status it had on acceptance.
-    expect(text).toMatch(/detached stop still reads/);
-  });
-
-  it('points at exit codes rather than message text', () => {
-    expect(plain()).toContain('Branch on exit codes');
-  });
-
-  it('mentions RUNTA_TOKEN, which is how an agent authenticates', () => {
-    expect(plain()).toContain('RUNTA_TOKEN');
+  // The content did not vanish; it is on the commands now.
+  it('keeps the waiting explanation on the command that waits', () => {
+    const create = buildProgram().commands.find((c) => c.name() === 'create');
+    let captured = '';
+    create?.configureOutput({
+      writeOut: (t) => {
+        captured += t;
+      },
+    });
+    create?.outputHelp();
+    expect(captured).toContain('Waiting:');
   });
 });
 
 describe('the docs pointer', () => {
   it('names the docs site, so a reader can go deeper than --help', () => {
     expect(plain()).toContain('https://runta.haxzie.com/docs');
-  });
-
-  /**
-   * The whole point of naming this one: an agent that has read `--help` can fetch the entire
-   * manual in a single request instead of crawling rendered HTML page by page.
-   */
-  it('points agents at the plain-text rendering of the whole site', () => {
-    const text = plain();
-    expect(text).toContain('https://runta.haxzie.com/docs/llms-full.txt');
-    expect(text.indexOf('llms-full.txt')).toBeGreaterThan(text.indexOf('For agents:'));
   });
 });
 
