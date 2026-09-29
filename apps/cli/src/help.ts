@@ -24,7 +24,7 @@ interface Group {
  * one in `--help` is the point: an agent that reads help can fetch the whole manual in one request
  * instead of scraping rendered HTML page by page.
  */
-const DOCS_URL = 'https://runta-cli.haxzie.com/docs';
+const DOCS_URL = 'https://runta.haxzie.com/docs';
 const LLMS_URL = `${DOCS_URL}/llms-full.txt`;
 
 const GROUPS: Group[] = [

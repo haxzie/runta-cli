@@ -266,7 +266,7 @@ describe('every command and flag is documented', () => {
     'runtime', // The noun-first group; its verbs are documented individually.
   ]);
 
-  const topLevel = (): Command[] => buildProgram().commands;
+  const topLevel = (): readonly Command[] => buildProgram().commands;
 
   it('covers every top-level command', () => {
     const undocumented = topLevel()

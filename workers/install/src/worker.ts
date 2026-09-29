@@ -26,6 +26,18 @@ export interface Env {
    * `wrangler secret put GITHUB_TOKEN` if this repo ever goes private again.
    */
   GITHUB_TOKEN?: string;
+  /**
+   * The docs Worker, reached by service binding rather than over the internet.
+   *
+   * `runta.haxzie.com` is a custom domain, so this Worker receives every request to the hostname
+   * and no second Worker can be routed alongside it. Serving the docs from the same hostname
+   * therefore means forwarding, and a binding does it without a second TLS hop or a public
+   * dependency on the docs hostname staying up.
+   *
+   * Optional so the installer still works if the binding is absent — `/docs` 404s, `/install.sh`
+   * does not care.
+   */
+  DOCS?: Fetcher;
 }
 
 /** Refs we are willing to interpolate into an upstream URL. */
@@ -46,11 +58,27 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   }
 
   const url = new URL(request.url);
+
+  // The docs share the hostname. This is the one path family allowed to answer 2xx besides the
+  // installer, and it is deliberately narrow: `/docs` and below, nothing else. `/` stays a 404 so
+  // that `curl -fsSL runta.haxzie.com | sh` — a plausible typo for the install command — still
+  // aborts rather than piping a rendered page into a shell.
+  if (url.pathname === '/docs' || url.pathname.startsWith('/docs/')) {
+    if (!env.DOCS) return text('Docs are not bound on this deployment.\n', 404);
+    // `/docs` without the trailing slash would resolve against the asset tree as a miss; the site
+    // is built with `base: '/docs/'`, so send the canonical form.
+    if (url.pathname === '/docs') {
+      return Response.redirect(`${url.origin}/docs/${url.search}`, 308);
+    }
+    return env.DOCS.fetch(request);
+  }
+
   if (url.pathname !== '/install.sh') {
     // A 404 rather than a redirect or a friendly page: anything with a 2xx status could be piped
     // into a shell by someone who mistyped the URL.
     return text(
-      `Not found.\n\nInstall the Runta CLI with:\n\n  curl -fsSL ${url.origin}/install.sh | sh\n`,
+      `Not found.\n\nInstall the Runta CLI with:\n\n  curl -fsSL ${url.origin}/install.sh | sh\n\n` +
+        `Docs: ${url.origin}/docs/\n`,
       404,
     );
   }

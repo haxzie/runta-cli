@@ -208,3 +208,105 @@ describe('pinning a ref', () => {
     },
   );
 });
+
+describe('docs', () => {
+  /** A stand-in for the bound docs Worker, recording what it was asked for. */
+  const docsBinding = (body = '<!doctype html><title>Docs</title>') => {
+    const seen: string[] = [];
+    const DOCS = {
+      fetch: async (request: Request) => {
+        seen.push(new URL(request.url).pathname);
+        return new Response(body, {
+          status: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        });
+      },
+    } as unknown as Fetcher;
+    return { DOCS, seen };
+  };
+
+  const docsGet = (path: string, extra: Partial<Env> = {}) =>
+    handle(new Request(`https://runta.haxzie.com${path}`), { ...env, ...extra });
+
+  it('forwards a docs path to the bound Worker', async () => {
+    const { DOCS, seen } = docsBinding();
+
+    const response = await docsGet('/docs/commands/list', { DOCS });
+
+    expect(response.status).toBe(200);
+    expect(seen).toEqual(['/docs/commands/list']);
+    expect(await response.text()).toContain('Docs');
+  });
+
+  it('redirects /docs to /docs/, which is what the asset tree is built for', async () => {
+    const { DOCS, seen } = docsBinding();
+
+    const response = await docsGet('/docs', { DOCS });
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get('location')).toBe('https://runta.haxzie.com/docs/');
+    expect(seen).toEqual([]);
+  });
+
+  it('does not reach for the installer source when serving docs', async () => {
+    const { DOCS } = docsBinding();
+    const urls = upstream(() => new Response(SCRIPT));
+
+    await docsGet('/docs/', { DOCS });
+
+    expect(urls).toEqual([]);
+  });
+
+  it('404s a docs request when the binding is absent, rather than erroring', async () => {
+    const response = await docsGet('/docs/');
+
+    expect(response.status).toBe(404);
+  });
+
+  /**
+   * The property the whole Worker is built around. `/` must never be a 2xx: someone who types the
+   * install command wrong should get an abort from `curl -fsSL`, not a rendered page piped into a
+   * shell. Adding the docs to this hostname is exactly the change that could break it.
+   */
+  it('keeps every non-docs, non-installer path a 404 even with docs bound', async () => {
+    const { DOCS, seen } = docsBinding();
+
+    for (const path of ['/', '/index.html', '/doc', '/docsy', '/install']) {
+      const response = await docsGet(path, { DOCS });
+      expect(response.status, `${path} should not be served`).toBe(404);
+    }
+    expect(seen).toEqual([]);
+  });
+
+  /**
+   * Path traversal is handled by `new URL()` before the prefix check runs, so `..` can only ever
+   * resolve to a real path that is then matched exactly — it cannot smuggle one prefix into the
+   * other. Worth pinning, because the prefix check reads like something traversal could fool.
+   */
+  it('normalises traversal before matching, so it cannot cross between the two prefixes', async () => {
+    const { DOCS, seen } = docsBinding();
+    upstream(() => new Response(SCRIPT));
+
+    // Resolves to /docs/ — genuinely a docs request, and served as one.
+    expect((await docsGet('/../docs/', { DOCS })).status).toBe(200);
+    // Resolves to /install.sh — genuinely the installer, and served as one.
+    expect((await docsGet('/docs/../install.sh', { DOCS })).status).toBe(200);
+    // Encoded dots are not decoded into traversal; this resolves to `/`, which is a 404.
+    expect((await docsGet('/docs/%2e%2e/', { DOCS })).status).toBe(404);
+
+    expect(seen).toEqual(['/docs/']);
+  });
+
+  it('still serves the installer with docs bound', async () => {
+    const { DOCS } = docsBinding();
+    upstream(() => new Response(SCRIPT));
+
+    const response = await handle(new Request('https://runta.haxzie.com/install.sh'), {
+      ...env,
+      DOCS,
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(SCRIPT);
+  });
+});

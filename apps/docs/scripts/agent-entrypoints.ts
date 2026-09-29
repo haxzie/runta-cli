@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const docsRoot = join(here, '../../../docs');
 const outDir = join(here, '../.vitepress/dist/docs');
-const SITE = 'https://runta-cli.haxzie.com/docs';
+const SITE = 'https://runta.haxzie.com/docs';
 
 /** Reading order, matching the sidebar. Pages absent from here are still published, just unlisted. */
 const ORDER = [

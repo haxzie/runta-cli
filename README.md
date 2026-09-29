@@ -26,7 +26,7 @@ published to npm — there is no Node.js runtime requirement.
 Supported targets: macOS and Linux, on `x64` and `arm64` (glibc and musl).
 
 This is an experimental CLI. Runta's own is published to npm as `@runta/runta-cli` and covers far
-more; this one implements eight commands and renames three of them deliberately. The command here is
+more; this one implements twelve commands and renames three of them deliberately. The command here is
 `runta-next`, so installing it never shadows `runta`.
 
 See [docs/installation.md](./docs/installation.md#it-sits-beside-the-official-cli) — including why
@@ -66,8 +66,8 @@ runta-next [global options] <command> [command options]
 `--help` is generated from the program itself and can never drift from what the binary
 accepts. If it disagrees with the docs, believe `--help`.
 
-The API exposes 85 operations; the CLI covers four. Runtimes, checkpoints, secrets, egress,
-file transfer and agents are not implemented yet — see
+The API exposes 85 operations; the CLI covers eight, plus `exec` over its WebSocket. Checkpoints,
+secrets, egress, file transfer, GitHub and cloud agents are not implemented yet — see
 [docs/commands](./docs/commands/index.md#not-yet-implemented).
 
 ### Authenticating
@@ -157,7 +157,7 @@ $ runta-next login --json --no-browser
 
 ## Documentation
 
-**<https://runta-cli.haxzie.com/docs>**
+**<https://runta.haxzie.com/docs/>**
 
 The source is [`docs/`](./docs) — plain markdown with frontmatter, the single copy. `apps/docs`
 builds the site from it, so there is nothing to keep in sync between the repo and the web:
@@ -178,8 +178,8 @@ For agents, every page is also served as plain text — [`/docs/llms.txt`][llms]
 page. `runta-next --help` names the second one, so an agent that reads help can fetch the whole
 manual without crawling HTML.
 
-[llms]: https://runta-cli.haxzie.com/docs/llms.txt
-[full]: https://runta-cli.haxzie.com/docs/llms-full.txt
+[llms]: https://runta.haxzie.com/docs/llms.txt
+[full]: https://runta.haxzie.com/docs/llms-full.txt
 
 Keep the docs in step with the code: a flag added without a docs change is a bug, and
 `apps/cli/src/docs.test.ts` enforces it by resolving every `runta-next …` example in `docs/`
@@ -322,9 +322,20 @@ deployment infrastructure are not things a user installs.
 Both Workers are deployed by hand, from a machine with `wrangler login`:
 
 ```sh
-pnpm --filter @runta/install-worker run deploy   # runta.haxzie.com/install.sh
-pnpm --filter @runta/docs run deploy             # runta-cli.haxzie.com/docs
+pnpm --filter @runta/docs run deploy             # must go first; see below
+pnpm --filter @runta/install-worker run deploy   # runta.haxzie.com
 ```
+
+`runta.haxzie.com` is a Cloudflare **custom domain** owned by the install Worker, so every request
+to that hostname reaches it and no second Worker can be routed alongside. The docs are therefore
+reached by a service binding: the install Worker answers `/install.sh` itself, forwards `/docs/*`
+to `runta-next-docs`, and 404s everything else. Deploy the docs Worker first — a binding to a
+service that does not exist yet fails the install Worker's deploy.
+
+That last part is a safety property, not tidiness. `/` must never be a 2xx, because
+`curl -fsSL runta.haxzie.com | sh` is a plausible mistyping of the install command and `curl -fsSL`
+aborts on a non-2xx rather than piping a rendered page into a shell. `install-health.yml` asserts
+it daily, alongside `/docs/` being a 200.
 
 `run` is not optional. `pnpm deploy` is a reserved pnpm command that packages a workspace into a
 directory, so `pnpm --filter … deploy` fails with `ERR_PNPM_INVALID_DEPLOY_TARGET` instead of
