@@ -56,7 +56,12 @@ const PASSTHROUGH = [
 const { values: opts } = parseArgs({
   options: {
     trials: { type: 'string', default: '5' },
-    tasks: { type: 'string', default: TASKS.map((t) => t.id).join(',') },
+    tasks: {
+      type: 'string',
+      default: TASKS.filter((t) => !t.retired)
+        .map((t) => t.id)
+        .join(','),
+    },
     arms: { type: 'string', default: 'A,B' },
     model: { type: 'string', default: process.env.EVAL_MODEL ?? 'claude-sonnet-5-5' },
     'max-turns': { type: 'string', default: '40' },
@@ -314,6 +319,9 @@ async function main() {
   const tasks = opts.tasks.split(',').map((id) => {
     const t = TASKS.find((x) => x.id === id.trim().toUpperCase());
     if (!t) fail(`unknown task ${id}. Tasks: ${TASKS.map((x) => x.id).join(', ')}`);
+    // Retired tasks stay in TASKS for the record, but running one only burns trials on a
+    // fixture that cannot succeed, so say why instead of letting it fail trial by trial.
+    if (t.retired) fail(`${t.id} is retired: ${t.retired}`);
     return t;
   });
   const arms = opts.arms.split(',').map((id) => {

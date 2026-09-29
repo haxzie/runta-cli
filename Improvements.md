@@ -420,3 +420,81 @@ update endpoint that would back an `update` command, so it belongs with
 **API limitation, not an upstream omission** — the patch body has no CPU field at all, confirmed
 against both the REST reference and the generated Python SDK. `update` therefore cannot offer it
 either, and must say so rather than leaving a gap; see I-5 and `CLI_ISSUES.md` C-37.
+
+---
+
+## I-10 — `--fields` selects columns for both halves of the output
+
+**Status:** decided, 2026-09-29, and implemented. **The measurement that motivated it did not
+reproduce the expected benefit — read "What the eval said" before citing this as a win.**
+
+Upstream's only control over how much `ps` returns is `--full`, which is binary — the compact
+listing or complete runtime objects — and is a silent no-op on a TTY (`CLI_ISSUES.md` C-07).
+Ours takes a field list:
+
+```console
+$ runta-next list --fields name,vcpus        $ runta-next list --fields name,vcpus --json
+NAME            VCPUS                        [ { "name": "jesting_kalong", "vcpus": 1 }, … ]
+jesting_kalong      1
+```
+
+Three decisions inside that.
+
+**`--fields` names columns, and the same names key the JSON.** One vocabulary covers what a person
+reads and what a script parses, rather than a set of column headings for the table and a set of API
+field paths for `--json`. A caller who can read the table can write the `jq`.
+
+**The human cell and the machine value are decided separately.** `memory` renders as `512 MiB` in
+the table and `512` in JSON; `status` renders as `running (degraded)` and serialises as `"running"`,
+with `degraded` available as its own field. The unit belongs in a cell a person reads, not in a
+value a script is about to do arithmetic on, and a script should not substring-match
+`"running (degraded)"` to learn one boolean.
+
+**It is additive.** Without `--fields`, `--json` is byte-for-byte what it was — the API's own
+objects, `display_name` and nested `resources` — so existing `jq` paths keep working. A test pins
+that.
+
+A misspelled field is an error naming it and the valid ones, exit code 2, before any request goes
+out. A silently short row is worse than an error because a script will act on it, which is the same
+reasoning as C-15.
+
+### What the eval said
+
+The flag came out of `evals/cli-ab`: `list --json` was 4,096 characters on a near-empty tenant
+against 271 for the table, and T6 and T14 were the two tasks where our arm read *more* output than
+upstream's. With `--fields`, the narrow path is 158 characters — 26× smaller.
+
+Rerunning the suite (`runs/full2`, 13 tasks, both arms, one trial) did not show that saving:
+
+| Arm B, the 9 tasks shared with `full1` | before | after |
+| --- | --- | --- |
+| Cost | $0.47 | $0.49 |
+| Turns | 38 | 40 |
+| CLI output read | 44,580 chars | 46,172 chars |
+
+Flat, or marginally worse, though n=1 per cell is well inside the noise. Two reasons, both
+structural:
+
+- **Only 4 of 13 tasks call `list` at all.** The rest name a runtime the prompt already gave them
+  and go straight to `inspect` or `exec`, which have no `--fields`. The big payload was real but it
+  was not on the critical path.
+- **Where it was used, it was used second.** In T6 the agent ran `list --json`, then
+  `list --all --json --fields name,status,vcpus` — it explored with the full payload and narrowed
+  afterwards, paying for both. An agent's first call on an unfamiliar surface is exploratory, and
+  exploration is exactly when it does not yet know which fields it wants.
+
+The flag was discovered unprompted from `--help` in both tasks that used it, so discoverability is
+not the problem.
+
+### What this commits us to
+
+Keeping it: it is correct, tested, documented, and cheap. But not claiming it reduces agent context
+in aggregate, because the one measurement we have says it does not.
+
+It also points at where the cost actually is. Neither CLI can filter *rows* — the API takes only
+`status`, `limit` and `after`, with no name or prefix parameter — so T7 and T14, which both ask for
+"every runtime whose name starts with …", are solved in both arms by listing the whole tenant and
+filtering in the shell. Trimming columns off a full listing saves much less than not fetching most
+of the listing would. If we act on this, `inspect --fields` and row filtering are the candidates,
+and neither should be built without a measurement first. This entry exists partly as a reminder
+that the last one was built without one.

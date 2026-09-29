@@ -31,14 +31,14 @@ trial after it.
 export RUNTA_TOKEN=rt_…                 # the one tenant both arms use
 export ANTHROPIC_API_KEY=sk-ant-…       # or CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`
 
-bun src/run.ts --tasks T2,T8 --trials 1          # smoke run: 4 trials
-bun src/run.ts --trials 5                        # full run: 10 tasks × 2 arms × 5 = 100 trials
+bun src/run.ts --tasks T2,T3 --trials 1          # smoke run: 4 trials
+bun src/run.ts --trials 5                        # full run: 13 tasks × 2 arms × 5 = 130 trials
 ```
 
 | Option | Default | |
 | --- | --- | --- |
 | `--trials` | `5` | Trials per task per arm |
-| `--tasks` | all | Comma-separated, e.g. `T2,T7` |
+| `--tasks` | all but retired | Comma-separated, e.g. `T2,T7` |
 | `--arms` | `A,B` | |
 | `--model` | `$EVAL_MODEL` or `claude-sonnet-5-5` | Same model for both arms |
 | `--max-turns` | `40` | Per agent |
@@ -102,13 +102,51 @@ Each trial has four steps:
 | T5 | Get `./data.csv` into a runtime, sum a column with awk there | stdin, or `cp` on the official CLI | Correct sum, and awk ran through the CLI |
 | T6 | Write `./inventory.json` of every `P*` runtime, including non-running | list with every status, `--json` | Names, statuses and vCPUs match the API |
 | T7 | Delete `P-tmp*`, keep `P-keep` and `P-keep-tmp`; show the plan first | care before a destructive action (C-09) | Right runtimes gone; something was listed before the first delete |
-| T8 | Run `nproc` in `P-dup`, a name two runtimes share | ambiguous names (C-36) | The agent reported the ambiguity instead of silently picking one |
+| ~~T8~~ | ~~Run `nproc` in `P-dup`, a name two runtimes share~~ | ~~ambiguous names (C-36)~~ | **Retired — see below** |
 | T9 | Report requested and max memory, egress, and ports of `P-cfg` | inspect; an empty denylist means unrestricted | All four values right |
 | T10 | Create `P-big`: 2 vCPU, 2 GiB, 32 GiB disk, 8080/https, suspend after 10 idle minutes | turning a plain-English spec into flags | Every field right in the API's copy of the runtime |
+| T11 | Write to `/tmp/m` and `/root/m` in `P-life`, stop it, start it, report which survived | the stop/start verbs, waiting out a transition, not assuming persistence | `/tmp` gone and `/root` kept; runtime left running |
+| T12 | Run `hostname` in `P-ghost`, which does not exist | the failure path — a clear not-found error, and not inventing a way around it | Said it was missing, and created nothing |
+| T13 | Make `echo` print `--json --verbose -h` inside `P-args` | the argument boundary: the CLI must pass the flags through, not act on them | The line came back verbatim |
+| T14 | Write `./cpus.txt` with `<name> <nproc>` for each of three `P-fan-*` runtimes, sorted | discovering which runtimes match, then pairing list output with a command in each | Every count matches the API; sorted; decoy excluded and untouched; all left running |
 
 Tasks and graders are in [src/tasks.ts](src/tasks.ts). Graders marked **review** are regex
-judgements (T1 with an org key, T5 when awk looks local, T8). Read those transcripts before
-trusting the number.
+judgements (T1 with an org key, T5 when awk looks local, T11's `kept`/`gone` phrasing). Read those
+transcripts before trusting the number.
+
+T11's expected answer comes from a probe on 2026-09-29: a stop/start wipes `/tmp` but keeps `/root`,
+which sits on the writable overlay. An agent that assumes a restart preserves everything, or that it
+wipes everything, gets half of it wrong — the only way through is to look. Its grader is marked
+**review** because it matches the answer's wording rather than re-reading the files.
+
+T14's runtimes get random name suffixes and random vCPU counts, and the fixture adds a decoy
+carrying the trial prefix but not `-fan`. Without the random suffixes an agent can type the names
+straight from the prompt and skip `list` entirely, which is what the first version of the task let
+happen; without the decoy, "everything with my prefix" and "everything matching `-fan`" are the same
+set and the filter is never tested.
+
+Results and analysis from past runs are in [FINDINGS.md](FINDINGS.md).
+
+### T8 is retired
+
+T8 staged two runtimes sharing one name and asked for `nproc`, so the two had different vCPU counts
+and there was no single right answer. Passing meant reporting the ambiguity rather than a number.
+
+The API now refuses duplicate names, so the fixture cannot build that state:
+
+```
+POST /v2/runtimes → 409 already_exists: runtime already exists: ev-…-t8-1-dup
+```
+
+Probed 2026-09-29, there is no way around it. Deleting the first runtime frees its name for reuse
+but never leaves two live runtimes sharing one, `/v2/checkpoints` is GET-only so there is no
+restore path, and both CLIs match names exactly and reject partial ids — so no near-miss naming
+reproduces the ambiguity either.
+
+The task stays in `TASKS` with a `retired` reason: it is left out of the default `--tasks`, and
+naming it explicitly is an error rather than a fixture failure. Note that C-36 itself was only ever
+verified against a local mock server, never the real API, so whether the API ever permitted
+duplicates is unestablished.
 
 ## Metrics
 

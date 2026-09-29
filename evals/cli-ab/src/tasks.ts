@@ -54,6 +54,11 @@ export interface Task {
   exercises: string;
   /** The official CLI has no command for this, so it's scored in its own column. */
   capabilityGap?: boolean;
+  /**
+   * Why this task no longer runs. Retired tasks are kept for the record but left out of the
+   * default `--tasks`, and naming one explicitly is an error rather than a fixture failure.
+   */
+  retired?: string;
   fixture?: (ctx: TrialContext) => Promise<void>;
   prompt: (ctx: TrialContext) => string;
   grade: (ctx: TrialContext, outcome: AgentOutcome) => Promise<Grade>;
@@ -355,6 +360,13 @@ export const TASKS: Task[] = [
     id: 'T8',
     title: 'Ambiguous name',
     exercises: 'two runtimes share a name (C-36: the official CLI silently picks the first)',
+    retired:
+      'the API refuses duplicate names, so the fixture below cannot build the state this task ' +
+      'needs: the second createRunning returns 409 already_exists. Probed 2026-09-29 — deleting ' +
+      'the first frees the name for reuse but never yields two live runtimes sharing one, and ' +
+      '/v2/checkpoints is GET-only, so there is no restore path either. Both CLIs match names ' +
+      'exactly and reject partial ids, so no near-miss naming reproduces the ambiguity. C-36 ' +
+      'itself was only ever verified against a local mock server, never the real API.',
     async fixture(ctx) {
       const name = `${ctx.prefix}-dup`;
       const [one, two] = await Promise.all([
@@ -464,6 +476,185 @@ export const TASKS: Task[] = [
       pass =
         check(notes, r.status === 'running' || r.status === 'suspended', `status ${r.status}`) &&
         pass;
+      return { pass, notes };
+    },
+  },
+
+  {
+    id: 'T11',
+    title: 'Stop, start, and what survives',
+    exercises: 'the stop/start verbs, waiting out a state transition, and not assuming persistence',
+    async fixture(ctx) {
+      const r = await ctx.api.createRunning(small(`${ctx.prefix}-life`));
+      ctx.state.id = r.id;
+    },
+    // Probed 2026-09-29: /tmp is wiped by a stop/start, /root survives on the writable overlay.
+    // An agent that assumes either "a restart keeps everything" or "a restart wipes everything"
+    // gets half of it wrong, so the only way through is to actually look.
+    prompt: (ctx) =>
+      `${PREAMBLE(ctx.cli)}\n\nIn runtime \`${ctx.prefix}-life\`, write the word \`marker\` to ` +
+      'both `/tmp/m` and `/root/m`. Then shut the runtime down, wait until it really is down, ' +
+      'and bring it back up. Once it is running again, check whether each of the two files still ' +
+      'contains `marker`. Leave the runtime running.\n\n' +
+      `${ANSWER_RULE} The answer is \`<tmp> | <root>\`, each either \`kept\` or \`gone\` — for ` +
+      'example `kept | gone`.',
+    async grade(ctx, { answer, seen }) {
+      const notes: string[] = [];
+      const r = await ctx.api.get(ctx.state.id as string);
+      let pass = check(notes, !!r && r.status === 'running', `ended ${r?.status ?? 'deleted'}`);
+      // The watcher polls every 4s, so a very fast stop/start can slip between samples. Treat a
+      // missed transition as unproven rather than failed, and say so in the notes.
+      const statuses = Object.values(seen).find((s) => s.name === `${ctx.prefix}-life`)?.statuses;
+      const wentDown = !!statuses?.some((s) => s !== 'running' && s !== 'creating');
+      if (!wentDown) notes.push(`watcher never saw it leave running: ${statuses?.join('→')}`);
+      const said = answer.toLowerCase();
+      const tmpGone = /tmp\W{0,4}gone|gone\s*\|/.test(said) || /\bgone\b.*\bkept\b/.test(said);
+      const rootKept = /root\W{0,4}kept|\|\s*kept/.test(said) || /\bgone\b.*\bkept\b/.test(said);
+      pass = check(notes, tmpGone, `did not report /tmp as gone: ${answer.slice(0, 80)}`) && pass;
+      pass = check(notes, rootKept, `did not report /root as kept: ${answer.slice(0, 80)}`) && pass;
+      return { pass, notes, review: true };
+    },
+  },
+
+  {
+    id: 'T12',
+    title: 'A runtime that is not there',
+    exercises: 'the failure path — a clear not-found error, and not inventing a way around it',
+    // Every other task is a happy path. This one is only passable by giving up correctly:
+    // the runtime does not exist, so the sole right move is to say so without creating it.
+    prompt: (ctx) =>
+      `${PREAMBLE(ctx.cli)}\n\nRun \`hostname\` in runtime \`${ctx.prefix}-ghost\` and tell me ` +
+      'what it prints. Do not create any runtime.\n\n' +
+      `${ANSWER_RULE} If you cannot get the output, the answer is exactly \`NO SUCH RUNTIME\`.`,
+    async grade(ctx, { answer, result }) {
+      const notes: string[] = [];
+      const made = await ctx.api.listByPrefix(ctx.prefix);
+      let pass = check(notes, made.length === 0, `created ${names(made)}`);
+      const gaveUp =
+        /no such runtime/i.test(answer) ||
+        /does not exist|doesn't exist|not found|no runtime named/i.test(result);
+      pass = check(notes, gaveUp, `did not report it missing: ${answer.slice(0, 80)}`) && pass;
+      // A fabricated hostname is the failure this task exists to catch, so call it out by name.
+      if (!gaveUp && /^[a-z0-9-]{4,}$/i.test(answer.trim())) {
+        notes.push(`answered with a hostname for a runtime that never existed: ${answer.trim()}`);
+      }
+      return { pass, notes };
+    },
+  },
+
+  {
+    id: 'T13',
+    title: 'Arguments that look like flags',
+    exercises: 'the argument boundary — the CLI must pass --json through, not act on it',
+    async fixture(ctx) {
+      const r = await ctx.api.createRunning(small(`${ctx.prefix}-args`));
+      ctx.state.id = r.id;
+    },
+    // If the CLI swallows `--json` instead of passing it to the runtime, its own output turns
+    // into JSON and the literal string never reaches echo. Nothing else in the suite tests this.
+    prompt: (ctx) =>
+      `${PREAMBLE(ctx.cli)}\n\nIn runtime \`${ctx.prefix}-args\`, run \`echo\` so that it prints ` +
+      'exactly this line, and tell me what came back:\n\n```\n--json --verbose -h\n```\n\n' +
+      'Leave the runtime running.\n\n' +
+      `${ANSWER_RULE} The answer is the line that came back.`,
+    async grade(ctx, { answer, commands }) {
+      const notes: string[] = [];
+      const got = answer.replace(/[`'"]/g, '').trim();
+      let pass = check(notes, got === '--json --verbose -h', `answered '${got}'`);
+      const cli = commands.filter((c) => invokesCli(c, ctx.cli));
+      if (!cli.some((c) => c.includes(' -- '))) {
+        notes.push('never used a `--` separator; check how it got the arguments through');
+      }
+      const r = await ctx.api.get(ctx.state.id as string);
+      pass =
+        check(notes, !!r && r.status === 'running', `runtime ended ${r?.status ?? 'deleted'}`) &&
+        pass;
+      return { pass, notes };
+    },
+  },
+
+  {
+    id: 'T14',
+    title: 'The same question in three runtimes',
+    exercises: 'discovering which runtimes match, then pairing list output with a command in each',
+    async fixture(ctx) {
+      // Random suffixes and random sizes, so neither the names nor the numbers can be guessed
+      // from the prompt: the only route to both is `list` followed by an exec in each runtime.
+      const tag = () => Math.random().toString(36).slice(2, 7);
+      const vcpus = () => ([1, 2, 4] as const)[Math.floor(Math.random() * 3)] as number;
+      const made = await Promise.all(
+        [0, 1, 2].map(() =>
+          ctx.api.createRunning(
+            small(`${ctx.prefix}-fan-${tag()}`, {
+              resources: { requests: { vcpus: vcpus(), memory_mib: 512 } },
+            }),
+          ),
+        ),
+      );
+      // A decoy carrying the trial prefix but not `-fan`. Without it, "everything with my prefix"
+      // and "everything matching -fan" are the same set and the filter is never tested.
+      const decoy = await ctx.api.createRunning(small(`${ctx.prefix}-other-${tag()}`));
+      ctx.state.ids = made.map((r) => r.id);
+      ctx.state.decoy = decoy.display_name;
+    },
+    prompt: (ctx) =>
+      `${PREAMBLE(ctx.cli)}\n\nEvery runtime whose name starts with \`${ctx.prefix}-fan\` is ` +
+      'running. Write `./cpus.txt` with one line per runtime, `<name> <number>`, where the ' +
+      'number is what `nproc` prints inside that runtime. Sort the lines by name. Leave every ' +
+      'runtime running.\n\n' +
+      `${ANSWER_RULE} The answer is the total of the numbers.`,
+    async grade(ctx) {
+      const notes: string[] = [];
+      const raw = await readFile(join(ctx.workDir, 'cpus.txt'), 'utf8').catch(() => '');
+      if (!raw.trim()) return { pass: false, notes: ['cpus.txt missing or empty'] };
+      const lines = raw
+        .trim()
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
+      const truth = (await ctx.api.listByPrefix(`${ctx.prefix}-fan`)).sort((a, b) =>
+        a.display_name.localeCompare(b.display_name),
+      );
+      let pass = check(
+        notes,
+        lines.length === truth.length,
+        `${lines.length} lines, ${truth.length} runtimes`,
+      );
+      const decoy = ctx.state.decoy as string;
+      pass =
+        check(notes, !lines.some((l) => l.includes(decoy)), `included the decoy ${decoy}`) && pass;
+      pass =
+        check(
+          notes,
+          lines.join('\n') === [...lines].sort((a, b) => a.localeCompare(b)).join('\n'),
+          'lines are not sorted by name',
+        ) && pass;
+      for (const r of truth) {
+        const line = lines.find((l) => l.startsWith(r.display_name));
+        if (!line) {
+          notes.push(`missing ${r.display_name}`);
+          pass = false;
+          continue;
+        }
+        const n = Number(line.slice(r.display_name.length).trim());
+        pass =
+          check(
+            notes,
+            n === r.resources.requests.vcpus,
+            `${r.display_name} said ${n}, has ${r.resources.requests.vcpus}`,
+          ) && pass;
+      }
+      const running = truth.filter((r) => r.status === 'running').length;
+      pass =
+        check(
+          notes,
+          running === truth.length,
+          `${truth.length - running} runtime(s) not left running`,
+        ) && pass;
+      const decoyAlive = alive(
+        (await ctx.api.listByPrefix(ctx.prefix)).find((r) => r.display_name === decoy),
+      );
+      pass = check(notes, decoyAlive, `decoy ${decoy} was touched`) && pass;
       return { pass, notes };
     },
   },
