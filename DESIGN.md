@@ -107,23 +107,6 @@ convergence and from an ambiguity a person would trip over. The agent evidence a
 from a harness built for something else. Legibility is not a separate axis from agent-readiness; it
 is the same axis measured twice.
 
-### What it cost
-
-**No compatibility aliases** ([I-3](Improvements.md)). No `ps` for `list`, no `run` for `create`, no
-`rm` for `delete`. An alias hides a decision: `runta-next ps` silently working would mean nobody
-ever learns that `list` is the name, and the scope ambiguity would survive in the surface we removed
-it from. The cost is real and lands on exactly the person most likely to try us — someone arriving
-from the official CLI types `ps` and gets the command list instead of an answer
-([`FAILURE-AND-RECOVERY.md`](FAILURE-AND-RECOVERY.md) §3).
-
-**Agents never used the canonical form.** Across four runs, arm B invoked the top-level shortcut
-every single time — 15 `list`, 12 `create`, 9 `inspect`, 9 `delete` — and `runta-next runtime <verb>`
-exactly zero times. The shortcut was justified in I-2 as a human ergonomic. It turns out to be what
-agents reach for too, which means the noun-first form is currently earning its place through
-*predictability for nouns we have not shipped yet* rather than through use. That is a real
-justification, but it is a promise rather than a measurement, and it should be revisited once a
-second resource exists.
-
 ---
 
 ## 2. The insight
@@ -351,9 +334,17 @@ error bars.
 
 ## 7. Tradeoffs
 
-**No compatibility aliases (I-3),** and **the canonical noun-first form is currently unused by
-agents (I-2)** — both covered in [§1](#1-the-names-and-what-they-bought), which is where the naming
-decisions and their costs are argued in full.
+**No compatibility aliases (I-3).** No `ps` for `list`, no `run` for `create`, no `rm` for
+`delete`. An alias hides a decision: `runta-next ps` silently working would mean nobody ever learns
+that `list` is the name, and the scope ambiguity [§1](#1-the-names-and-what-they-bought) exists to
+remove would survive in the surface we removed it from. The cost lands on exactly the person most
+likely to try us — someone arriving from the official CLI types `ps` and gets the command list
+instead of an answer ([`FAILURE-AND-RECOVERY.md`](FAILURE-AND-RECOVERY.md) §3).
+
+**Runtimes are the only noun with a top-level shortcut (I-2).** Across four eval runs agents used
+the shortcut every time and `runta-next runtime <verb>` exactly zero times, so the canonical
+noun-first form is currently justified by predictability for nouns we have not shipped rather than
+by use. Worth revisiting once a second resource exists.
 
 **Explicit `--json` over implied.** Slightly more typing for scripts; identical behaviour in every
 context. We think predictability wins (C-08).
