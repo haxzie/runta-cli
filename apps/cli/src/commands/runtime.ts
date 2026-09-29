@@ -5,6 +5,7 @@ import {
   RuntaApiError,
   type RuntaClient,
   type Runtime,
+  type RuntimeImage,
 } from '@runta/api';
 import {
   createContext,
@@ -78,7 +79,6 @@ export interface CreateOptions {
   idleTimeout?: string;
   fromCheckpoint?: string;
   modelProviderProtocol?: string;
-  runtimeSignIn?: boolean;
   detach?: boolean;
   timeout?: string;
   json?: boolean;
@@ -89,16 +89,15 @@ export async function create(
   deps: CommandDeps = defaultDeps,
 ): Promise<void> {
   const { client } = await createContext();
-  const body = await run(() => createBody(client, options));
+  const { body, image } = await run(() => createBody(client, options));
 
-  let runtime = await run(async () => {
-    const { data } = await createRuntime({ client, body, throwOnError: true });
-    return data.data;
-  });
+  const attempt = await run(() => createWithSignInFallback(client, body, image));
+  let runtime = attempt.runtime;
+  const pending = attempt.signInPending;
 
   if (options.detach) {
-    emit(runtime, options.json, deps, `Creating runtime '${runtime.display_name}'.`, options);
-    printNextSteps(createNextSteps(runtime, false, options));
+    emit(runtime, options.json, deps, `Creating runtime '${runtime.display_name}'.`, pending);
+    printNextSteps(createNextSteps(runtime, false, pending));
     return;
   }
 
@@ -116,8 +115,8 @@ export async function create(
     ),
   );
 
-  emit(runtime, options.json, deps, describeCreated(runtime, options), options);
-  printNextSteps(createNextSteps(runtime, true, options));
+  emit(runtime, options.json, deps, describeCreated(runtime, pending), pending);
+  printNextSteps(createNextSteps(runtime, true, pending));
 }
 
 /**
@@ -127,7 +126,7 @@ export async function create(
 async function createBody(
   client: RuntaClient,
   options: CreateOptions,
-): Promise<Parameters<typeof createRuntime>[0]['body']> {
+): Promise<{ body: Parameters<typeof createRuntime>[0]['body']; image?: RuntimeImage }> {
   const common = {
     ...(options.name ? { name: options.name } : {}),
     ...(options.publish?.length ? { ingress_specs: options.publish.map(ingress) } : {}),
@@ -150,7 +149,9 @@ async function createBody(
         });
       }
     }
-    return { ...common, checkpoint_id: await resolveCheckpointId(client, options.fromCheckpoint) };
+    return {
+      body: { ...common, checkpoint_id: await resolveCheckpointId(client, options.fromCheckpoint) },
+    };
   }
 
   const requests = {
@@ -162,17 +163,22 @@ async function createBody(
     ? { memory_mib: int(options.memoryMax, '--memory-max') }
     : undefined;
 
+  const image = options.image ? await resolveImage(client, options.image) : undefined;
+
   return {
-    ...common,
-    ...(options.image ? { image: await imageSpec(client, options) } : {}),
-    ...(Object.keys(requests).length || limits
-      ? {
-          resources: {
-            ...(Object.keys(requests).length ? { requests } : {}),
-            ...(limits ? { limits } : {}),
-          },
-        }
-      : {}),
+    image,
+    body: {
+      ...common,
+      ...(image ? { image: imageSpec(image, options) } : {}),
+      ...(Object.keys(requests).length || limits
+        ? {
+            resources: {
+              ...(Object.keys(requests).length ? { requests } : {}),
+              ...(limits ? { limits } : {}),
+            },
+          }
+        : {}),
+    },
   };
 }
 
@@ -182,42 +188,55 @@ async function createBody(
  * An image that fronts a model provider is refused without one — 12 of the 13 images do — and four
  * bind exactly one protocol, so it is inferred when unambiguous rather than demanded.
  */
-async function imageSpec(
-  client: RuntaClient,
+function imageSpec(
+  image: RuntimeImage,
   options: CreateOptions,
-): Promise<{ id: string; model_provider_protocol?: string; runtime_sign_in?: boolean }> {
-  const image = await resolveImage(client, options.image as string);
+): { id: string; model_provider_protocol?: string } {
   const protocol = modelProviderProtocol(image, options.modelProviderProtocol);
-
-  // Refuse up front on an image that cannot be signed into, rather than sending a field the API
-  // will either reject confusingly or accept and ignore.
-  if (options.runtimeSignIn && !image.model_provider?.allow_runtime_sign_in) {
-    fail(`Image '${image.id}' does not support signing in inside the runtime.`, {
-      exitCode: 2,
-      hint: image.model_provider
-        ? 'Connect a model provider at https://dashboard.runta.com instead.'
-        : 'That image needs no credential, so --runtime-sign-in has nothing to do.',
-    });
-  }
-
-  return {
-    id: image.id,
-    ...(protocol ? { model_provider_protocol: protocol } : {}),
-    ...(options.runtimeSignIn ? { runtime_sign_in: true } : {}),
-  };
+  return { id: image.id, ...(protocol ? { model_provider_protocol: protocol } : {}) };
 }
 
+/** The API's wording when an image needs a model-provider credential and none was supplied. */
+const NEEDS_CREDENTIAL = /which no secret in this request populates/;
+
 /**
- * Whether this runtime came up with an agent that still has to be signed into.
+ * Creates the runtime, falling back to an in-runtime sign-in when the API says it needs a
+ * credential nobody supplied.
  *
- * `--runtime-sign-in` is a *waiver*, not a provisioning step: it tells the API not to demand a
- * credential at create time, and the runtime then starts with none. The production CLI's flag
- * promises to "configure provider authentication inside the Runtime" and configures nothing, so
- * you get `status: running`, `degraded: false`, `error_code: null` and an agent that prints
- * "Not logged in" — invisible to `inspect`, to `list`, and to the output of the flag that caused
- * it (CLI_ISSUES.md C-33). Saying so is the whole point of supporting the flag at all.
+ * There is no flag for this. An image either needs a credential or it does not, and if it does,
+ * the only two outcomes are "something injected one" and "you will sign in inside the box" — so
+ * asking the user to spell the second one out is asking them to restate the situation back to us.
+ * The production CLI's `--runtime-sign-in` is a flag on every `run`, relevant to a minority of
+ * images, that does nothing at all on the rest.
+ *
+ * Deliberately a retry on the refusal rather than a field sent up front. When the organization has
+ * a matching model provider the API injects it and never refuses, and sending the waiver eagerly
+ * could waive that injection too — a regression for exactly the users who set one up. The refusal
+ * is fast (~2s measured), and it only happens when there is genuinely nothing to inject.
  */
-const signInPending = (options: CreateOptions): boolean => options.runtimeSignIn === true;
+async function createWithSignInFallback(
+  client: RuntaClient,
+  body: Parameters<typeof createRuntime>[0]['body'],
+  image: RuntimeImage | undefined,
+): Promise<{ runtime: Runtime; signInPending: boolean }> {
+  try {
+    const { data } = await createRuntime({ client, body, throwOnError: true });
+    return { runtime: data.data, signInPending: false };
+  } catch (error) {
+    if (!(error instanceof RuntaApiError) || !NEEDS_CREDENTIAL.test(error.message)) throw error;
+
+    // Only images that say they allow it; anything else keeps the API's refusal, translated.
+    // The image was already resolved to build the body, so this costs no extra request.
+    if (!image?.model_provider?.allow_runtime_sign_in) throw error;
+
+    const retry = {
+      ...body,
+      image: { ...(body as { image?: object }).image, runtime_sign_in: true },
+    } as typeof body;
+    const { data } = await createRuntime({ client, body: retry, throwOnError: true });
+    return { runtime: data.data, signInPending: true };
+  }
+}
 
 const ingress = (spec: string): { protocol: 'http' | 'https'; runtime_port: number } => {
   const match = /^(\d+)\/(https?)$/.exec(spec);
@@ -959,14 +978,13 @@ function emit(
   json: boolean | undefined,
   deps: CommandDeps,
   message: string,
-  options?: CreateOptions,
+  signInPending = false,
 ): void {
   if (json) {
     // The runtime object is the API's own and says nothing about a pending sign-in — there is no
     // field for it — so the one caller who can know adds it. An agent branching on `status` alone
     // would otherwise call this runtime ready.
-    const payload =
-      options && signInPending(options) ? { ...runtime, sign_in_pending: true } : runtime;
+    const payload = signInPending ? { ...runtime, sign_in_pending: true } : runtime;
     deps.write(`${JSON.stringify(payload, null, 2)}\n`);
     return;
   }
@@ -974,9 +992,9 @@ function emit(
 }
 
 /** `describe`, plus the one thing the runtime object cannot tell you. */
-function describeCreated(runtime: Runtime, options: CreateOptions): string {
+function describeCreated(runtime: Runtime, signInPending: boolean): string {
   const base = describe(runtime);
-  if (!signInPending(options)) return base;
+  if (!signInPending) return base;
   return `${base}\nIts agent is installed but not signed in yet.`;
 }
 
@@ -991,17 +1009,13 @@ function describe(runtime: Runtime): string {
 }
 
 /** What to do with a runtime that was just created. */
-function createNextSteps(
-  runtime: Runtime,
-  waited: boolean,
-  options: CreateOptions = {},
-): NextStep[] {
+function createNextSteps(runtime: Runtime, waited: boolean, signInPending = false): NextStep[] {
   const name = runtime.display_name;
   const steps: NextStep[] = [];
 
   // First, because nothing else about the runtime matters until its agent can reach a model.
   // Interactive by necessity: the sign-in is an OAuth flow that needs a human at a terminal.
-  if (waited && signInPending(options)) {
+  if (waited && signInPending) {
     // A shell rather than the agent binary: each image ships a different one (`claude`, `codex`,
     // `opencode` …) and naming the wrong one is worse than naming none. Interactive by necessity —
     // the sign-in is an OAuth flow that needs a human at a terminal.
@@ -1061,10 +1075,6 @@ function addRuntimeVerbs(parent: Command): void {
     .option(
       '--model-provider-protocol <protocol>',
       'required by images that front a model provider; inferred when the image binds only one',
-    )
-    .option(
-      '--runtime-sign-in',
-      'skip the credential check and sign the agent in inside the runtime instead',
     )
     .option('-d, --detach', 'return as soon as creation is accepted, without waiting')
     .option('--timeout <secs>', 'how long to wait before giving up (default 180)')

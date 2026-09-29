@@ -1094,6 +1094,26 @@ plainly in `run`'s output that the runtime is up but authentication is pending, 
 command as the next step. Surface the state on the runtime object so `inspect` can be trusted, and
 consider `degraded: true` until an agent runtime can actually reach a model.
 
+### The flag is also the wrong shape
+
+Separately from what it does: `--runtime-sign-in` is a flag on **every** `runta run`, and it is
+applicable only to images whose catalog entry sets `allow_runtime_sign_in`. On `clean` — the
+default image — it means nothing. On an image that fronts a provider but forbids signing in, it is
+a promise the image cannot keep. A flag that is inapplicable to most invocations of the command it
+hangs off makes the surface read as larger than the problem, and gives a reader no way to tell
+which commands it is for without consulting the image catalog — which `runta image ls` will not
+show, since it lists only images you built yourself.
+
+It also asks the caller to restate something the tool already knows. An image either needs a
+credential or it does not; when it does, the outcomes are "something injected one" or "you sign in
+inside the box", and the API says which in its refusal. Requiring a flag to express the second is
+the same defect as requiring `--model-provider-protocol` for an image that binds exactly one.
+
+**What ours does.** No flag. `create` sends the request, and on the API's *"which no secret in this
+request populates"* refusal it retries once with the waiver when the image allows it — then reports
+that the agent is not signed in yet, puts the sign-in first in the next steps, and adds
+`sign_in_pending: true` to `--json`. Recorded as `Improvements.md` I-11.
+
 ### C-34 — The runtime argument is a flag on two commands and positional on 34
 _Severity: medium. Extends [C-26](#c-26-verb-and-convention-salad-across-84-commands)._
 
