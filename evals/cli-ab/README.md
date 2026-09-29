@@ -109,10 +109,19 @@ Each trial has four steps:
 | T12 | Run `hostname` in `P-ghost`, which does not exist | the failure path — a clear not-found error, and not inventing a way around it | Said it was missing, and created nothing |
 | T13 | Make `echo` print `--json --verbose -h` inside `P-args` | the argument boundary: the CLI must pass the flags through, not act on them | The line came back verbatim |
 | T14 | Write `./cpus.txt` with `<name> <nproc>` for each of three `P-fan-*` runtimes, sorted | discovering which runtimes match, then pairing list output with a command in each | Every count matches the API; sorted; decoy excluded and untouched; all left running |
+| T15 | List the images you can create from, say how many, and name one that needs a model provider and one that does not | the image catalog. The official `image ls` lists only images you built, so it answers `[]` — scored outside the head-to-head | The count, plus an id from each side of the split |
+| T16 | Create `P-agent` from `claude`, say whether its agent could answer a prompt right now, delete it | honest reporting of a half-ready runtime (C-33) | Answered `no` **and** named authentication; nothing left behind |
 
 Tasks and graders are in [src/tasks.ts](src/tasks.ts). Graders marked **review** are regex
-judgements (T1 with an org key, T5 when awk looks local, T11's `kept`/`gone` phrasing). Read those
-transcripts before trusting the number.
+judgements (T1 with an org key, T5 when awk looks local, T11's `kept`/`gone` phrasing, T16's
+reason). Read those transcripts before trusting the number.
+
+T16 is the one task where the *correct* answer is the pessimistic one. Both CLIs build the runtime
+and both report `status: running`, `degraded: false`, `error_code: null` — so an agent that checks
+status says "yes" and is wrong: the agent inside prints `Not logged in`. runta-next says so in
+`create`'s own output; the official CLI says nothing, and its `--runtime-sign-in` help claims to
+have configured the authentication it did not. The grader is marked **review** because an agent can
+reach "no" by guessing rather than probing, and the transcript is the only way to tell.
 
 T11's expected answer comes from a probe on 2026-09-29: a stop/start wipes `/tmp` but keeps `/root`,
 which sits on the writable overlay. An agent that assumes a restart preserves everything, or that it
@@ -169,6 +178,18 @@ Pass/fail comes from the grader. The rest comes from the `stream-json` transcrip
 Both arms share one tenant. Trials run one at a time by default, and each trial alternates which
 arm goes first. `--concurrency N` is faster, but then agents see each other's runtimes in `list`
 output. That noise hits both arms equally, but it does make the tasks harder.
+
+### Past results predate `auto` output
+
+Arm B's output contract changed in 0.9.0. It used to require an explicit `--json`; it now defaults
+to `auto` — a table on a terminal, JSON anywhere else. **The harness runs both CLIs without a TTY**,
+so from 0.9.0 onward `runta-next list` hands the agent JSON where earlier runs handed it a table.
+
+That is not a small difference for an eval about how much an agent has to read. It changes the
+bytes in `cliOutputChars`, it may change whether an agent reaches for `--json` at all, and it makes
+both arms behave the same way off-TTY where they used to differ. Every number in
+[FINDINGS.md](FINDINGS.md) was measured before it. **Do not compare a new run against those totals**
+— re-run both arms.
 
 ### T1 depends on the credential
 

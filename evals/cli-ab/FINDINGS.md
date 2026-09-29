@@ -4,6 +4,12 @@ Results and analysis from running [the eval](README.md). This file records what 
 what it means; it is not an audit of the official CLI. Audit findings live in
 [`CLI_ISSUES.md`](../../CLI_ISSUES.md) as `C-NN` points, and nothing here has been added there.
 
+> **These runs predate runta-next 0.9.0.** Output then required an explicit `--json`; it now
+> defaults to `auto`, and the harness runs without a TTY, so arm B is handed JSON where these runs
+> were handed a table. That moves `cliOutputChars` and may move turn counts. The totals below are
+> still the record of what happened; they are not a baseline for a new run. Tasks T15 and T16 were
+> also added afterwards and appear in none of them.
+
 ## Run `full1` — 2026-09-29
 
 Nine tasks, both arms, one trial each. Model `claude-sonnet-5`. Arm A is the official

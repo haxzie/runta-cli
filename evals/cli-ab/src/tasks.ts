@@ -1,9 +1,14 @@
 /**
  * The tasks both agents get, their fixtures, and their graders.
  *
- * Every task stays inside what runta-next implements today — create, list, inspect, delete, exec
- * and whoami — so the comparison is like for like. Prompts name the CLI but never a flag: working
- * out the flags is what's being measured.
+ * Every task stays inside what runta-next implements today — create, list, inspect, delete, exec,
+ * whoami, the lifecycle verbs and `image list` — so the comparison is like for like. Prompts name
+ * the CLI but never a flag: working out the flags is what's being measured.
+ *
+ * Two tasks are scored in their own column because the official CLI cannot reach the answer at
+ * all: T1 (it has no `whoami`, C-20) and T15 (its `image ls` lists only images you built, so the
+ * catalog is invisible). Those are capability gaps, not speed differences, and mixing them into
+ * the head-to-head totals would flatter us.
  *
  * Graders judge the tenant's real state through the REST API (see api.ts), plus the agent's final
  * `ANSWER:` line. Where a regex can't fully judge an answer, the grade is marked `review` so a
@@ -656,6 +661,91 @@ export const TASKS: Task[] = [
       );
       pass = check(notes, decoyAlive, `decoy ${decoy} was touched`) && pass;
       return { pass, notes };
+    },
+  },
+  {
+    id: 'T15',
+    title: 'Which images can I build from',
+    exercises: 'the image catalog; the official `image ls` shows only images you built yourself',
+    capabilityGap: true,
+    async fixture(ctx) {
+      ctx.state.images = await ctx.api.images();
+    },
+    prompt: (ctx) =>
+      `${PREAMBLE(ctx.cli)}\n\nList the runtime images available to create from, and say how many ` +
+      'there are. Then name one that needs a model-provider credential and one that does not.\n\n' +
+      `${ANSWER_RULE} Format: \`<count> | <needs a provider> | <needs none>\`.`,
+    async grade(ctx, { answer }) {
+      const images = ctx.state.images as { id: string; needsProvider: boolean }[];
+      const notes: string[] = [];
+
+      // The count is the part that separates reading the catalog from guessing: the official CLI
+      // answers `[]` here, so an agent that trusts it reports zero or invents a list.
+      let pass = check(
+        notes,
+        new RegExp(`\\b${images.length}\\b`).test(answer),
+        `expected the count ${images.length}`,
+      );
+
+      const named = (ids: string[]) => ids.some((id) => new RegExp(`\\b${id}\\b`).test(answer));
+      pass =
+        check(
+          notes,
+          named(images.filter((i) => i.needsProvider).map((i) => i.id)),
+          'named no image that needs a model provider',
+        ) && pass;
+      pass =
+        check(
+          notes,
+          named(images.filter((i) => !i.needsProvider).map((i) => i.id)),
+          'named no image that needs none',
+        ) && pass;
+      return { pass, notes };
+    },
+  },
+
+  {
+    id: 'T16',
+    title: 'Is the agent in this runtime actually usable',
+    exercises:
+      'honest reporting of a half-ready runtime — the runtime runs, its agent is not signed in ' +
+      '(C-33). Both CLIs can build it; only one says so.',
+    async fixture(ctx) {
+      const images = await ctx.api.images();
+      ctx.state.agentImage = images.find((i) => i.id === 'claude') ? 'claude' : undefined;
+    },
+    prompt: (ctx) =>
+      `${PREAMBLE(ctx.cli)}\n\nCreate a runtime named \`${ctx.prefix}-agent\` from the \`claude\` ` +
+      'image. Then determine whether the Claude Code agent inside it could actually answer a ' +
+      'prompt right now, and say why or why not. Delete the runtime when you are done.\n\n' +
+      `${ANSWER_RULE} Format: \`yes\` or \`no — <reason>\`.`,
+    async grade(ctx, { answer, seen }) {
+      const notes: string[] = [];
+      if (!ctx.state.agentImage) {
+        return { pass: false, notes: ['the claude image is not in this tenant catalog'] };
+      }
+
+      const made = Object.values(seen).find((r) => r.name === `${ctx.prefix}-agent`);
+      let pass = check(notes, !!made, `never saw a runtime named ${ctx.prefix}-agent`);
+      if (made) {
+        pass = check(notes, made.image_id === 'claude', `image ${made.image_id}`) && pass;
+      }
+
+      // The whole point. The runtime reaches `running` with `degraded: false` and an agent that
+      // prints "Not logged in", so "yes" is the answer a status check gives and the wrong one.
+      const saidNo = /^\s*no\b/i.test(answer);
+      pass = check(notes, saidNo, 'claimed the agent is usable; it is not signed in') && pass;
+      pass =
+        check(
+          notes,
+          /sign|log ?in|auth|credential|api[ -]?key|provider/i.test(answer),
+          'said no without naming authentication as the reason',
+        ) && pass;
+
+      const left = await aliveWithPrefix(ctx);
+      pass = check(notes, left.length === 0, `left behind: ${names(left)}`) && pass;
+      // An agent could reach the right answer by a wrong route — guessing rather than probing.
+      return { pass, notes, review: true };
     },
   },
 ];

@@ -193,6 +193,56 @@ describe('graders', () => {
     expect(g.notes.join()).toContain('ev-t-keep-tmp was deleted');
   });
 
+  it('T15 wants the count and one image from each side of the provider split', async () => {
+    const images = [
+      { id: 'clean', name: 'Clean runtime', needsProvider: false },
+      { id: 'claude', name: 'Claude Code', needsProvider: true },
+    ];
+    const c = ctx([], { state: { images } });
+
+    expect((await task('T15').grade(c, outcome({ answer: '2 | claude | clean' }))).pass).toBe(true);
+
+    // The count is what separates reading the catalog from trusting `image ls`, which answers []
+    // on a tenant with no custom images.
+    const zero = await task('T15').grade(c, outcome({ answer: '0 | none | none' }));
+    expect(zero.pass).toBe(false);
+    expect(zero.notes.join()).toContain('expected the count 2');
+
+    const oneSided = await task('T15').grade(c, outcome({ answer: '2 | claude | claude' }));
+    expect(oneSided.pass).toBe(false);
+    expect(oneSided.notes.join()).toContain('needs none');
+  });
+
+  it('T16 fails an agent that calls a half-ready runtime usable', async () => {
+    const seen = {
+      a: {
+        name: 'ev-t-agent',
+        image_id: 'claude',
+        vcpus: 2,
+        memory_mib: 2048,
+        statuses: ['creating', 'running'] as Runtime['status'][],
+      },
+    };
+    const c = ctx([], { state: { agentImage: 'claude' } });
+
+    // `status: running`, `degraded: false` — the answer a status check gives, and wrong.
+    const optimistic = await task('T16').grade(c, outcome({ answer: 'yes', seen }));
+    expect(optimistic.pass).toBe(false);
+    expect(optimistic.notes.join()).toContain('not signed in');
+
+    const correct = await task('T16').grade(
+      c,
+      outcome({ answer: 'no — Claude Code is installed but not signed in', seen }),
+    );
+    expect(correct.pass).toBe(true);
+    // Right answer, possibly wrong route: a human reads this one.
+    expect(correct.review).toBe(true);
+
+    // "No" for an unrelated reason does not count.
+    const vague = await task('T16').grade(c, outcome({ answer: 'no — it looked slow', seen }));
+    expect(vague.pass).toBe(false);
+  });
+
   it('T8 passes only when the ambiguity is reported', async () => {
     const c = ctx([], { state: { ids: ['aaa', 'bbb'] } });
     expect((await task('T8').grade(c, outcome({ result: 'It printed 1.\nANSWER: 1' }))).pass).toBe(
