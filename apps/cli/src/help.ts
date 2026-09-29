@@ -20,12 +20,12 @@ interface Group {
 }
 
 /**
- * The human docs, and the same content as one plain-text document for agents. Naming the second
- * one in `--help` is the point: an agent that reads help can fetch the whole manual in one request
- * instead of scraping rendered HTML page by page.
+ * Root help stays a command index: usage, who you are signed in as, the commands, the global
+ * flags, and where the rest lives. Everything that explains *how* a command behaves belongs to
+ * that command's own `--help`, where it is read at the moment it matters rather than scrolled
+ * past on the way to the command list.
  */
 const DOCS_URL = 'https://runta.haxzie.com/docs';
-const LLMS_URL = `${DOCS_URL}/llms-full.txt`;
 
 const GROUPS: Group[] = [
   {
@@ -49,18 +49,6 @@ const USAGE: Record<string, string> = {
   pause: 'pause <runtime>',
   help: 'help [command]',
 };
-
-const EXAMPLES: [string, string?][] = [
-  ['runta-next login'],
-  ['runta-next image list', 'what create can build from'],
-  ['runta-next create --name demo --cpus 1 --memory 512'],
-  ['runta-next exec demo -- uname -a'],
-  ['runta-next exec demo -it -- sh', 'interactive shell'],
-  ['runta-next list --json', 'machine-readable'],
-  ['runta-next delete demo --dry-run', 'show what would go, change nothing'],
-  ['runta-next create --name demo --detach', 'do not wait for it to be ready'],
-  ['runta-next upgrade --check', 'is there a newer version?'],
-];
 
 /**
  * Bold only where escapes will render. Commander also strips styling when it decides colours are
@@ -141,33 +129,6 @@ export function rootHelp(
     lines.push(`  ${option.flags.padEnd(width)}  ${option.description}`);
   }
   lines.push(`  ${'-h, --help'.padEnd(width)}  Show this help`);
-
-  lines.push('');
-  lines.push(bold('For agents:', colour));
-  lines.push('  Output defaults to a table on a terminal and JSON anywhere else, so a pipe is');
-  lines.push('  already JSON. Pass --json (or -o json) to pin it and never depend on detection;');
-  lines.push('  -o table forces the table back. Narrow a large payload with --fields, so you');
-  lines.push('  read only what you need. Branch on exit codes rather than message text — codes');
-  lines.push(`  are stable, wording is not. Set RUNTA_TOKEN to skip ${name} login entirely.`);
-  lines.push(`  Every page of the docs is also served as plain text: ${LLMS_URL}`);
-
-  lines.push('');
-  lines.push(bold('Waiting:', colour));
-  lines.push('  Commands that change a runtime wait for the change to finish before they return,');
-  lines.push('  so success means the runtime really is in the state you asked for. create waits');
-  lines.push('  until it can accept commands; start, stop, pause and delete wait for the');
-  lines.push('  transition to settle. --timeout <secs> caps the wait (default 180).');
-  lines.push('  Pass -d/--detach to return as soon as the request is accepted. That is a');
-  lines.push('  receipt, not a state: the status you get back is the one at acceptance, so a');
-  lines.push('  detached create reads `creating` and a detached stop still reads `running`.');
-  lines.push(`  Poll ${name} inspect if you need to know when it settled.`);
-
-  lines.push('');
-  lines.push(bold('Examples:', colour));
-  for (const [example, note] of EXAMPLES) {
-    const padded = note ? example.padEnd(46) : example;
-    lines.push(`  ${dim('$', colour)} ${padded}${note ? dim(`# ${note}`, colour) : ''}`);
-  }
 
   lines.push('');
   lines.push(`Docs: ${dim(DOCS_URL, colour)}`);

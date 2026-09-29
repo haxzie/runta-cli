@@ -498,3 +498,65 @@ filtering in the shell. Trimming columns off a full listing saves much less than
 of the listing would. If we act on this, `inspect --fields` and row filtering are the candidates,
 and neither should be built without a measurement first. This entry exists partly as a reminder
 that the last one was built without one.
+
+---
+
+## I-11 — An in-runtime sign-in is a fallback, not a flag
+
+**Status:** decided, 2026-09-29, and implemented. **Closes** the question I-7 deliberately left
+open.
+
+I-7 ends by saying the `--runtime-sign-in` path "stays open rather than being assumed fixed". This
+is that path, and the decision is that it should not be a flag at all.
+
+The production CLI exposes it as `runta run --runtime-sign-in`. Three things are wrong with that
+shape, and only the first is a bug:
+
+1. **It promises what it does not do.** Its help reads "Configure provider authentication inside
+   the Runtime". It configures nothing — it waives the API's credential check, and the runtime
+   starts with no credential at all. That is `CLI_ISSUES.md` C-33.
+2. **It over-standardises.** It is a flag on every `run`, relevant only to images whose catalog
+   entry sets `allow_runtime_sign_in`. On `clean` it is meaningless; on an image that fronts a
+   provider but forbids it, it is a lie. A flag that is inapplicable to most invocations of the
+   command it hangs off teaches the reader that the surface is bigger than the problem.
+3. **It asks the user to restate the situation.** An image either needs a credential or it does
+   not. When it does, there are exactly two outcomes: something injected one, or you will sign in
+   inside the box. The CLI knows which, because the API just told it. Requiring a flag is
+   requiring the user to repeat information the tool is already holding — the same objection I-7
+   raised against demanding `--model-provider-protocol` for an image that binds one protocol.
+
+So there is no flag. `create` sends the request; if the API refuses with *"which no secret in this
+request populates"* and the image allows signing in, it retries once with the waiver and reports
+what actually happened:
+
+```console
+$ runta-next create --name demo --image claude
+Runtime 'demo' is running.
+Its agent is installed but not signed in yet.
+
+Next steps:
+  runta-next exec demo -it -- bash  start the agent and sign in with /login
+```
+
+### Why a retry rather than always sending it
+
+Sending the waiver up front would be one fewer round trip, and was the first thing I tried. It is
+wrong: when the organization has a matching model provider the API injects it and never refuses, so
+an eager waiver could waive that injection too — a regression for precisely the users who set one
+up. We have no tenant with a provider configured to test against, which makes the eager version a
+guess and the retry version an observation. The refusal is fast (~2s measured), and it only happens
+when there is genuinely nothing to inject.
+
+The image is already resolved to build the request body, so the retry path costs no extra lookup.
+
+### What it commits us to
+
+Saying so, every time. The runtime comes up `status: running`, `degraded: false`, `error_code:
+null` with an agent that prints `Not logged in`, and the API's runtime object has **no field** that
+distinguishes it from a working one. So the CLI adds `sign_in_pending: true` to `create --json`,
+and the prose says it outright. `inspect` cannot know and does not pretend to — which is a real
+limit, and the reason C-33's recommendation to "surface the state on the runtime object" is aimed
+at the API rather than at us.
+
+The next step names a shell rather than an agent binary. Each image ships a different one —
+`claude`, `codex`, `opencode` — and naming the wrong one is worse than naming none.

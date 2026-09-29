@@ -1,5 +1,5 @@
 import type { Runtime } from '@runta/api';
-import { isCliError, setLogLevel } from '@runta/utils';
+import { isCliError, logger, setLogLevel } from '@runta/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { captureStdout, isolateEnv, type Route, stubFetch } from '../test/harness.js';
 import {
@@ -119,6 +119,133 @@ const bodyOf = async (request: Request): Promise<Record<string, unknown>> =>
   JSON.parse(await request.text()) as Record<string, unknown>;
 
 // ------------------------------------------------------------------ create
+
+describe('create falls back to an in-runtime sign-in', () => {
+  /** An image that fronts a provider and allows an in-runtime sign-in, like `claude`. */
+  const signInImage = [
+    {
+      id: 'claude',
+      name: 'Claude Code',
+      model_provider: {
+        allow_runtime_sign_in: true,
+        protocol_bindings: [{ protocol: 'anthropic_messages' }],
+      },
+    },
+  ] as never;
+
+  /** The refusal the API gives when nothing populates the image's credential variable. */
+  const NO_CREDENTIAL = POST(
+    {
+      error: {
+        code: 'invalid_argument',
+        message:
+          'the selected runtime image reads its model-provider credential from ' +
+          'ANTHROPIC_API_KEY, which no secret in this request populates',
+      },
+    },
+    422,
+  );
+
+  it('retries with runtime_sign_in after the API refuses', async () => {
+    const { stub, deps } = harness([
+      IMAGES(signInImage),
+      NO_CREDENTIAL,
+      IMAGES(signInImage),
+      POST({ data: runtime() }),
+      GET({ data: runtime() }),
+    ]);
+
+    await create({ image: 'claude' }, deps);
+
+    const posts = stub.calls.filter((c) => c.method === 'POST');
+    expect(posts).toHaveLength(2);
+    expect((await bodyOf(posts[0] as Request)).image).not.toHaveProperty('runtime_sign_in');
+    expect((await bodyOf(posts[1] as Request)).image).toMatchObject({ runtime_sign_in: true });
+  });
+
+  /**
+   * Eagerly sending the waiver would risk waiving the organization's own provider injection —
+   * a regression for exactly the users who configured one. The happy path must stay one call.
+   */
+  it('sends nothing extra when the first attempt succeeds', async () => {
+    const { stub, deps } = harness([
+      IMAGES(signInImage),
+      POST({ data: runtime() }),
+      GET({ data: runtime() }),
+    ]);
+
+    await create({ image: 'claude' }, deps);
+
+    const posts = stub.calls.filter((c) => c.method === 'POST');
+    expect(posts).toHaveLength(1);
+    expect((await bodyOf(posts[0] as Request)).image).not.toHaveProperty('runtime_sign_in');
+  });
+
+  it('says the agent is not signed in yet', async () => {
+    const { deps } = harness([
+      IMAGES(signInImage),
+      NO_CREDENTIAL,
+      IMAGES(signInImage),
+      POST({ data: runtime() }),
+      GET({ data: runtime() }),
+    ]);
+    const success = vi.spyOn(logger, 'success').mockImplementation(() => {});
+
+    await create({ image: 'claude' }, deps);
+
+    expect(success.mock.calls.flat().join(' ')).toMatch(/not signed in yet/);
+  });
+
+  it('adds sign_in_pending to the JSON, which the runtime object has no field for', async () => {
+    const { out, deps } = harness([
+      IMAGES(signInImage),
+      NO_CREDENTIAL,
+      IMAGES(signInImage),
+      POST({ data: runtime() }),
+      GET({ data: runtime() }),
+    ]);
+
+    await create({ image: 'claude', json: true }, deps);
+
+    const payload = JSON.parse(out.text) as Record<string, unknown>;
+    expect(payload.sign_in_pending).toBe(true);
+    expect(payload.status).toBe('running');
+  });
+
+  it('leaves the JSON untouched when no fallback was needed', async () => {
+    const { out, deps } = harness([
+      IMAGES(signInImage),
+      POST({ data: runtime() }),
+      GET({ data: runtime() }),
+    ]);
+
+    await create({ image: 'claude', json: true }, deps);
+
+    expect(JSON.parse(out.text)).not.toHaveProperty('sign_in_pending');
+  });
+
+  // `clean` needs no credential, so it never produces this refusal; an image that fronts a
+  // provider but forbids signing in keeps the API's refusal, translated.
+  it('keeps the refusal for an image that cannot be signed into', async () => {
+    const noSignIn = [
+      {
+        id: 'locked',
+        name: 'Locked',
+        model_provider: {
+          allow_runtime_sign_in: false,
+          protocol_bindings: [{ protocol: 'anthropic_messages' }],
+        },
+      },
+    ] as never;
+    const { stub, deps } = harness([IMAGES(noSignIn), NO_CREDENTIAL, IMAGES(noSignIn)]);
+
+    const error = await create({ image: 'locked' }, deps).catch((e: unknown) => e);
+
+    expect(isCliError(error)).toBe(true);
+    expect((error as { hint?: string }).hint).toMatch(/dashboard\.runta\.com/);
+    expect(stub.calls.filter((c) => c.method === 'POST')).toHaveLength(1);
+  });
+});
 
 describe('create', () => {
   it('waits until the runtime is running and reports how to use it', async () => {
