@@ -11,6 +11,8 @@
     "SCRIPT_PATH": "scripts/install.sh"
   },
   // A custom domain rather than a route pattern: this Worker owns the hostname outright, and
-  // Cloudflare manages the DNS record and certificate for it.
-  "routes": [{ "pattern": "runta.haxzie.com", "custom_domain": true }]
+  // Cloudflare manages the DNS record and certificate for it. That ownership is why the docs are
+  // reached by service binding below rather than by routing a second Worker at the same host.
+  "routes": [{ "pattern": "runta.haxzie.com", "custom_domain": true }],
+  "services": [{ "binding": "DOCS", "service": "runta-next-docs" }]
 }

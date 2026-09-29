@@ -136,7 +136,7 @@ describe('the agent section', () => {
 
 describe('the docs pointer', () => {
   it('names the docs site, so a reader can go deeper than --help', () => {
-    expect(plain()).toContain('https://runta-cli.haxzie.com/docs');
+    expect(plain()).toContain('https://runta.haxzie.com/docs');
   });
 
   /**
@@ -145,7 +145,7 @@ describe('the docs pointer', () => {
    */
   it('points agents at the plain-text rendering of the whole site', () => {
     const text = plain();
-    expect(text).toContain('https://runta-cli.haxzie.com/docs/llms-full.txt');
+    expect(text).toContain('https://runta.haxzie.com/docs/llms-full.txt');
     expect(text.indexOf('llms-full.txt')).toBeGreaterThan(text.indexOf('For agents:'));
   });
 });

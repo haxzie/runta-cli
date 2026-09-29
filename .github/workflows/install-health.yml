@@ -54,6 +54,14 @@ jobs:
             exit 1
           }
 
+      - name: The docs are served from the same host
+        run: |
+          status=$(curl -sS -o /dev/null -w '%{http_code}' https://runta.haxzie.com/docs/)
+          [ "$status" = "200" ] || {
+            echo "::error::/docs/ returned $status, expected 200"
+            exit 1
+          }
+
       - name: A bad ref is refused rather than fetched
         run: |
           status=$(curl -sS -o /dev/null -w '%{http_code}' \

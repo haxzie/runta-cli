@@ -231,3 +231,74 @@ describe('documented commands and flags exist', () => {
     expect(longFlagsOf(resolve(program, ['create']).command).has('--checkpoint')).toBe(false);
   });
 });
+
+/**
+ * The other direction.
+ *
+ * The suite above checks docs -> binary: nothing documented may be invented. That catches a flag
+ * the docs made up; it cannot catch a flag the docs never mention. `--fields` was documented by
+ * hand when it shipped, which worked, but "remembered to" is not a property — the whole reason
+ * `CLI_ISSUES.md` C-05 and C-30 exist upstream is that a generated artefact drifted from the
+ * binary and no test noticed.
+ */
+describe('every command and flag is documented', () => {
+  /** Where a command's flags are expected to be written down. */
+  const PAGE_FOR: Record<string, string> = {
+    create: 'create.md',
+    list: 'list.md',
+    inspect: 'inspect.md',
+    exec: 'exec.md',
+    delete: 'delete.md',
+    login: 'login.md',
+    logout: 'logout.md',
+    whoami: 'whoami.md',
+    upgrade: 'upgrade.md',
+    // The three lifecycle verbs share one page, because their argument and output shapes are the
+    // same story told three times (Improvements.md I-9).
+    start: 'lifecycle.md',
+    stop: 'lifecycle.md',
+    pause: 'lifecycle.md',
+  };
+
+  /** Commands that are deliberately not user-facing pages of their own. */
+  const NO_PAGE = new Set([
+    'help', // Commander's built-in.
+    'runtime', // The noun-first group; its verbs are documented individually.
+  ]);
+
+  const topLevel = (): readonly Command[] => buildProgram().commands;
+
+  it('covers every top-level command', () => {
+    const undocumented = topLevel()
+      .map((c) => c.name())
+      .filter((name) => !NO_PAGE.has(name) && !PAGE_FOR[name]);
+
+    expect(undocumented).toEqual([]);
+  });
+
+  it('writes every long flag down on that command’s own page', () => {
+    const missing: string[] = [];
+
+    for (const command of topLevel()) {
+      const page = PAGE_FOR[command.name()];
+      if (!page) continue;
+      const text = readFileSync(join(DOCS, 'commands', page), 'utf8');
+      for (const flag of longFlagsOf(command)) {
+        // Commander adds `--help` everywhere; documenting it on every page would be noise.
+        if (flag === '--help') continue;
+        if (!text.includes(flag)) missing.push(`${page}: ${command.name()} ${flag}`);
+      }
+    }
+
+    expect(missing).toEqual([]);
+  });
+
+  it('rejects a flag that exists on the binary and nowhere in the docs', () => {
+    // Guards the guard: `--fields` is real and documented, `--fEilds` is neither.
+    const list = buildProgram().commands.find((c) => c.name() === 'list') as Command;
+    const text = readFileSync(join(DOCS, 'commands', 'list.md'), 'utf8');
+    expect(longFlagsOf(list).has('--fields')).toBe(true);
+    expect(text.includes('--fields')).toBe(true);
+    expect(text.includes('--fEilds')).toBe(false);
+  });
+});
