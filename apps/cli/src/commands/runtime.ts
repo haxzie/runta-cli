@@ -24,6 +24,7 @@ import {
 } from '@runta/core';
 import { type Column, fail, logger, renderTable } from '@runta/utils';
 import type { Command } from 'commander';
+import { detachHelp } from '../help.js';
 import { outputOption, resolveOutput } from '../output.js';
 import { type NextStep, printNextSteps } from '../suggest.js';
 
@@ -1007,6 +1008,7 @@ function addRuntimeVerbs(parent: Command): void {
     .option('--timeout <secs>', 'how long to wait before giving up (default 180)')
     .option('--json', 'print the runtime as JSON')
     .addOption(outputOption())
+    .addHelpText('after', detachHelp('the runtime can accept commands'))
     .action(async (opts: CreateOptions) => {
       await create(resolveOutput(opts));
     });
@@ -1048,6 +1050,7 @@ function addRuntimeVerbs(parent: Command): void {
     .option('--timeout <secs>', 'how long to wait before giving up (default 180)')
     .option('--json', 'print the result as JSON')
     .addOption(outputOption())
+    .addHelpText('after', detachHelp('the runtimes are gone'))
     .action(async (references: string[], opts: DeleteOptions) => {
       await remove(references, resolveOutput(opts));
     });
@@ -1062,6 +1065,7 @@ function addRuntimeVerbs(parent: Command): void {
       .option('--timeout <secs>', 'how long to wait before giving up (default 180)')
       .option('--json', 'print the result as JSON')
       .addOption(outputOption())
+      .addHelpText('after', detachHelp('the transition settles'))
       .action(async (reference: string, opts: LifecycleOptions) => {
         await lifecycle(action, reference, resolveOutput(opts));
       });

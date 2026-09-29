@@ -342,3 +342,20 @@ exit 2
 
 Before the `errorFromResponse` fix, all three printed `http_403`/`http_401` with a generic status
 message, because the normaliser read `code`/`message` from the top level of the body.
+
+## `DELETE /v2/images/{image_id}` — success shape unverified
+
+The endpoint exists and is reachable. Probed live with a non-existent UUID:
+
+```console
+$ curl -X DELETE .../v2/images/00000000-0000-4000-8000-000000000000
+422 {"error":{"code":"invalid_argument","message":"only custom Runtime Images can be deleted"},
+     "request_id":"01a0ee02-…"}
+```
+
+Two things follow. A **non-existent** id answers the same 422 as a **built-in** one, so the status
+cannot distinguish a typo from a category error — which is why `image delete` resolves the name
+against the catalog before calling. And the spec models success as `204`, which is a **guess**: the
+account used to verify this had no custom images, so the success path was never exercised. If a
+real delete turns out to return `200` with a body, the SDK will still work (the CLI ignores the
+response) but the spec should be corrected.

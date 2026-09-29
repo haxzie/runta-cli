@@ -1,7 +1,7 @@
 ---
 title: runta-next exec
 description: Run a command inside a runtime, including interactive pty sessions, streaming output, NDJSON frames, and why an unknown outcome is not a failure.
-sidebar_position: 11
+sidebar_position: 12
 ---
 
 # `runta-next exec`

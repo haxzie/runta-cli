@@ -1,7 +1,7 @@
 ---
 title: runta-next delete
 description: Delete runtimes, with --dry-run, confirmation, optimistic concurrency and waiting until they are gone.
-sidebar_position: 10
+sidebar_position: 11
 ---
 
 # `runta-next delete`

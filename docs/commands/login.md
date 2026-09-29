@@ -1,7 +1,7 @@
 ---
 title: runta-next login
 description: Sign in through the browser with a one-time device code, including flags, NDJSON output, and how the poller tolerates a flaky API.
-sidebar_position: 12
+sidebar_position: 13
 ---
 
 # `runta-next login`

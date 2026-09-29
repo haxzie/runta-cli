@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BeginDeviceAuthorizationData, BeginDeviceAuthorizationErrors, BeginDeviceAuthorizationResponses, CreateRuntimeData, CreateRuntimeErrors, CreateRuntimeResponses, DeleteRuntimeData, DeleteRuntimeErrors, DeleteRuntimeResponses, ExchangeDeviceTokenData, ExchangeDeviceTokenErrors, ExchangeDeviceTokenResponses, GetMeData, GetMeErrors, GetMeResponses, GetRuntimeData, GetRuntimeErrors, GetRuntimeResponses, ListCheckpointsData, ListCheckpointsErrors, ListCheckpointsResponses, ListManagedModelProvidersData, ListManagedModelProvidersErrors, ListManagedModelProvidersResponses, ListRuntimeImagesData, ListRuntimeImagesErrors, ListRuntimeImagesResponses, ListRuntimesData, ListRuntimesErrors, ListRuntimesResponses, PauseRuntimeData, PauseRuntimeErrors, PauseRuntimeResponses, ResumeRuntimeData, ResumeRuntimeErrors, ResumeRuntimeResponses, RevokeCurrentTokenData, RevokeCurrentTokenErrors, RevokeCurrentTokenResponses, StartRuntimeData, StartRuntimeErrors, StartRuntimeResponses, StopRuntimeData, StopRuntimeErrors, StopRuntimeResponses } from './types.gen';
+import type { BeginDeviceAuthorizationData, BeginDeviceAuthorizationErrors, BeginDeviceAuthorizationResponses, CreateRuntimeData, CreateRuntimeErrors, CreateRuntimeResponses, DeleteRuntimeData, DeleteRuntimeErrors, DeleteRuntimeImageData, DeleteRuntimeImageErrors, DeleteRuntimeImageResponses, DeleteRuntimeResponses, ExchangeDeviceTokenData, ExchangeDeviceTokenErrors, ExchangeDeviceTokenResponses, GetMeData, GetMeErrors, GetMeResponses, GetRuntimeData, GetRuntimeErrors, GetRuntimeResponses, ListCheckpointsData, ListCheckpointsErrors, ListCheckpointsResponses, ListManagedModelProvidersData, ListManagedModelProvidersErrors, ListManagedModelProvidersResponses, ListRuntimeImagesData, ListRuntimeImagesErrors, ListRuntimeImagesResponses, ListRuntimesData, ListRuntimesErrors, ListRuntimesResponses, PauseRuntimeData, PauseRuntimeErrors, PauseRuntimeResponses, ResumeRuntimeData, ResumeRuntimeErrors, ResumeRuntimeResponses, RevokeCurrentTokenData, RevokeCurrentTokenErrors, RevokeCurrentTokenResponses, StartRuntimeData, StartRuntimeErrors, StartRuntimeResponses, StopRuntimeData, StopRuntimeErrors, StopRuntimeResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -217,4 +217,15 @@ export const stopRuntime = <ThrowOnError extends boolean = false>(options: Optio
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Delete a custom runtime image
+ *
+ * Only images the organization built can be deleted; the catalog images are not deletable and answer 422 `invalid_argument` with "only custom Runtime Images can be deleted". Verified live against a non-existent id, which returns that same 422 rather than a 404 — so a typo and a built-in are indistinguishable from the status alone. The success shape is NOT verified: the account used had no custom images to delete. See NOTES.md.
+ */
+export const deleteRuntimeImage = <ThrowOnError extends boolean = false>(options: Options<DeleteRuntimeImageData, ThrowOnError>): RequestResult<DeleteRuntimeImageResponses, DeleteRuntimeImageErrors, ThrowOnError> => (options.client ?? client).delete<DeleteRuntimeImageResponses, DeleteRuntimeImageErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/v2/images/{image_id}',
+    ...options
 });

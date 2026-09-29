@@ -1,7 +1,7 @@
 ---
 title: runta-next whoami
 description: Show the authenticated user, and why an organization API key is rejected here.
-sidebar_position: 14
+sidebar_position: 15
 ---
 
 # `runta-next whoami`

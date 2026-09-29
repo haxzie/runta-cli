@@ -53,6 +53,7 @@ npm packages, the Homebrew tap, and the shipped binary (the source repo is priva
 | [C-35](#c-35-no-published-openapi-document-so-every-client-is-hand-written) | No published OpenAPI document; API docs disagree with the live API in six places | high |
 | [C-36](#c-36--an-ambiguous-runtime-name-silently-resolves-to-the-first-match) | An ambiguous runtime name silently resolves to the first match | high |
 | [C-37](#c-37--vcpus-cannot-be-changed-after-creation-and-nothing-says-so) | vCPUs cannot be changed after creation, and nothing says so | medium |
+| [C-38](#c-38--an-existing-claude-subscription-cannot-be-used-when-creating-a-runtime) | A connected Claude subscription cannot be used when creating a runtime | high |
 
 ---
 
@@ -1356,6 +1357,65 @@ live API eleven times (`packages/api/NOTES.md`), so the documented shape is evid
 
 **What ours does.** Nothing yet — we have no `update`. Recorded as a requirement on it in
 `Improvements.md` I-5 so the explanation ships with the command rather than after it.
+
+### C-38 — An existing Claude subscription cannot be used when creating a runtime
+_Severity: high._
+
+The Dashboard offers a Claude subscription sign-in, and using it stores a secret on the tenant:
+
+```console
+$ runta secret list
+{ "secrets": [ { "display_name": "__agent_oauth_refresh_ce14fc04-…", "id": "88b4840c-…" }, … ] }
+```
+
+Nothing can then spend it at create time. `run --image` promises that "a matching organization model
+provider is injected automatically", but a subscription is not a managed provider:
+
+```console
+$ runta model-provider ls
+{ "action": "model-provider-list", "model_providers": [] }
+```
+
+So the create is refused for a credential the tenant demonstrably has:
+
+```console
+$ runta run --image claude
+error invalid argument: the selected runtime image reads its model-provider credential from
+ANTHROPIC_API_KEY, which no secret in this request populates
+This image needs a model provider. Connect one at https://dashboard.runta.com, then create the
+runtime again.
+```
+
+The error is well written and actionable in general, but wrong in this case — it sends the user to the
+Dashboard to connect a provider they have already connected, with no way to tell that the thing they
+connected is the wrong *kind* of thing. Nothing names the distinction anywhere in the CLI: `secret
+list` shows the subscription under a reserved-looking `__agent_oauth_refresh_` name with no type,
+protocol or purpose, and `model-provider ls` shows an empty list without saying that a subscription
+exists but does not count.
+
+The image catalog knows the difference and does not expose it. `GET /v2/images` describes `claude`
+with both a `protocol_bindings` entry (API-key shaped, `ANTHROPIC_API_KEY`) **and**
+`subscription_options: [{ protocols: ["anthropic_messages"], secret_preset_ids: ["claude_oauth"] }]`
+— so the catalog models subscriptions as a first-class way to satisfy the image, while `run` offers no
+flag that selects one. Its only credential knobs are `--model-provider-protocol`, `--base-url`,
+`--model`, `--runtime-sign-in` and `--secret-config-file`.
+
+That leaves `--runtime-sign-in` as the only route, which lands in [C-33](#c-33---runtime-sign-in-reports-a-ready-runtime-whose-agent-cant-run):
+a runtime reported `running` whose agent prints `Not logged in · Please run /login`. Reproduced again
+here on `claude` at v2.1.234. So a user who has paid for a subscription and connected it still cannot
+get a working Claude runtime without a human at a terminal — and the two failure modes compound, since
+the first error tells you to go connect the thing that leads you to the second.
+
+→ Let a subscription satisfy the image. Either inject it automatically the way a managed provider is
+injected, or add an explicit selector (`--subscription <id>`, or `--model-provider` accepting either
+kind). Failing that, the error must distinguish "no credential" from "a subscription exists but cannot
+be used here", and `model-provider ls` should show subscriptions alongside providers rather than an
+empty list that implies nothing is connected.
+
+**What ours does.** Nothing — `runta-next create` has no secret, provider or sign-in flags at all, so
+it inherits the same wall one step earlier. Worth recording as a requirement before we add any of
+them: whatever we build should accept a subscription wherever it accepts a provider.
+
 
 ## Not exercised
 
