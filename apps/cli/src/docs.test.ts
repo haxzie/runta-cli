@@ -22,7 +22,7 @@ const ROOT = join(import.meta.dirname, '..', '..', '..');
  * drift the same way. `DESIGN.md` is the submission's front door, so a stale flag there is the
  * most expensive kind.
  */
-const ROOT_DOCS = ['DESIGN.md', 'FAILURE-AND-RECOVERY.md', 'DEMO.md'];
+const ROOT_DOCS = ['DESIGN.md', 'FAILURE-AND-RECOVERY.md'];
 
 /**
  * Invocations that are wrong on purpose, because the surrounding prose is about what happens when
@@ -30,11 +30,10 @@ const ROOT_DOCS = ['DESIGN.md', 'FAILURE-AND-RECOVERY.md', 'DEMO.md'];
  * listed rather than silently skipped.
  */
 const INTENTIONALLY_INVALID = new Set([
-  // FAILURE-AND-RECOVERY §1 and DEMO 3a: an agent assumed `inspect` had `list`'s flag.
+  // FAILURE-AND-RECOVERY §1: an agent assumed `inspect` had `list`'s flag.
   'runta-next inspect jesting_kalong --json --fields status,desired_status',
-  'runta-next inspect demo --json --fields status',
   'runta-next inspect $R --json --fields status,desired_status',
-  // FAILURE-AND-RECOVERY §3 and DEMO 3c: arriving from the official CLI, and a typo.
+  // FAILURE-AND-RECOVERY §3: arriving from the official CLI, and a typo.
   'runta-next ps',
   'runta-next lst',
   // docs/commands/list.md: the unknown-field error the page documents.

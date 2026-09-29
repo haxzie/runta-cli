@@ -24,5 +24,12 @@ else
   echo "note: $official is missing — run evals/cli-ab/setup.sh for the comparison tape" >&2
 fi
 
+# The eval gives each arm node and jq and nothing else; match it, so a recording and a graded
+# trial put the agent in the same environment.
+for tool in node jq; do
+  path=$(command -v "$tool") || { echo "error: $tool is required" >&2; exit 1; }
+  ln -sf "$path" "$bin/$tool"
+done
+
 echo "ours:   $("$bin/runta-next" --version)"
 [ -x "$bin/runta" ] && echo "theirs: $("$bin/runta" --version 2>&1 | tr -d '\n  ')" || true

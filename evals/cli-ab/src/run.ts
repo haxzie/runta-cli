@@ -63,7 +63,7 @@ const { values: opts } = parseArgs({
         .join(','),
     },
     arms: { type: 'string', default: 'A,B' },
-    model: { type: 'string', default: process.env.EVAL_MODEL ?? 'claude-sonnet-5-5' },
+    model: { type: 'string', default: process.env.EVAL_MODEL ?? 'claude-sonnet-5' },
     'max-turns': { type: 'string', default: '40' },
     'budget-usd': { type: 'string', default: '3' },
     'timeout-min': { type: 'string', default: '15' },
@@ -110,6 +110,18 @@ function preflight(arms: Arm[]): string {
   }
   const claude = spawnSync('sh', ['-c', 'command -v claude'], { encoding: 'utf8' }).stdout.trim();
   if (!claude) fail('`claude` is not on PATH.');
+
+  // An unrecognised model is not an error: the CLI warns on stderr and serves a fallback, so a run
+  // reports a model it never used. Every earlier run asked for `claude-sonnet-5-5`, which does not
+  // exist, and the comparison stayed valid only because both arms got the same fallback. Fail here
+  // instead, so the model named in run.json is the model that answered.
+  const probe = spawnSync(claude, ['-p', 'ok', '--model', opts.model, '--max-turns', '1'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  if (/unrecognized_model/.test(probe.stderr ?? '')) {
+    fail(`model '${opts.model}' is not recognised; the run would silently use a fallback.`);
+  }
 
   for (const arm of arms) {
     const env = armEnv(arm, '/tmp');

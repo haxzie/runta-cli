@@ -18,3 +18,6 @@ coverage/
 
 # VitePress dev-server cache.
 apps/docs/.vitepress/cache/
+
+# Built by demo/setup.sh: absolute symlinks to the two CLI binaries.
+demo/bin/
