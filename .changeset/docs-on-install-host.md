@@ -1,5 +1,5 @@
 ---
-'@runta/cli': patch
+'@haxzie/runta-next': patch
 ---
 
 Serve the docs from `runta.haxzie.com/docs/`, and point the CLI at it.
