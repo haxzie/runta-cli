@@ -10,17 +10,6 @@ Nine tasks, both arms, one trial each. Model `claude-sonnet-5`. Arm A is the off
 `@runta/runta-cli@0.2.10`; arm B is runta-next 0.6.1 built from `vancouver`. T8 was retired before
 this run (see [README](README.md#t8-is-retired)).
 
-> **On the model id.** The raw artifacts under `runs/` record `claude-sonnet-5-5`, which is not a
-> real model id — the harness had a wrong default, and Claude Code warns on an unrecognised model
-> and serves a fallback rather than failing. Sonnet 5 is established from the billing: trial
-> `T7-B-1` used 10 input, 860 output, 85,408 cache-read and 8,544 one-hour cache-write tokens for
-> `$0.0598776`, which matches Sonnet 5's published rates ($2/$10 per MTok, cache reads 0.1×, 1h
-> writes 2×) to seven decimal places; every other model is off by a clean multiple. The transcripts
-> only ever echo the requested string, so this is inference from cost rather than a recorded fact.
-> Both arms were treated identically, so the comparison is unaffected either way, and the turn,
-> call and character counts below come from the transcript rather than any pricing table. The
-> runner now refuses an unrecognised model instead of proceeding.
-
 ### Pass rate: a tie
 
 | Task | runta (official) | runta-next |
