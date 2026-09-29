@@ -1,4 +1,9 @@
-import { listRuntimeImages, RuntaApiError, type RuntimeImage } from '@runta/api';
+import {
+  deleteRuntimeImage,
+  listRuntimeImages,
+  RuntaApiError,
+  type RuntimeImage,
+} from '@runta/api';
 import { createContext } from '@runta/core';
 import { type Column, fail, logger, renderTable } from '@runta/utils';
 import type { Command } from 'commander';
@@ -10,12 +15,36 @@ export interface ImagesOptions {
   custom?: boolean;
 }
 
+export interface DeleteImageOptions {
+  json?: boolean;
+  output?: string;
+  dryRun?: boolean;
+  yes?: boolean;
+}
+
 export interface ImagesDeps {
   write: (text: string) => void;
 }
 
-export const defaultImagesDeps: ImagesDeps = {
+/** `delete` is the only half that can ask a question, so only it carries the means to. */
+export interface DeleteImageDeps extends ImagesDeps {
+  /** Prompts for confirmation. Resolves false to abort. */
+  confirm: (question: string) => Promise<boolean>;
+  isInteractive: () => boolean;
+}
+
+export const defaultImagesDeps: DeleteImageDeps = {
   write: (text) => process.stdout.write(text),
+  confirm: async (question) => {
+    const { createInterface } = await import('node:readline/promises');
+    const rl = createInterface({ input: process.stdin, output: process.stderr });
+    try {
+      return /^y(es)?$/i.test((await rl.question(`${question} [y/N] `)).trim());
+    } finally {
+      rl.close();
+    }
+  },
+  isInteractive: () => Boolean(process.stdin.isTTY && process.stderr.isTTY),
 };
 
 /**
@@ -52,6 +81,80 @@ export async function images(
   }
 
   deps.write(`${renderTable(list, COLUMNS)}\n`);
+}
+
+/**
+ * Deletes a custom image.
+ *
+ * Only images the organization built can go; the API answers 422 `invalid_argument` for a catalog
+ * image. It answers the *same* 422 for an id that does not exist at all, so a typo and a built-in
+ * are indistinguishable from the response — which is why this resolves the id against the catalog
+ * first and says which of the two it is.
+ */
+export async function deleteImage(
+  reference: string,
+  options: DeleteImageOptions = {},
+  deps: DeleteImageDeps = defaultImagesDeps,
+): Promise<void> {
+  const { client } = await createContext();
+
+  const catalog = await request(() =>
+    listRuntimeImages({ client, throwOnError: true }).then((r) => r.data.data),
+  );
+  const target = catalog.find((image) => image.id === reference || image.name === reference);
+
+  if (!target) {
+    fail(`No image named '${reference}'.`, {
+      hint: 'List what exists with `runta-next image list`.',
+      exitCode: 1,
+    });
+    return;
+  }
+
+  // Refuse before the request rather than relaying a 422 that names neither the image nor why.
+  if (!target.is_custom) {
+    fail(`'${target.id}' is a built-in image, and built-in images cannot be deleted.`, {
+      hint: 'Only images your organization built can be deleted: `runta-next image list --custom`.',
+      exitCode: 1,
+    });
+    return;
+  }
+
+  if (options.dryRun) {
+    const plan = {
+      action: 'image-delete',
+      dry_run: true,
+      image: { id: target.id, name: target.name },
+    };
+    if (options.json) {
+      deps.write(`${JSON.stringify(plan, null, 2)}\n`);
+      return;
+    }
+    deps.write(`Would delete custom image ${target.id} (${target.name}).\n`);
+    return;
+  }
+
+  // Confirm only where a human can answer. Under --json or in a pipe a prompt would hang.
+  if (!options.yes && !options.json && deps.isInteractive()) {
+    const ok = await deps.confirm(`Delete custom image '${target.id}'? This cannot be undone.`);
+    if (!ok) fail('Aborted.', { exitCode: 1 });
+  }
+
+  await request(() =>
+    deleteRuntimeImage({ client, path: { image_id: target.id }, throwOnError: true }),
+  );
+
+  if (options.json) {
+    deps.write(
+      `${JSON.stringify(
+        { action: 'image-delete', deleted: true, image: { id: target.id, name: target.name } },
+        null,
+        2,
+      )}\n`,
+    );
+    return;
+  }
+  logger.success(`Deleted custom image ${target.id}.`);
 }
 
 /**
@@ -126,14 +229,36 @@ function hintFor(error: RuntaApiError): string | undefined {
   return undefined;
 }
 
+/**
+ * Noun-first only, with no top-level alias.
+ *
+ * Improvements.md I-2 gives top-level shortcuts to the *runtime* verbs alone, because those are
+ * what you type all day; every other resource reads `runta-next <noun> <verb>` so that having seen
+ * one, a reader can guess the rest. An earlier version of this shipped a flat `images`, which broke
+ * that rule for the sake of one character.
+ */
 export function registerImages(program: Command): void {
-  program
-    .command('images')
+  const group = program.command('image').description('Inspect and manage runtime images');
+
+  group
+    .command('list')
     .description('List the runtime images create can build from')
     .option('--custom', 'show only images built by your organization')
     .option('--json', 'print the images as JSON')
     .addOption(outputOption())
     .action(async (opts: ImagesOptions) => {
       await images(resolveOutput(opts));
+    });
+
+  group
+    .command('delete')
+    .description('Delete a custom runtime image')
+    .argument('<image>', 'image id or name')
+    .option('--dry-run', 'show what would be deleted and exit')
+    .option('-y, --yes', 'skip the confirmation prompt')
+    .option('--json', 'print the result as JSON')
+    .addOption(outputOption())
+    .action(async (reference: string, opts: DeleteImageOptions) => {
+      await deleteImage(reference, resolveOutput(opts));
     });
 }

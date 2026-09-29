@@ -119,10 +119,24 @@ describe('the agent section', () => {
     expect(text).toContain('--json');
   });
 
-  it('says the shape does not depend on whether stdout is a terminal', () => {
-    // The reason an agent can trust it: unlike the production CLI, --json is explicit rather than
-    // implied off-TTY, so piping does not change the contract.
-    expect(plain()).toMatch(/does not change based on/);
+  // Output defaults to `auto`, so an agent that spawns the CLI is already getting JSON. What it
+  // must be told is how to stop depending on that detection, which is the explicit flag.
+  it('says a pipe is already JSON, and names the flag that pins it', () => {
+    const text = plain();
+    expect(text).toMatch(/a pipe is\s+already JSON/);
+    expect(text).toMatch(/-o table forces the table back/);
+  });
+
+  it('never claims the shape is independent of the terminal, which stopped being true', () => {
+    expect(plain()).not.toMatch(/does not change based on/);
+  });
+
+  it('explains that state-changing commands wait, and what --detach trades away', () => {
+    const text = plain();
+    expect(text).toContain('Waiting:');
+    expect(text).toMatch(/wait for the change to finish/);
+    // The trap worth naming: a detached stop reports the status it had on acceptance.
+    expect(text).toMatch(/detached stop still reads/);
   });
 
   it('points at exit codes rather than message text', () => {
@@ -171,5 +185,53 @@ describe('subcommand help is left to commander', () => {
 
     expect(text).toContain('--memory-max');
     expect(text).toContain('--from-checkpoint');
+  });
+});
+
+/**
+ * Per-command waiting text. One helper feeds every command that has `--detach`, because five
+ * copies would let the guarantee drift — and a user who believes `--detach` means something
+ * different on `stop` than on `create` has been misled by the docs, not by the code.
+ */
+describe('detachHelp', () => {
+  const withDetach = ['create', 'delete', 'start', 'stop', 'pause'];
+
+  /**
+   * What the command actually prints, not `helpInformation()`.
+   *
+   * `addHelpText('after', …)` is applied by `outputHelp`, so `helpInformation()` returns the
+   * formatted body without it — a test built on that would pass while the text never reached a
+   * user, which is the exact failure this suite exists to catch.
+   */
+  const helpFor = (name: string): string => {
+    const command = buildProgram().commands.find((c) => c.name() === name);
+    if (!command) throw new Error(`no such command: ${name}`);
+
+    let captured = '';
+    command.configureOutput({
+      writeOut: (text) => {
+        captured += text;
+      },
+    });
+    command.outputHelp();
+    return captured;
+  };
+
+  it.each(withDetach)('documents waiting on %s', (name) => {
+    const text = helpFor(name);
+
+    expect(text).toContain('Waiting:');
+    expect(text).toMatch(/-d, --detach returns as soon as the request is accepted/);
+    expect(text).toMatch(/a receipt, not a\s+state/);
+  });
+
+  it('names what each command waits for, because they differ', () => {
+    expect(helpFor('create')).toMatch(/the runtime can accept commands/);
+    expect(helpFor('stop')).toMatch(/the transition settles/);
+    expect(helpFor('delete')).toMatch(/the runtimes are gone/);
+  });
+
+  it('adds nothing to a command that cannot detach', () => {
+    expect(helpFor('inspect')).not.toContain('Waiting:');
   });
 });

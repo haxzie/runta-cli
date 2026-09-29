@@ -1,7 +1,7 @@
 import { isCliError } from '@runta/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { captureStdout, isolateEnv, type Route, stubFetch } from '../test/harness.js';
-import { images } from './images.js';
+import { deleteImage, images } from './images.js';
 
 let env: Awaited<ReturnType<typeof isolateEnv>>;
 const realFetch = globalThis.fetch;
@@ -57,6 +57,23 @@ const opencode = image({
 const route = (body: unknown, status = 200): Route[] => [
   { method: 'GET', path: '/v2/images', status, body },
 ];
+
+const custom = image({ id: 'mine', name: 'My Image', is_default: false, is_custom: true });
+
+/** stdout plus the two things only `delete` can do. */
+const deleteDeps = (
+  over: Partial<{ confirm: () => Promise<boolean>; isInteractive: () => boolean }> = {},
+) => {
+  const out = captureStdout();
+  return {
+    write: out.write,
+    get text() {
+      return out.text;
+    },
+    confirm: over.confirm ?? (async () => true),
+    isInteractive: over.isInteractive ?? (() => false),
+  };
+};
 
 const serve = (body: unknown, status = 200) => {
   const { fetch } = stubFetch(route(body, status));
@@ -204,5 +221,171 @@ describe('images', () => {
       expect((error as { exitCode?: number }).exitCode).toBe(1);
       expect((error as { hint?: string }).hint).toMatch(/transient/);
     });
+  });
+});
+
+describe('image delete', () => {
+  const routes = (images: unknown[], del?: Route): Route[] => [
+    { method: 'GET', path: '/v2/images', status: 200, body: { data: images } },
+    ...(del ? [del] : []),
+  ];
+
+  const serveDelete = (images: unknown[], del?: Route) => {
+    const { fetch, calls } = stubFetch(routes(images, del));
+    globalThis.fetch = fetch as unknown as typeof globalThis.fetch;
+    // `calls` holds real Request objects, so the path lives on the URL.
+    return {
+      sent: (method: string, path?: string) =>
+        calls.some(
+          (c) => c.method === method && (path === undefined || new URL(c.url).pathname === path),
+        ),
+    };
+  };
+
+  it('deletes a custom image', async () => {
+    const sent = serveDelete([image(), custom], {
+      method: 'DELETE',
+      path: '/v2/images/mine',
+      status: 204,
+      body: undefined,
+    });
+    const deps = deleteDeps();
+
+    await deleteImage('mine', {}, deps);
+
+    expect(sent.sent('DELETE', '/v2/images/mine')).toBe(true);
+  });
+
+  it('accepts the display name as well as the id', async () => {
+    const sent = serveDelete([custom], {
+      method: 'DELETE',
+      path: '/v2/images/mine',
+      status: 204,
+      body: undefined,
+    });
+
+    await deleteImage('My Image', {}, deleteDeps());
+
+    expect(sent.sent('DELETE', '/v2/images/mine')).toBe(true);
+  });
+
+  /**
+   * The API answers the same 422 for a built-in and for an id that does not exist, so relaying it
+   * would leave the user unable to tell a typo from a category error. These resolve first.
+   */
+  describe('refusing before the request', () => {
+    it('names a built-in as a built-in, and sends no DELETE', async () => {
+      const sent = serveDelete([image()]);
+
+      const error = await deleteImage('clean', {}, deleteDeps()).catch((e: unknown) => e);
+
+      expect(isCliError(error)).toBe(true);
+      expect(String(error)).toMatch(/built-in image/);
+      expect(sent.sent('DELETE')).toBe(false);
+    });
+
+    it('says a name does not exist, and sends no DELETE', async () => {
+      const sent = serveDelete([image()]);
+
+      const error = await deleteImage('nope', {}, deleteDeps()).catch((e: unknown) => e);
+
+      expect(String(error)).toMatch(/No image named 'nope'/);
+      expect((error as { hint?: string }).hint).toMatch(/image list/);
+      expect(sent.sent('DELETE')).toBe(false);
+    });
+  });
+
+  describe('--dry-run', () => {
+    it('describes the deletion and sends nothing', async () => {
+      const sent = serveDelete([custom]);
+      const deps = deleteDeps();
+
+      await deleteImage('mine', { dryRun: true }, deps);
+
+      expect(deps.text).toMatch(/Would delete custom image mine/);
+      expect(sent.sent('DELETE')).toBe(false);
+    });
+
+    it('gives an agent the same plan as JSON', async () => {
+      serveDelete([custom]);
+      const deps = deleteDeps();
+
+      await deleteImage('mine', { dryRun: true, json: true }, deps);
+
+      const payload = JSON.parse(deps.text) as Record<string, unknown>;
+      expect(payload.dry_run).toBe(true);
+      expect(payload.image).toEqual({ id: 'mine', name: 'My Image' });
+    });
+  });
+
+  describe('confirmation', () => {
+    it('asks on a terminal, and aborts on no', async () => {
+      const sent = serveDelete([custom]);
+      const deps = deleteDeps({ isInteractive: () => true, confirm: async () => false });
+
+      const error = await deleteImage('mine', {}, deps).catch((e: unknown) => e);
+
+      expect(String(error)).toMatch(/Aborted/);
+      expect(sent.sent('DELETE')).toBe(false);
+    });
+
+    // A prompt in a pipe would hang forever, so scripts must never meet one.
+    it('never asks under --json', async () => {
+      serveDelete([custom], {
+        method: 'DELETE',
+        path: '/v2/images/mine',
+        status: 204,
+        body: undefined,
+      });
+      let asked = false;
+      const deps = deleteDeps({
+        isInteractive: () => true,
+        confirm: async () => {
+          asked = true;
+          return true;
+        },
+      });
+
+      await deleteImage('mine', { json: true }, deps);
+
+      expect(asked).toBe(false);
+    });
+
+    it('skips the prompt with --yes', async () => {
+      serveDelete([custom], {
+        method: 'DELETE',
+        path: '/v2/images/mine',
+        status: 204,
+        body: undefined,
+      });
+      let asked = false;
+      const deps = deleteDeps({
+        isInteractive: () => true,
+        confirm: async () => {
+          asked = true;
+          return true;
+        },
+      });
+
+      await deleteImage('mine', { yes: true }, deps);
+
+      expect(asked).toBe(false);
+    });
+  });
+
+  it('reports the deletion as JSON', async () => {
+    serveDelete([custom], {
+      method: 'DELETE',
+      path: '/v2/images/mine',
+      status: 204,
+      body: undefined,
+    });
+    const deps = deleteDeps();
+
+    await deleteImage('mine', { json: true, yes: true }, deps);
+
+    const payload = JSON.parse(deps.text) as Record<string, unknown>;
+    expect(payload.deleted).toBe(true);
+    expect(payload.action).toBe('image-delete');
   });
 });

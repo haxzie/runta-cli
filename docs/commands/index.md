@@ -17,7 +17,8 @@ runta-next [global options] <command> [command options]
 
 | Command | Does |
 | --- | --- |
-| [`runta-next images`](./images.md) | List the runtime images create can build from |
+| [`runta-next image list`](./images.md) | List the runtime images create can build from |
+| [`runta-next image delete`](./images.md) | Delete a custom runtime image |
 | [`runta-next create`](./create.md) | Create a runtime and wait until it can accept commands |
 | [`runta-next list`](./list.md) | List runtimes |
 | [`runta-next inspect`](./inspect.md) | Show everything about one runtime |

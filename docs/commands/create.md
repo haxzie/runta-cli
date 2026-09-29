@@ -102,7 +102,7 @@ error Image 'kimi' supports several model-provider protocols.
 Pick one with --model-provider-protocol: anthropic_messages, openai_chat, openai_responses.
 ```
 
-[`runta-next images`](./images.md) tells you which case an image is in before you try: its
+[`runta-next image list`](./images.md) tells you which case an image is in before you try: its
 `MODEL PROVIDER` column shows the single protocol when one is inferred, and a count when the flag
 is required.
 

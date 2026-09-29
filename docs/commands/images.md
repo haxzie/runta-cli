@@ -1,17 +1,23 @@
 ---
-title: runta-next images
-description: List the runtime images create can build from, with their recommended resources and model-provider protocols.
+title: runta-next image
+description: List the runtime images create can build from, and delete custom ones.
 sidebar_position: 7
 ---
 
-# `runta-next images`
+# `runta-next image`
 
-Lists the runtime images `create --image` accepts. Every image is a prepared environment — a clean
-Ubuntu box, or one with a coding agent already installed.
+Runtime images are the prepared environments `create --image` builds from — a clean Ubuntu box, or
+one with a coding agent already installed.
 
 ```
-runta-next images [options]
+runta-next image list [options]
+runta-next image delete <image> [options]
 ```
+
+Noun-first with no top-level shortcut: only the runtime verbs get one, so every other resource reads
+`runta-next <noun> <verb>` and you can guess the rest from one example.
+
+## `image list`
 
 | Option | Does |
 | --- | --- |
@@ -20,7 +26,7 @@ runta-next images [options]
 | `-o, --output <mode>` | `auto` (JSON when not a terminal), `table`, or `json` |
 
 ```console
-$ runta-next images
+$ runta-next image list
 ID                NAME               VCPUS  MEMORY  MODEL PROVIDER      KIND
 claude            Claude Code            2    2048  anthropic_messages  —
 clean             Clean runtime          1    1024  —                   default
@@ -51,7 +57,7 @@ $ runta image ls
 ```
 
 That made `--image <id>` a flag whose valid values were undiscoverable from either CLI — you had to
-open the Dashboard or call `GET /v2/images` by hand. `runta-next images` is that call.
+open the Dashboard or call `GET /v2/images` by hand. `runta-next image list` is that call.
 
 ## `MODEL PROVIDER` decides whether you need another flag
 
@@ -68,7 +74,7 @@ Three protocol names side by side would push the `ID` column into an ellipsis, a
 cell you have to retype — so the table gives the count and `--json` gives the names:
 
 ```sh
-runta-next images --json | jq -r '.[] | select(.id == "opencode") |
+runta-next image list --json | jq -r '.[] | select(.id == "opencode") |
   .model_provider.protocol_bindings[].protocol'
 ```
 
@@ -81,12 +87,52 @@ Recommended `VCPUS` and `MEMORY` come from the image's own catalog entry. Omit `
 `exposed_ports`, and the full `model_provider` block the table compresses:
 
 ```console
-$ runta-next images --json | jq -r '.[] | "\(.id)\t\(.recommended_resources.memory_mib)"'
+$ runta-next image list --json | jq -r '.[] | "\(.id)\t\(.recommended_resources.memory_mib)"'
 claude	2048
 clean	1024
 ```
 
 It is a plain array, so `.[]` works with no per-command key to learn.
+
+## `image delete`
+
+Deletes an image **your organization built**. The catalog images are not deletable.
+
+| Option | Does |
+| --- | --- |
+| `--dry-run` | Show what would be deleted and exit |
+| `-y, --yes` | Skip the confirmation prompt |
+| `--json` | Print the result as JSON |
+| `-o, --output <mode>` | `auto` (JSON when not a terminal), `table`, or `json` |
+
+```console
+$ runta-next image delete my-image --dry-run
+Would delete custom image my-image (My Image).
+
+$ runta-next image delete my-image
+Delete custom image 'my-image'? This cannot be undone. [y/N] y
+Deleted custom image my-image.
+```
+
+The confirmation appears only on a terminal — under `--json` or in a pipe it would hang, so scripts
+are unaffected. `-y` skips it.
+
+### Why it refuses before calling the API
+
+The API answers `422 invalid_argument` — *"only custom Runtime Images can be deleted"* — for a
+built-in image **and** for an id that does not exist at all. Those are different mistakes with
+different fixes, and the status cannot tell them apart, so this resolves the name against the
+catalog first:
+
+```console
+$ runta-next image delete claude
+error 'claude' is a built-in image, and built-in images cannot be deleted.
+Only images your organization built can be deleted: `runta-next image list --custom`.
+
+$ runta-next image delete nope
+error No image named 'nope'.
+List what exists with `runta-next image list`.
+```
 
 ## Next
 

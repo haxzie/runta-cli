@@ -1262,6 +1262,65 @@
           }
         }
       }
+    },
+    "/v2/images/{image_id}": {
+      "delete": {
+        "operationId": "deleteRuntimeImage",
+        "summary": "Delete a custom runtime image",
+        "tags": [
+          "images"
+        ],
+        "description": "Only images the organization built can be deleted; the catalog images are not deletable and answer 422 `invalid_argument` with \"only custom Runtime Images can be deleted\". Verified live against a non-existent id, which returns that same 422 rather than a 404 \u2014 so a typo and a built-in are indistinguishable from the status alone. The success shape is NOT verified: the account used had no custom images to delete. See NOTES.md.",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Runtime image id."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The image was deleted."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error501"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Error504"
+          }
+        }
+      }
     }
   },
   "components": {

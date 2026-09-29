@@ -1633,3 +1633,73 @@ export type StopRuntimeResponses = {
 };
 
 export type StopRuntimeResponse = StopRuntimeResponses[keyof StopRuntimeResponses];
+
+export type DeleteRuntimeImageData = {
+    body?: never;
+    path: {
+        /**
+         * Runtime image id.
+         */
+        image_id: string;
+    };
+    query?: never;
+    url: '/v2/images/{image_id}';
+};
+
+export type DeleteRuntimeImageErrors = {
+    /**
+     * Malformed or invalid request body.
+     */
+    400: ErrorResponse;
+    /**
+     * The bearer token was present but rejected.
+     */
+    401: ErrorResponse;
+    /**
+     * No bearer token was supplied, or the token's role does not allow this action.
+     */
+    403: ErrorResponse;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrorResponse;
+    /**
+     * The request conflicts with current resource state.
+     */
+    409: ErrorResponse;
+    /**
+     * Validation or application error.
+     */
+    422: ErrorResponse;
+    /**
+     * Rate limit exceeded.
+     */
+    429: ErrorResponse;
+    /**
+     * Internal error.
+     */
+    500: ErrorResponse;
+    /**
+     * Operation is not implemented.
+     */
+    501: ErrorResponse;
+    /**
+     * Upstream service is unavailable.
+     */
+    503: ErrorResponse;
+    /**
+     * Upstream request timed out.
+     */
+    504: ErrorResponse;
+};
+
+export type DeleteRuntimeImageError = DeleteRuntimeImageErrors[keyof DeleteRuntimeImageErrors];
+
+export type DeleteRuntimeImageResponses = {
+    /**
+     * The image was deleted.
+     */
+    204: void;
+};
+
+export type DeleteRuntimeImageResponse = DeleteRuntimeImageResponses[keyof DeleteRuntimeImageResponses];

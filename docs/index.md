@@ -48,7 +48,7 @@ runta-next whoami
 
 The CLI is early. Today it covers the runtime lifecycle, authentication and identity:
 
-- [`runta-next images`](./commands/images.md) · [`runta-next create`](./commands/create.md) ·
+- [`runta-next image list`](./commands/images.md) · [`runta-next create`](./commands/create.md) ·
   [`runta-next list`](./commands/list.md) ·
   [`runta-next inspect`](./commands/inspect.md) · [`runta-next delete`](./commands/delete.md) ·
   [`runta-next exec`](./commands/exec.md)

@@ -32,7 +32,7 @@ const GROUPS: Group[] = [
     title: 'Runtimes',
     // Lifecycle order, not alphabetical: pick what to build from, make one, look at it, use it,
     // park it, remove it.
-    commands: ['images', 'create', 'list', 'inspect', 'exec', 'start', 'stop', 'pause', 'delete'],
+    commands: ['image', 'create', 'list', 'inspect', 'exec', 'start', 'stop', 'pause', 'delete'],
   },
   { title: 'Account', commands: ['login', 'logout', 'whoami'] },
   { title: 'More', commands: ['runtime', 'upgrade', 'help'] },
@@ -40,6 +40,7 @@ const GROUPS: Group[] = [
 
 /** Commands whose usage is worth showing in the list, because the bare name is not enough. */
 const USAGE: Record<string, string> = {
+  image: 'image list | delete',
   inspect: 'inspect <runtime>',
   delete: 'delete <runtime>...',
   exec: 'exec <runtime> -- <command>',
@@ -51,12 +52,13 @@ const USAGE: Record<string, string> = {
 
 const EXAMPLES: [string, string?][] = [
   ['runta-next login'],
-  ['runta-next images', 'what create can build from'],
+  ['runta-next image list', 'what create can build from'],
   ['runta-next create --name demo --cpus 1 --memory 512'],
   ['runta-next exec demo -- uname -a'],
   ['runta-next exec demo -it -- sh', 'interactive shell'],
   ['runta-next list --json', 'machine-readable'],
   ['runta-next delete demo --dry-run', 'show what would go, change nothing'],
+  ['runta-next create --name demo --detach', 'do not wait for it to be ready'],
   ['runta-next upgrade --check', 'is there a newer version?'],
 ];
 
@@ -142,12 +144,23 @@ export function rootHelp(
 
   lines.push('');
   lines.push(bold('For agents:', colour));
-  lines.push('  Pass --json to any command that returns data. The shape does not change based on');
-  lines.push('  whether stdout is a terminal, so behaviour is identical interactively and in a');
-  lines.push('  pipe. Narrow a large payload with --fields, so you read only what you need.');
-  lines.push('  Branch on exit codes rather than message text — codes are stable, wording');
-  lines.push(`  is not. Set RUNTA_TOKEN to skip ${name} login entirely.`);
+  lines.push('  Output defaults to a table on a terminal and JSON anywhere else, so a pipe is');
+  lines.push('  already JSON. Pass --json (or -o json) to pin it and never depend on detection;');
+  lines.push('  -o table forces the table back. Narrow a large payload with --fields, so you');
+  lines.push('  read only what you need. Branch on exit codes rather than message text — codes');
+  lines.push(`  are stable, wording is not. Set RUNTA_TOKEN to skip ${name} login entirely.`);
   lines.push(`  Every page of the docs is also served as plain text: ${LLMS_URL}`);
+
+  lines.push('');
+  lines.push(bold('Waiting:', colour));
+  lines.push('  Commands that change a runtime wait for the change to finish before they return,');
+  lines.push('  so success means the runtime really is in the state you asked for. create waits');
+  lines.push('  until it can accept commands; start, stop, pause and delete wait for the');
+  lines.push('  transition to settle. --timeout <secs> caps the wait (default 180).');
+  lines.push('  Pass -d/--detach to return as soon as the request is accepted. That is a');
+  lines.push('  receipt, not a state: the status you get back is the one at acceptance, so a');
+  lines.push('  detached create reads `creating` and a detached stop still reads `running`.');
+  lines.push(`  Poll ${name} inspect if you need to know when it settled.`);
 
   lines.push('');
   lines.push(bold('Examples:', colour));
@@ -160,6 +173,29 @@ export function rootHelp(
   lines.push(`Docs: ${dim(DOCS_URL, colour)}`);
   lines.push('');
   return lines.join('\n');
+}
+
+/**
+ * The waiting paragraph, attached to every command that has `--detach`.
+ *
+ * One function rather than five copies: the guarantee is identical across them, and the failure
+ * mode if the wordings drift is a user who believes `--detach` means something different on
+ * `stop` than on `create`. `$0` is commander's placeholder for the command's own name.
+ *
+ * `settles` names what the command waits *for*, because it differs — `create` waits to be usable,
+ * the rest wait for a transition.
+ */
+export function detachHelp(settles: string): string {
+  return [
+    '',
+    'Waiting:',
+    `  Waits until ${settles}, so success means it really happened.`,
+    '  --timeout <secs> caps the wait (default 180).',
+    '',
+    '  -d, --detach returns as soon as the request is accepted. That is a receipt, not a',
+    '  state: the status reported is the one at acceptance, not the one you asked for.',
+    '  Poll `runta-next inspect <runtime>` to find out when it settled.',
+  ].join('\n');
 }
 
 /** Installs the grouped help on the root command, leaving subcommand help to commander. */
