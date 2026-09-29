@@ -232,12 +232,15 @@ export interface ListOptions {
   status?: string;
   limit?: string;
   json?: boolean;
+  fields?: string;
 }
 
 export async function list(
   options: ListOptions = {},
   deps: CommandDeps = defaultDeps,
 ): Promise<void> {
+  // Parsed before the request, so a typo in --fields costs nothing and fails immediately.
+  const fields = options.fields ? selectFields(options.fields) : undefined;
   const { client } = await createContext();
   const limit = options.limit ? int(options.limit, '--limit') : undefined;
 
@@ -247,7 +250,10 @@ export async function list(
   const runtimes = await run(() => collect(client, status ? { status } : {}, limit));
 
   if (options.json) {
-    deps.write(`${JSON.stringify(runtimes, null, 2)}\n`);
+    // Without --fields the payload stays the API's own object, so the default contract does not
+    // move. With it, each row is projected to the field names the caller asked for.
+    const payload = fields ? runtimes.map((r) => project(r, fields)) : runtimes;
+    deps.write(`${JSON.stringify(payload, null, 2)}\n`);
     return;
   }
   if (runtimes.length === 0) {
@@ -263,21 +269,101 @@ export async function list(
     ]);
     return;
   }
-  deps.write(`${renderTable(runtimes, LIST_COLUMNS)}\n`);
+  deps.write(`${renderTable(runtimes, fields ?? LIST_FIELD_ORDER.map(column))}\n`);
 }
 
-const LIST_COLUMNS: Column[] = [
-  { header: 'name', value: (r: Runtime) => r.display_name },
-  { header: 'status', value: (r: Runtime) => (r.degraded ? `${r.status} (degraded)` : r.status) },
-  { header: 'vcpus', value: (r: Runtime) => String(r.resources.requests.vcpus), align: 'right' },
-  {
-    header: 'memory',
-    value: (r: Runtime) => `${r.resources.requests.memory_mib} MiB`,
-    align: 'right',
+/**
+ * The fields `list` can show, keyed by the name `--fields` accepts.
+ *
+ * One vocabulary for both halves of the output: `--fields` names columns, the table renders them
+ * as columns, and `--json` keys each row by the same names. `human` is what a person reads and
+ * `json` is what a script gets, which is why `memory` is `512 MiB` in the table and `512` in JSON
+ * — the unit belongs in a rendered cell, not in a value something is about to do arithmetic on
+ * (see the `--help` text, which states the unit).
+ */
+const LIST_FIELDS = {
+  name: { human: (r: Runtime) => r.display_name, json: (r: Runtime) => r.display_name },
+  id: { human: (r: Runtime) => r.id, json: (r: Runtime) => r.id },
+  status: {
+    human: (r: Runtime) => (r.degraded ? `${r.status} (degraded)` : r.status),
+    json: (r: Runtime) => r.status,
   },
-  { header: 'image', value: (r: Runtime) => r.image_id },
-  { header: 'created', value: (r: Runtime) => r.created_at },
-] as unknown as Column[];
+  degraded: { human: (r: Runtime) => String(r.degraded), json: (r: Runtime) => r.degraded },
+  vcpus: {
+    human: (r: Runtime) => String(r.resources.requests.vcpus),
+    json: (r: Runtime) => r.resources.requests.vcpus,
+    align: 'right' as const,
+  },
+  memory: {
+    human: (r: Runtime) => `${r.resources.requests.memory_mib} MiB`,
+    json: (r: Runtime) => r.resources.requests.memory_mib,
+    align: 'right' as const,
+  },
+  image: { human: (r: Runtime) => r.image_id, json: (r: Runtime) => r.image_id },
+  created: { human: (r: Runtime) => r.created_at, json: (r: Runtime) => r.created_at },
+} satisfies Record<string, ListFieldSpec>;
+
+interface ListFieldSpec {
+  /** What a person reads in the table cell. */
+  human: (r: Runtime) => string;
+  /** What a script gets from `--json`. */
+  json: (r: Runtime) => unknown;
+  align?: 'right';
+}
+
+export type ListField = keyof typeof LIST_FIELDS;
+
+/** `satisfies` narrows each entry to its own literal type, so read them back through the spec. */
+const spec = (field: ListField): ListFieldSpec => LIST_FIELDS[field] as ListFieldSpec;
+
+/** The default table, and the order `--fields` output falls back to reporting in errors. */
+const LIST_FIELD_ORDER: ListField[] = ['name', 'status', 'vcpus', 'memory', 'image', 'created'];
+
+const column = (field: ListField): Column =>
+  ({
+    header: field,
+    value: spec(field).human,
+    align: spec(field).align,
+  }) as unknown as Column;
+
+/**
+ * Turns `--fields name,vcpus` into columns, in the order asked for.
+ *
+ * An unknown name is an error naming the offender and every valid field, rather than a silently
+ * missing column: a caller that misspells `vcpu` should not receive a short row it might act on
+ * (CLI_ISSUES.md C-15 is the same failure in a different place).
+ */
+export function selectFields(spec: string): Column[] {
+  const asked = spec
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (asked.length === 0) {
+    fail(`--fields needs at least one field name`, {
+      exitCode: 2,
+      hint: `Available fields: ${Object.keys(LIST_FIELDS).join(', ')}`,
+    });
+  }
+  const unknown = asked.filter((f) => !(f in LIST_FIELDS));
+  if (unknown.length > 0) {
+    fail(`Unknown --fields value${unknown.length > 1 ? 's' : ''}: ${unknown.join(', ')}`, {
+      exitCode: 2,
+      hint: `Available fields: ${Object.keys(LIST_FIELDS).join(', ')}`,
+    });
+  }
+  // Dedupe but keep the caller's order, so `--fields name,name` is one column rather than an error
+  // about something that changes nothing.
+  return [...new Set(asked as ListField[])].map(column);
+}
+
+/** Projects one runtime onto the selected fields, for the `--json` half. */
+function project(runtime: Runtime, fields: Column[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const col of fields) {
+    out[col.header] = spec(col.header as ListField).json(runtime);
+  }
+  return out;
+}
 
 /**
  * Walks pages up to `limit`. The API caps a page at 100 and names the cursor `after`, so a
@@ -928,6 +1014,11 @@ function addRuntimeVerbs(parent: Command): void {
     .option('-a, --all', 'include stopped, failed and deleting runtimes')
     .option('--status <statuses>', 'comma-separated statuses to include')
     .option('--limit <n>', 'stop after this many runtimes')
+    .option(
+      '--fields <names>',
+      'comma-separated fields to show, in that order: name, id, status, degraded, vcpus, ' +
+        'memory (MiB), image, created. Applies to the table and to --json',
+    )
     .option('--json', 'print the runtimes as JSON')
     .action(async (opts: ListOptions) => {
       await list(opts);
