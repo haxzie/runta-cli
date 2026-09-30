@@ -77,10 +77,25 @@ const runDir = join(ROOT, 'runs', runId);
 const token = process.env.RUNTA_TOKEN ?? '';
 const api = new Api(token, process.env.RUNTA_API_URL);
 
+/**
+ * Opt-in escape hatch: run the agents with the operator's real HOME.
+ *
+ * The per-trial HOME is what keeps arms from seeing each other's config, and what keeps this
+ * repo's `cli-design` skill — which documents runta-next — out of both agents' context. Turning it
+ * off buys one thing: a Claude subscription login the agents can actually use, without minting a
+ * long-lived token. It costs the property that makes the comparison mean anything, so a run made
+ * this way is a smoke test of the graders, never a measurement.
+ */
+const REAL_HOME = process.env.EVAL_USE_REAL_HOME === '1';
+
 function armEnv(arm: Arm, home: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     PATH: `${arm.bin}:/usr/bin:/bin`,
-    HOME: home,
+    HOME: REAL_HOME ? (process.env.HOME ?? home) : home,
+    // macOS resolves the login keychain through the user identity, not HOME, so `claude` cannot
+    // read its own stored credential without these — it reports "Not logged in" and the agent
+    // never starts. Costs nothing when a token is supplied instead.
+    ...(process.env.USER ? { USER: process.env.USER, LOGNAME: process.env.USER } : {}),
     RUNTA_TOKEN: token,
     TERM: 'xterm-256color',
   };
@@ -102,10 +117,17 @@ const versions: Partial<Record<ArmId, string>> = {};
 
 function preflight(arms: Arm[]): string {
   if (!token) fail('RUNTA_TOKEN is not set. Both CLIs and the graders use it.');
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.CLAUDE_CODE_OAUTH_TOKEN) {
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.CLAUDE_CODE_OAUTH_TOKEN && !REAL_HOME) {
     fail(
       'Set ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`). ' +
         'Each agent runs with its own empty HOME, so a stored Claude login is not visible to it.',
+    );
+  }
+  if (REAL_HOME) {
+    console.error(
+      'warning EVAL_USE_REAL_HOME=1: agents run with your real HOME, so both arms inherit your\n' +
+        '        shell config and any Claude skills on this machine — including cli-design, which\n' +
+        '        documents runta-next. Results are a grader smoke test, not a measurement.',
     );
   }
   const claude = spawnSync('sh', ['-c', 'command -v claude'], { encoding: 'utf8' }).stdout.trim();
