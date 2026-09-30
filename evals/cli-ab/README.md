@@ -179,17 +179,27 @@ Both arms share one tenant. Trials run one at a time by default, and each trial 
 arm goes first. `--concurrency N` is faster, but then agents see each other's runtimes in `list`
 output. That noise hits both arms equally, but it does make the tasks harder.
 
-### Past results predate `auto` output
+### Arm B's output contract changed in 0.9.0
 
-Arm B's output contract changed in 0.9.0. It used to require an explicit `--json`; it now defaults
-to `auto` — a table on a terminal, JSON anywhere else. **The harness runs both CLIs without a TTY**,
-so from 0.9.0 onward `runta-next list` hands the agent JSON where earlier runs handed it a table.
+Arm B used to require an explicit `--json`; it now defaults to `auto` — a table on a terminal, JSON
+anywhere else. **The harness runs both CLIs without a TTY**, so from 0.9.0 onward `runta-next list`
+hands the agent JSON where earlier runs handed it a table.
 
-That is not a small difference for an eval about how much an agent has to read. It changes the
-bytes in `cliOutputChars`, it may change whether an agent reaches for `--json` at all, and it makes
-both arms behave the same way off-TTY where they used to differ. Every number in
-[FINDINGS.md](FINDINGS.md) was measured before it. **Do not compare a new run against those totals**
-— re-run both arms.
+That moves `cliOutputChars`, which is the metric the context-cost argument rests on. Results from
+before 0.9.0 have been dropped for that reason; [FINDINGS.md](FINDINGS.md) records `clean1` and
+nothing older.
+
+### A stored Claude login is not visible to the agents
+
+Each agent gets its own empty `HOME`, which is what keeps the arms from seeing each other's config
+and keeps this repo's `cli-design` skill — which documents runta-next — out of both contexts. A
+subscription login lives under the real `HOME`, so set `CLAUDE_CODE_OAUTH_TOKEN` from
+`claude setup-token` rather than relying on being logged in.
+
+`EVAL_USE_REAL_HOME=1` turns the isolation off and uses the operator's `HOME` instead. It exists
+because the alternative is minting a long-lived token, and it prints a warning every run: both arms
+then inherit the operator's shell config and skills, and in testing an agent read the operator's
+`MEMORY.md`. **A run made that way is a smoke test of the graders, never a measurement.**
 
 ### T1 depends on the credential
 
