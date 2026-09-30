@@ -464,9 +464,11 @@ The flag came out of `evals/cli-ab`: `list --json` was 4,096 characters on a nea
 against 271 for the table, and T6 and T14 were the two tasks where our arm read *more* output than
 upstream's. With `--fields`, the narrow path is 158 characters — 26× smaller.
 
-Rerunning the suite (`runs/full2`, 13 tasks, both arms, one trial) did not show that saving:
+Rerunning the suite at the time (13 tasks, both arms, one trial) did not show that saving. Those
+raw transcripts are gitignored and no longer on disk, so the table below is the surviving record
+rather than something re-derivable:
 
-| Arm B, the 9 tasks shared with `full1` | before | after |
+| Arm B, the 9 tasks shared across both runs | before | after |
 | --- | --- | --- |
 | Cost | $0.47 | $0.49 |
 | Turns | 38 | 40 |

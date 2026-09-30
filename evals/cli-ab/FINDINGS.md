@@ -4,140 +4,91 @@ Results and analysis from running [the eval](README.md). This file records what 
 what it means; it is not an audit of the official CLI. Audit findings live in
 [`CLI_ISSUES.md`](../../CLI_ISSUES.md) as `C-NN` points, and nothing here has been added there.
 
-## Run `full1` — 2026-09-29
+Earlier runs (`full1`, `full2`) were made before runta-next 0.9.0 changed the output contract, and
+their raw transcripts are gitignored and no longer on disk. They have been dropped rather than kept
+alongside numbers they cannot be compared with.
 
-Nine tasks, both arms, one trial each. Model `claude-sonnet-5`. Arm A is the official
-`@runta/runta-cli@0.2.10`; arm B is runta-next 0.6.1 built from `vancouver`. T8 was retired before
-this run (see [README](README.md#t8-is-retired)).
+## Run `clean1` — 2026-09-30
+
+Fifteen tasks, both arms, one trial each, 30 trials. Model `claude-sonnet-5`. Arm A is the official
+`@runta/runta-cli@0.2.10`; arm B is `@haxzie/runta-next@0.11.2` installed from the published
+release. Each agent ran with its own empty `HOME` and only its arm's CLI on `PATH`.
 
 ### Pass rate: a tie
 
-| Task | runta (official) | runta-next |
+**13/13 both arms**, excluding the two tasks the official CLI has no command for.
+
+| | runta | runta-next |
 | --- | --- | --- |
-| T1 Who am I signed in as *(capability gap)* | 0/1 | 1/1 |
-| T2 Create, inspect the OS, delete | 1/1 | 1/1 |
-| T3 Exit code and a file | 1/1 | 1/1 |
-| T4 Keep stdout, drop stderr | 1/1 | 1/1 |
-| T5 Pipe a local file in | 1/1 | 1/1 |
-| T6 Inventory as JSON | 1/1 | 1/1 |
-| T7 Delete by prefix, safely | 1/1 | 1/1 |
-| T9 Read a runtime's configuration | 1/1 | 1/1 |
-| T10 Create with a full spec | 1/1 | 1/1 |
-| **Head-to-head** | **8/8** | **8/8** |
+| Head-to-head (13 tasks) | 13/13 | 13/13 |
+| T1 — who am I signed in as | 0/1 | 1/1 |
+| T15 — which images can I build from | 0/1 | 1/1 |
 
-Both CLIs can do everything the suite asks. T1's failure is the expected capability gap — the
-official CLI has no `whoami` (C-20) — and the agent handled it honestly: *"Unable to determine.
-`runta` has no command that reveals the signed-in account."*
+The official CLI is not incapable, and no run has ever suggested otherwise. Both capability gaps are
+absences rather than defects: there is no `whoami` (C-20), and `image ls` lists only images the
+organization built, so the catalog is unreachable.
 
-**This matters for how the rest of the numbers should be read.** runta-next did not succeed where
-the official CLI failed. It cost less to drive. That is an efficiency result, not a capability one.
+### Effort: where the difference is
 
-### Effort: not a tie
-
-Totals across nine trials per arm.
-
-| | runta (official) | runta-next | |
+| Total, 15 tasks | runta | runta-next | |
 | --- | --- | --- | --- |
-| Agent cost | $0.83 | $0.47 | 1.8× cheaper |
-| Turns | 79 | 38 | 2.1× fewer |
-| Wall clock | 308s | 170s | 1.8× faster |
-| CLI calls | 65 | 28 | 2.3× fewer |
-| `--help` calls | 37 | 14 | 2.6× fewer |
-| CLI output read | 93.4k chars | 44.6k chars | 2.1× less context |
-| CLI errors | 3 | 0 | — |
+| Cost | $2.44 | $1.07 | 2.3× |
+| Turns | 194 | 82 | 2.4× |
+| CLI calls | 144 | 64 | 2.3× |
+| **Help calls** | **71** | **18** | **3.9×** |
+| CLI output read | 199.5k chars | 122.1k chars | 1.6× |
 
-## Why the gap exists
+Help is the largest multiplier, as in every previous run. `runta --help` is 78,370 characters of
+clap's command tree as JSON; nothing skims that, so agents write a parser instead. **28 commands
+across this run piped help output into `python3` or `jq`** — each one a turn spent building
+scaffolding to read documentation, and each usually extracting a fragment, so the agent comes back.
 
-Four mechanisms, all visible in `runs/full1/trials/*/transcript.jsonl`.
+### The two extremes
 
-### 1. Help output that cannot be read (the dominant cause)
+**T15 is the worst case for arm A**: 41 turns, $0.66, 379 seconds, 13 help calls, 41.7k characters
+read — and no answer. `image ls` returns `[]` on a tenant with no custom images, and there is no
+other route to the catalog, so the agent explored until it ran out of places to look. Arm B: 4
+turns, $0.07, 17 seconds.
 
-| `--help` output | Size | Format |
-| --- | --- | --- |
-| `runta` | 78,370 chars | JSON (the whole clap command tree) |
-| `runta-next` | 2,233 chars | grouped text |
+**T13 is the sharpest small case**: arm A took 8 turns and **6 CLI errors** to make `echo` print
+`--json --verbose -h`, against arm B's 2 turns and 0 errors. The argument boundary is where a CLI
+either passes flags through or acts on them.
 
-35×, and it is a format difference rather than a content one: the official CLI dumps its whole
-clap command tree as JSON. That is not skimmable, so the agent stops trying to read it and writes a
-parser instead:
+### Where arm A won
 
-```
-runta help exec 2>&1 | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-def walk(c):
-    if c['name']=='exec': …
-```
+Worth stating, because a suite written from one CLI's defects will otherwise read as a sweep.
 
-That pattern recurs in T4, T7, T9 and T10. Each occurrence is a turn spent building scaffolding to
-read documentation, and it usually extracts only a fragment, so the agent comes back for more. This
-accounts for most of the 37-vs-14 help calls and most of the context gap — 93k characters is roughly
-23k tokens the agent had to read and re-read. It is C-31 showing up as a measurable bill.
+- **T12** — a runtime that does not exist. Arm A: 2 turns, 240 characters read. Arm B: 3 turns,
+  5.6k. The official CLI's `NOT_FOUND` is terse and immediately conclusive; ours says more than the
+  agent needed.
+- **T14** — the same question in three runtimes. Arm A read 6.2k characters, arm B read 13.2k. Our
+  `list` output is larger, and `--fields` did not get used to narrow it.
 
-### 2. Guessing at command names
+### T16 passed on both arms, and the grader cannot tell them apart
 
-T7, arm A, in order:
+Both answered "no — the agent is not signed in", which is correct: the runtime reaches `running`
+with `degraded: false` and its agent prints `Not logged in` (C-33). They reached it differently.
 
-```
-runta list   →   runta ls   →   runta ps   →   runta ps --all
-```
+Arm B created the runtime, probed the agent, and reported `sign_in_pending`. **Arm A never created
+the runtime at all** — it hit the credential refusal, never found `--runtime-sign-in`, and inferred
+the answer from the failure, spending 21 turns and 6 CLI errors doing it.
 
-Four attempts to find the verb for "show me the runtimes", one of which counted as a CLI error. Arm
-B ran `runta-next list` and got it.
+Same verdict, different epistemics, and the grader passes both. That is a weakness in the task, not
+a result: it rewards an agent that gave up for the right reason as much as one that checked. Fix the
+grader before anyone leans on T16.
 
-### 3. Configuration scattered across commands
+### Caveats
 
-T9 asks for four values about one runtime. Arm A ran `inspect`, searched `ports --help` and
-`egress --help`, then ran `egress get` and `ports list` — three commands to assemble what one
-question asked for. Arm B ran `runta-next inspect <name> --json` once.
+**One trial per cell.** Directions are consistent across tasks; individual numbers have no error
+bars. T16 in particular turned on whether one agent discovered one flag.
 
-### 4. An affordance that matched the task
+**The suite was written from `CLI_ISSUES.md`,** and runta-next was built to fix those same findings,
+so it probes precisely the defects one arm was designed to address. The defects are real and the
+costs are real, but this measures **how much the known findings cost an agent**, not which CLI is
+better in general. A suite drawn from runta-next's own weak spots would read differently, and nobody
+has written one.
 
-T7 asks to show the plan before deleting. Arm B used `delete … --dry-run`. Arm A has no such flag,
-so it reconstructed the plan by listing, deleting, and listing again — which is C-09, and the reason
-the task is graded at all.
-
-Note the shape of all four: none is about the hard part of the task. Both agents knew what they
-wanted to do; one of them could express it. The single most expensive decision in the official CLI
-is emitting 78k characters of JSON from `--help`, and that is not a deep architectural problem.
-
-### One metric where runta-next loses
-
-T6: 11.2k chars read vs arm A's 7.5k. Not a regression — the agent chose `runta-next list --json`,
-which returns full runtime objects, where arm A's route returned less. Correct answer, more verbose
-path.
-
-## Caveats
-
-**The suite is not a neutral benchmark.** The tasks were written from `CLI_ISSUES.md` — T3 is C-01,
-T4 is C-16, T7 is C-09, T9 is C-07, and the retired T8 was C-36 — and runta-next was built to fix
-those same findings. The suite therefore probes precisely the defects one arm was designed to
-address. The defects are real and the costs they impose are real, but this measures *how much the
-known findings cost an agent*, not *which CLI is better in general*. A suite drawn from
-runta-next's own weak spots would read differently, and nobody has written one.
-
-**One trial per cell.** The effort ratios are consistent across nine tasks, so the direction is
-unlikely to move, but no single number here has error bars. The README also notes the official
-`exec` flakes about 10% of the time, which one trial per cell cannot surface.
-
-**Shared tenant.** Both arms see each other's runtimes in `list` output. The noise hits both arms
-equally.
-
-## Open question: C-36's severity
-
-C-36 (*an ambiguous runtime name silently resolves to the first match*) is rated `high`. Probing on
-2026-09-29 found the state it describes is not reachable through the API:
-
-- creating a second runtime with an existing name returns `409 already_exists`
-- deleting the first frees the name for reuse but never leaves two live runtimes sharing one
-- `/v2/checkpoints` is GET-only, so there is no restore path
-- both CLIs match names exactly and reject partial ids, so no near-miss naming reproduces it
-
-C-36's own evidence is a transcript against a local mock server on `127.0.0.1:8801` hand-configured
-to return two same-named runtimes; the claim that a user can reach the state "by passing `--name`
-twice" appears never to have been checked against the real API. Whether the API once permitted
-duplicates or never did is unestablished.
-
-The CLI-side behaviour is real either way — the official CLI does not check uniqueness before
-acting, and `rm` acts on the first match. What is in question is whether a user can ever trip it.
-**Re-rating C-36 has not been done and is left to the maintainer.**
+**C-06 was not exercised by any agent in this run.** No trial tried the `--flag true` form that the
+official `help --json` advertises. The defect is still live — verified directly on 2026-09-30, where
+`--all` and `--full` both advertise `possible_values=['true','false']` and `runta ps --all true`
+returns `UNKNOWN_ARGUMENT` — but this run is not evidence that agents hit it.

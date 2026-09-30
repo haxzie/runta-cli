@@ -100,8 +100,7 @@ arm A (official)                          arm B (ours)
 
 The agent's second guess was `ls`. It never guessed `ps`. Two turns went to finding the verb for
 "show me the runtimes", and the third fell back to parsing the JSON help tree — before the task had
-started. Reproduced identically in `runs/full1` and `runs/full2`; transcripts in
-[`evals/cli-ab/`](evals/cli-ab/).
+started. Transcripts in [`evals/cli-ab/`](evals/cli-ab/).
 
 This is the part worth drawing out: **the naming was decided for human reasons and the agent
 benefit came free.** Nothing in I-1 was argued from agent behaviour — it was argued from industry
@@ -127,9 +126,9 @@ That reframes the design problem. The question is not "what commands should exis
 does an agent have to read before it can act, and how often is that reading wrong?"** Everything
 below follows from taking that seriously.
 
-The measurement bears it out. Across 12 head-to-head tasks both CLIs scored **12/12** — the
-official CLI is not incapable. But getting there cost 1.8× the money, 2.1× the turns and 2.1× the
-context, and the single largest contributor was help output.
+The measurement bears it out. Across 13 head-to-head tasks both CLIs scored **13/13** — the
+official CLI is not incapable. But getting there cost 2.3× the money, 2.4× the turns and 3.9× the
+help calls, and help output is the single largest contributor.
 
 ---
 
@@ -181,9 +180,9 @@ def walk(c):
     if c['name']=='exec': …
 ```
 
-That pattern appears in four of nine tasks in `runs/full1`. Each occurrence is a turn spent
+**28 commands across `runs/clean1` piped help into `python3` or `jq`.** Each is a turn spent
 building scaffolding to read documentation, and it usually extracts a fragment, so the agent comes
-back for more: **37 help calls against 14**, and 93.4k characters of CLI output against 44.6k.
+back for more: **71 help calls against 18**, and 199.5k characters of CLI output against 122.1k.
 
 Ours groups commands under headings with one-line summaries, then a worked path through them as
 runnable examples. It also carried prose blocks explaining the output contract and the waiting
@@ -211,10 +210,14 @@ $ runta ps --all true
 error: unexpected argument 'true' found
 ```
 
-Two agents wrote the advertised form and failed, in `runs/full2` T2 and T6 — both immediately after
-reading the help that told them to. This is C-06, and it is the sharpest illustration of the whole
-thesis: **the contract penalised the agent for trusting it.** Full transcripts in
-[`FAILURE-AND-RECOVERY.md`](FAILURE-AND-RECOVERY.md) §2.
+Still live, verified directly on 2026-09-30: `--all` and `--full` both advertise
+`possible_values=['true','false']`, and `runta ps --all true` returns `UNKNOWN_ARGUMENT`. This is
+C-06, and it is the sharpest illustration of the whole thesis: **the contract penalises anyone for
+trusting it.**
+
+No agent in `runs/clean1` happened to try the advertised form, so that run is not evidence agents
+hit it — earlier runs recorded two who did, and those transcripts no longer exist. The defect stands
+on the direct probe rather than on a transcript.
 
 Ours has one boolean convention, bare `--flag` / `--no-flag`, with no values advertised anywhere.
 
@@ -271,8 +274,10 @@ commands, on eight destructive operations (C-09) — and its agent skill instruc
 because the tool cannot express it.
 
 Ours has `--dry-run` printing the resolved plan in both human and JSON form, confirmation on a TTY,
-`--yes` to skip, and never a prompt in a pipe. In `runs/full1` and `runs/full2`, T7, the agent used
-`delete --dry-run` unprompted before deleting.
+`--yes` to skip, and never a prompt in a pipe. T7 asks for exactly that care, and both arms passed
+it in `runs/clean1` — the official CLI's agent improvised the safety step by listing first, which is
+what C-09 predicts: the property is achievable, it just is not a primitive, so every caller has to
+reinvent it.
 
 ### 4.7 Context cost is a real cost
 
@@ -317,20 +322,27 @@ Two headless agents on Claude Sonnet 5, same tasks, isolated `PATH` per arm, gra
 real state through an independent REST client. Method in
 [`evals/cli-ab/README.md`](evals/cli-ab/README.md).
 
-**Arm B totals, nine tasks, `runs/full1`:**
+**Totals, fifteen tasks, `runs/clean1` (2026-09-30):**
 
 | | official | runta-next |
 | --- | --- | --- |
-| Cost | $0.83 | $0.47 |
-| Turns | 79 | 38 |
-| CLI calls | 65 | 28 |
-| `--help` calls | 37 | 14 |
-| Context read | 93.4k chars | 44.6k chars |
-| CLI errors | 3 | 0 |
+| Cost | $2.44 | $1.07 |
+| Turns | 194 | 82 |
+| CLI calls | 144 | 64 |
+| `--help` calls | 71 | 18 |
+| Context read | 199.5k chars | 122.1k chars |
+
+Arm A is `@runta/runta-cli@0.2.10`; arm B is `@haxzie/runta-next@0.11.2` from the published release.
+Each agent ran with its own empty `HOME` and only its arm's CLI on `PATH`.
+
+**Not everything went our way.** T12 (a runtime that does not exist) cost arm A 2 turns and 240
+characters against our 3 turns and 5.6k — their `NOT_FOUND` is terse and conclusive where ours says
+more than the agent needed. T14 read 6.2k characters on arm A against our 13.2k.
 
 **The negative result matters more.** `--fields` was built because `list --json` was 4,096
 characters against 271 for the table. The narrow path is 26× smaller. Rerunning the suite showed
-**no aggregate saving** — $0.47 → $0.49, 44,580 → 46,172 characters. Two structural reasons: only 4
+**no aggregate saving** — $0.47 → $0.49, 44,580 → 46,172 characters, measured on a run whose
+transcripts are no longer retained. Two structural reasons: only 4
 of 13 tasks call `list` at all, and where the flag was used the agent had already paid for a full
 dump while exploring.
 
@@ -399,7 +411,7 @@ pending a decision, rather than quietly adjusting either.
   not signed in, which the CLI says outright but cannot fix.
 - `inspect` cannot report a pending sign-in. `create --json` carries `sign_in_pending`, but the
   API's runtime object has no field distinguishing a signed-in agent from one that never was.
-- `inspect` has no `--fields`; an agent reached for it in `runs/full2` T11 and had to recover.
+- `inspect` has no `--fields`; an agent reached for it in an earlier run and had to recover.
 - No row filtering on `list`, because the API offers none.
 - No shell completions yet, despite being called out as high-leverage.
 - C-36's severity is unresolved: its triggering state looks unreachable through the API, and its

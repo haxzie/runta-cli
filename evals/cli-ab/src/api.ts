@@ -151,6 +151,23 @@ export class Api {
     }
   }
 
+  /**
+   * The image catalog, which T15 grades against.
+   *
+   * Read through the REST API rather than either CLI on purpose: the grader must know the truth
+   * independently of the tool being measured, and here the two CLIs disagree about what the word
+   * "image" even returns — `runta image ls` lists only images the organization built.
+   */
+  async images(): Promise<{ id: string; name: string; needsProvider: boolean }[]> {
+    const res = await this.request('GET', '/v2/images');
+    const text = await res.text();
+    if (!res.ok) throw new ApiError(res.status, text, 'GET /v2/images');
+    const { data } = JSON.parse(text) as {
+      data: { id: string; name: string; model_provider?: unknown }[];
+    };
+    return data.map((i) => ({ id: i.id, name: i.name, needsProvider: Boolean(i.model_provider) }));
+  }
+
   /** Probes `GET /v2/me`: org API keys get a 403 there (packages/api/NOTES.md §5). */
   async me(): Promise<{ email: string } | 'org_api_key'> {
     const res = await this.request('GET', '/v2/me');

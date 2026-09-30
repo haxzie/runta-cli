@@ -28,7 +28,10 @@ if [ -n "${RUNTA_NEXT_BIN:-}" ]; then
   cp "$RUNTA_NEXT_BIN" "$arms/B/real/runta-next"
   chmod +x "$arms/B/real/runta-next"
 else
-  RUNTA_INSTALL_DIR="$arms/B/real" RUNTA_BIN_NAME=runta-next \
+  # RUNTA_NO_MODIFY_PATH matters here: the installer edits the invoking user's shell profile so a
+  # real install is runnable, and this is not a real install. Without it, every setup.sh appended
+  # a throwaway arm directory to the developer's own ~/.zshrc.
+  RUNTA_INSTALL_DIR="$arms/B/real" RUNTA_BIN_NAME=runta-next RUNTA_NO_MODIFY_PATH=1 \
     ${RUNTA_NEXT_VERSION:+RUNTA_VERSION=$RUNTA_NEXT_VERSION} sh "$repo/scripts/install.sh"
 fi
 

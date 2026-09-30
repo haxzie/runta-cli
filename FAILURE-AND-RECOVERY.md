@@ -3,30 +3,37 @@
 What happens when an agent gets something wrong, and whether the CLI lets it get back on track
 without a human.
 
-Every transcript here is real. The agent ones come from `evals/cli-ab/runs/`, where two headless
-Claude Code agents were given the same tasks — one with only the official CLI on its `PATH`, one
-with only `runta-next` — and graded against the tenant's real state. Run ids are cited so each can
-be reread. The direct `console` sessions were captured against the live API on 2026-09-29 and can
-be re-run.
+Every transcript here is real. The agent ones come from `evals/cli-ab`, where two headless Claude
+Code agents were given the same tasks — one with only the official CLI on its `PATH`, one with only
+`runta-next` — and graded against the tenant's real state. The direct `console` sessions were
+captured against the live API and can be re-run.
 
-The claim is narrow and worth stating up front: **pass rate was a tie.** Across 12 head-to-head
-tasks both CLIs scored 12/12. Neither tool prevented an agent from finishing. What differs is how
-much it cost to get there, and recovery is a large part of that cost.
+> **On sourcing.** The runs these transcripts were captured from (`full1`, `full2`) predate
+> runta-next 0.9.0, and `runs/` is gitignored, so the raw files are no longer on disk. The
+> transcripts below are the surviving record: they are quoted verbatim as captured, but they cannot
+> be reread in context, and the run ids have been dropped rather than left as links to nothing. The
+> current run is [`clean1`](evals/cli-ab/FINDINGS.md), which reproduced the help-parsing pattern 28
+> times but did not happen to exercise the boolean-arity defect in §2.
+
+The claim is narrow and worth stating up front: **pass rate was a tie.** In the current run both
+CLIs scored 13/13 across the head-to-head tasks, as in every run before it. Neither tool prevented
+an agent from finishing. What differs is how much it cost to get there, and recovery is a large part
+of that cost.
 
 ---
 
 ## 1. Our CLI: an agent reaches for a flag that does not exist
 
-`runs/full2`, task T11, arm B. The task asks the agent to write to `/tmp` and `/root`, stop the
+Task T11, arm B (run no longer retained). The task asks the agent to write to `/tmp` and `/root`, stop the
 runtime, start it, and report which file survived.
 
 Mid-task the agent invented a flag:
 
 ```
-[ok ] runta-next inspect ev-full2-b-t11-1-life --json; runta-next stop --help
-[ERR] R=ev-full2-b-t11-1-life; runta-next exec $R -- sh -c 'echo marker > /tmp/m; …' \
+[ok ] runta-next inspect ev-b-t11-1-life --json; runta-next stop --help
+[ERR] R=ev-b-t11-1-life; runta-next exec $R -- sh -c 'echo marker > /tmp/m; …' \
         && runta-next stop $R; runta-next inspect $R --json --fields status,desired_status
-[ok ] R=ev-full2-b-t11-1-life; runta-next inspect $R --json | grep status; runta-next start $R; …
+[ok ] R=ev-b-t11-1-life; runta-next inspect $R --json | grep status; runta-next start $R; …
 ```
 
 It had just learned `--fields` from `list --help` and assumed `inspect` had it too. What it got:
@@ -94,18 +101,18 @@ $ echo $?
 This is `CLI_ISSUES.md` C-06, which predicted that "an agent reading it literally writes
 `runta ps --all true` and fails." Two agents did exactly that, in two separate tasks:
 
-**`runs/full2`, T2, arm A** — the clearest instance. The agent consulted `run --help` and
+**T2, arm A** — the clearest instance. The agent consulted `run --help` and
 `help --json` across two turns, then wrote the documented form, failed, and recovered by ignoring
 what it had just read:
 
 ```
 [ok ] runta run --help | head -c 5000
 [ok ] runta help --json | python3 -c "… for s in d['command']['subcommands']: if s['…"
-[ERR] runta run --name ev-full2-a-t2-1-a --image clean --cpus 1 --memory 512 --wait true
-[ok ] runta run --name ev-full2-a-t2-1-a --image clean --cpus 1 --memory 512 --wait
+[ERR] runta run --name ev-a-t2-1-a --image clean --cpus 1 --memory 512 --wait true
+[ok ] runta run --name ev-a-t2-1-a --image clean --cpus 1 --memory 512 --wait
 ```
 
-**`runs/full2`, T6, arm A** — same defect, same run, different flag. The agent read `help ps` in
+**T6, arm A** — same defect, same run, different flag. The agent read `help ps` in
 the immediately preceding turn:
 
 ```
@@ -126,7 +133,7 @@ anywhere.
 
 ## 3. The official CLI: a suggestion that points the wrong way
 
-`runs/full1` and `runs/full2`, T7, arm A — the same first move in both runs. The agent guessed the
+T7, arm A — the same first move in both of the runs then available. The agent guessed the
 most common name for a list command:
 
 ```console
